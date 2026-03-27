@@ -11,14 +11,14 @@ export const FRONTEND_URL = isProd
   : 'http://localhost:8080';
 
 export const API_BASE_URL = (isProd || FORCE_RENDER_BACKEND)
-  ? 'https://cyberdock-backend.onrender.com/api'
+  ? 'https://api.cyberdock.com.br/api'
   : 'http://localhost:3001/api';
 
 // Mercado Livre URLs (ajuste conforme necessário)
 export const MERCADOLIVRE_CLIENT_ID = '8423050287338772';
 
 export const MERCADOLIVRE_REDIRECT_URI = (isProd || FORCE_RENDER_BACKEND)
-  ? 'https://cyberdock-backend.onrender.com/api/ml/callback'
+  ? 'https://api.cyberdock.com.br/api/ml/callback'
   : 'http://localhost:3001/api/ml/callback';
 
 // Outras configs podem ser adicionadas aqui
