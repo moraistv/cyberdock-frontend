@@ -68,6 +68,7 @@
                   <thead>
                     <tr>
                       <th>Usuário</th>
+                      <th>Nome</th>
                       <th>Permissão</th>
                       <th>Serviços Contratados</th>
                       <th>Data de Criação</th>
@@ -77,6 +78,7 @@
                   <tbody>
                     <tr v-for="n in 8" :key="'sk-'+n" class="is-skeleton">
                       <td><div class="sk sk-text" style="width: 60%"></div></td>
+                      <td><div class="sk sk-text" style="width: 50%"></div></td>
                       <td><div class="sk sk-pill" style="width: 80px"></div></td>
                       <td><div class="sk sk-btn" style="width: 90px"></div></td>
                       <td><div class="sk sk-text" style="width: 40%"></div></td>
@@ -94,6 +96,7 @@
                   <thead>
                     <tr>
                       <th>Usuário</th>
+                      <th>Nome</th>
                       <th>Permissão</th>
                       <th>Serviços Contratados</th>
                       <th>Data de Criação</th>
@@ -107,6 +110,7 @@
                       class="row-anim"
                     >
                       <td data-label="Usuário">{{ user.mlNickname || user.email }}</td>
+                      <td data-label="Nome">{{ user.name || '—' }}</td>
                       <td data-label="Permissão">
                         <select
                           class="role-select"
@@ -163,6 +167,7 @@
           :style="activeMenu.style"
           ref="actionsDropdown"
         >
+          <a @click="openEditNameModal(activeMenu.user)">Editar Nome</a>
           <a @click="editUserSales(activeMenu.user)">Editar Vendas</a>
           <a @click="editUserStorage(activeMenu.user)">Editar Armazenamento</a>
           <a @click="editUserBilling(activeMenu.user)">Gerenciar Cobrança</a>
@@ -243,6 +248,19 @@
             </div>
             <div class="modal-actions"><button @click="closeDeleteUserModal" class="btn btn-secondary">Cancelar</button><button @click="confirmDeleteUser" class="btn btn-danger">Sim, Excluir</button></div>
         </UniversalModal>
+        <UniversalModal title="Editar Nome do Usuário" :is-open="isEditNameModalOpen" @close="closeEditNameModal">
+          <div v-if="editNameUser">
+            <p style="margin-bottom: 0.75rem; color: #6b7280;">Usuário: <strong>{{ editNameUser.mlNickname || editNameUser.email }}</strong></p>
+            <div class="form-group">
+              <label>Novo Nome</label>
+              <input type="text" v-model="editNameValue" @keyup.enter="handleSaveName" placeholder="Digite o nome do usuário" />
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button @click="closeEditNameModal" class="btn btn-secondary">Cancelar</button>
+            <button @click="handleSaveName" class="btn btn-primary" :disabled="isSavingName">{{ isSavingName ? 'Salvando...' : 'Salvar' }}</button>
+          </div>
+        </UniversalModal>
         <UniversalModal :title="`Gerenciar Serviços de ${currentUser?.mlNickname || currentUser?.email}`" :is-open="isContractModalOpen" @close="closeContractModal">
           <div class="contract-modal-content">
             <h4 class="modal-subtitle">Serviços Atuais</h4>
@@ -321,6 +339,7 @@ import { useUsers } from '@/composables/useUsers';
 import { useStatusesForUser } from '@/composables/useStatusesForUser';
 import { useServices } from '@/composables/useServices.js';
 import { useSyncManager } from '@/composables/useSyncManager';
+import { API_BASE_URL } from '@/config';
 
 const { users, isLoading: isLoadingUsers, error: usersError, fetchUsers, updateUserRole, deleteUser } = useUsers();
 const { syncState } = useSyncManager();
@@ -355,6 +374,10 @@ const newContract = ref({ serviceId: '', volume: 1, startDate: new Date().toISOS
 const isDeleteUserModalOpen = ref(false);
 const userToDelete = ref(null);
 const isSyncResultsModalOpen = ref(false);
+const isEditNameModalOpen = ref(false);
+const editNameUser = ref(null);
+const editNameValue = ref('');
+const isSavingName = ref(false);
 const syncResults = ref({});
 
 const filteredUsers = computed(() => {
@@ -362,7 +385,8 @@ const filteredUsers = computed(() => {
   const query = userSearchQuery.value.toLowerCase();
   return users.value.filter(u => 
     u.email.toLowerCase().includes(query) ||
-    (u.mlNickname && u.mlNickname.toLowerCase().includes(query))
+    (u.mlNickname && u.mlNickname.toLowerCase().includes(query)) ||
+    (u.name && u.name.toLowerCase().includes(query))
   );
 });
 const totalPages = computed(() => Math.ceil(filteredUsers.value.length / itemsPerPage.value));
@@ -431,6 +455,40 @@ const editUserBilling = (user) => { selectedUser.value = user; setView('billing'
 const openDeleteUserModal = (user) => { userToDelete.value = user; isDeleteUserModalOpen.value = true; activeMenu.value.user = null; };
 const closeDeleteUserModal = () => { isDeleteUserModalOpen.value = false; userToDelete.value = null; };
 const closeSyncResultsModal = () => { isSyncResultsModalOpen.value = false; syncResults.value = {}; };
+
+const openEditNameModal = (user) => {
+  editNameUser.value = user;
+  editNameValue.value = user.name || '';
+  isEditNameModalOpen.value = true;
+  activeMenu.value.user = null;
+};
+const closeEditNameModal = () => {
+  isEditNameModalOpen.value = false;
+  editNameUser.value = null;
+  editNameValue.value = '';
+};
+const handleSaveName = async () => {
+  if (!editNameUser.value || !editNameValue.value.trim()) return;
+  isSavingName.value = true;
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${API_BASE_URL}/users/${editNameUser.value.uid}/name`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ name: editNameValue.value.trim() }),
+    });
+    if (!response.ok) throw new Error('Falha ao atualizar nome');
+    // Atualiza o nome localmente na lista
+    const userInList = users.value.find(u => u.uid === editNameUser.value.uid);
+    if (userInList) userInList.name = editNameValue.value.trim();
+    closeEditNameModal();
+  } catch (error) {
+    console.error('Erro ao salvar nome:', error);
+    alert('Erro ao salvar o nome. Tente novamente.');
+  } finally {
+    isSavingName.value = false;
+  }
+};
 
 const confirmDeleteUser = async () => {
     if (!userToDelete.value) return;
