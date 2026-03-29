@@ -46,7 +46,41 @@
           </div>
         </div>
 
-        <div v-if="currentView !== 'users'" class="breadcrumbs">
+        <div v-if="currentView !== 'users' && selectedUser" class="user-context-panel">
+          <div class="user-context-header">
+            <button @click="setView('users')" class="btn-back" title="Voltar para lista">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <div class="user-context-info">
+              <span class="user-context-name">{{ selectedUser.name || selectedUser.mlNickname || selectedUser.email }}</span>
+              <span class="user-context-email" v-if="selectedUser.name || selectedUser.mlNickname">{{ selectedUser.email }}</span>
+            </div>
+          </div>
+          <nav class="user-tabs">
+            <button 
+              :class="['user-tab', { active: currentView === 'sales' }]" 
+              @click="switchUserView('sales')"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              Vendas
+            </button>
+            <button 
+              :class="['user-tab', { active: currentView === 'storage' }]" 
+              @click="switchUserView('storage')"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+              Armazenamento
+            </button>
+            <button 
+              :class="['user-tab', { active: currentView === 'billing' }]" 
+              @click="switchUserView('billing')"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+              Cobrança
+            </button>
+          </nav>
+        </div>
+        <div v-else-if="currentView !== 'users'" class="breadcrumbs">
           <button @click="setView('users')" class="breadcrumb-link">Todos os Usuários</button>
           <span class="breadcrumb-separator">/</span>
           <span class="breadcrumb-active">{{ breadcrumbTitle }}</span>
@@ -418,6 +452,12 @@ const setView = (view) => {
   nextTick(() => animateRows());
 };
 
+const switchUserView = (view) => {
+  if (!selectedUser.value) return;
+  activeMenu.value.user = null;
+  currentView.value = view;
+};
+
 const handleRoleChange = async (user, newRole) => {
     const originalRole = user.role;
     // Removendo o window.confirm para um ambiente sem browser-blocking popups
@@ -625,6 +665,86 @@ watch(() => syncState.value.isSyncing, (isSyncing, wasSyncing) => {
 .breadcrumb-link { color: #6366f1; text-decoration: none; background: none; border: none; cursor: pointer; padding: 0; }
 .breadcrumb-separator { margin: 0 .5rem; color: #6b7280; }
 .breadcrumb-active { color: #374151; font-weight: 500; }
+
+/* User Context Panel - Navegação por abas dentro do usuário */
+.user-context-panel {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+}
+.user-context-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+.btn-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.btn-back:hover {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+.user-context-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.user-context-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #111827;
+}
+.user-context-email {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+.user-tabs {
+  display: flex;
+  padding: 0 0.5rem;
+  gap: 0.25rem;
+  background: #fafbfc;
+}
+.user-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.7rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.user-tab:hover {
+  color: #374151;
+  background: #f3f4f6;
+}
+.user-tab.active {
+  color: #6366f1;
+  border-bottom-color: #6366f1;
+  background: #eef2ff;
+}
 .table-container { background-color: #ffffff; border: 1px solid #eef0f3; border-radius: .625rem; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); overflow: hidden; }
 .table-wrapper { max-width: 100%; overflow-x: auto; }
 .users-table { width: 100%; min-width: 800px; border-collapse: collapse; }
