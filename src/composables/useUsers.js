@@ -22,6 +22,7 @@ export function useUsers() {
       users.value = usersData.map(u => ({
         uid: u.uid,
         email: u.email,
+        name: u.name || null,
         role: u.role,
         createdAt: u.createdAt || u.created_at || null,
         mlNickname: u.mlNickname || null,
