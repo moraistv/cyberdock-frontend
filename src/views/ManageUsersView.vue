@@ -26,22 +26,9 @@
                   {{ syncState.newSalesCount }}
               </span>
             </button>
-            <button
-              v-if="currentView === 'sales'"
-              @click="openStatusManagerModal"
-              class="btn btn-secondary"
-            >
-              Gerenciar Status
-            </button>
-             <!-- Botão para a nova visão geral de vendas -->
-             <!-- <button @click="setView('master_sales')" class="btn btn-secondary">
-              Visão Geral de Vendas
-            </button> -->
+             <!-- Botão para histórico geral -->
              <button @click="setView('history')" class="btn btn-secondary">
               Histórico de Serviços
-            </button>
-            <button @click="openServiceCatalogueModal" class="btn btn-primary">
-              Gerenciar Catálogo
             </button>
           </div>
         </div>
@@ -86,8 +73,38 @@
           <span class="breadcrumb-active">{{ breadcrumbTitle }}</span>
         </div>
 
-        <!-- Visão: Lista de Usuários -->
+        <!-- Visão: Lista de Usuários e Cadastros Globais -->
         <div v-if="currentView === 'users'">
+          <!-- PAINEL DE CADASTROS GLOBAIS -->
+          <div class="global-settings-panel">
+            <h3 class="panel-title">Cadastros Globais (Replicáveis)</h3>
+            <div class="panel-buttons">
+              <button @click="openServiceCatalogueModal" class="btn-global">
+                <div class="btn-icon bg-indigo"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
+                <div class="btn-info">
+                  <span class="btn-title">Catálogo de Serviços</span>
+                  <span class="btn-desc">Planos e limites para clientes</span>
+                </div>
+              </button>
+              
+              <button @click="openStatusManagerModal" class="btn-global">
+                <div class="btn-icon bg-emerald"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
+                <div class="btn-info">
+                  <span class="btn-title">Status de Vendas</span>
+                  <span class="btn-desc">Etiquetas globais para pedidos</span>
+                </div>
+              </button>
+
+              <button @click="openPackageTypesModal" class="btn-global">
+                <div class="btn-icon bg-amber"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></div>
+                <div class="btn-info">
+                  <span class="btn-title">Tipos de Pacote</span>
+                  <span class="btn-desc">Custo de expedição e embalagens</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
           <div class="table-controls">
             <div class="search-wrapper">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -210,7 +227,7 @@
         </div>
 
         <!-- Modais (sem alterações) -->
-        <UniversalModal title="Gerenciar Status de Venda" :is-open="isStatusManagerOpen" @close="closeStatusManagerModal">
+        <UniversalModal title="Gerenciar Status de Venda (Global)" :is-open="isStatusManagerOpen" @close="closeStatusManagerModal">
           <div class="status-manager">
             <div class="status-creator">
               <input type="text" v-model="newStatusName" @keyup.enter="handleAddNewStatus" placeholder="Nome do novo status" class="status-input" />
@@ -238,6 +255,41 @@
             </ul>
           </div>
         </UniversalModal>
+
+        <UniversalModal title="Gerenciar Tipos de Pacote (Global)" :is-open="isPackageTypesModalOpen" @close="closePackageTypesModal">
+            <div class="plan-manager-content">
+                <form v-if="editingPackageType" @submit.prevent="handleSavePackageType" class="service-form" style="margin-bottom: 1.5rem;">
+                  <h4 class="modal-subtitle" style="margin-top: 0;">{{ packageTypeForm.id ? 'Editar Pacote' : 'Novo Pacote' }}</h4>
+                  <div class="form-group"><label>Nome do Pacote</label><input type="text" v-model="packageTypeForm.name" required /></div>
+                  <div class="form-group"><label>Preço por Unidade (R$)</label><input type="number" v-model.number="packageTypeForm.price" min="0" step="0.01" required /></div>
+                  <div class="modal-actions">
+                    <button @click="cancelEditPackageType" type="button" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Pacote</button>
+                  </div>
+                </form>
+                <button v-else @click="startNewPackageType" class="btn btn-primary btn-full-width">Adicionar Novo Tipo de Pacote</button>
+                
+                <h4 class="modal-subtitle">Tipos Existentes</h4>
+                <div class="table-wrapper-modal">
+                <table class="services-table-modal">
+                    <thead><tr><th>Embalagem</th><th>Preço</th><th>Ações</th></tr></thead>
+                    <tbody>
+                    <tr v-if="isLoadingPackageTypes"><td colspan="3" class="feedback-cell">Carregando...</td></tr>
+                    <tr v-else-if="allPackageTypes.length === 0"><td colspan="3" class="feedback-cell">Nenhum pacote cadastrado.</td></tr>
+                    <tr v-for="pkg in allPackageTypes" :key="pkg.id">
+                        <td><div class="service-name">{{ pkg.name }}</div></td>
+                        <td>{{ formatCurrency(pkg.price) }}</td>
+                        <td>
+                        <button @click="editExistingPackageType(pkg)" class="btn-action edit" title="Editar"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+                        <button @click="handleDeletePackageType(pkg.id)" class="btn-action delete" title="Excluir"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </UniversalModal>
+
         <UniversalModal title="Gerenciar Catálogo de Serviços" :is-open="isServiceCatalogueOpen" @close="closeServiceCatalogueModal">
             <div class="plan-manager-content">
                 <button @click="openServiceModal()" class="btn btn-primary btn-full-width">Adicionar Novo Serviço</button>
@@ -370,7 +422,8 @@ import MasterResumoCobranca from './MasterResumoCobranca.vue';
 import ServiceHistory from './ServiceHistory.vue';
 import ToastNotification from '../components/ToastNotification.vue';
 import { useUsers } from '@/composables/useUsers';
-import { useStatusesForUser } from '@/composables/useStatusesForUser';
+import { useGlobalStatuses } from '@/composables/useGlobalStatuses';
+import { usePackageTypes } from '@/composables/usePackageTypes';
 import { useServices } from '@/composables/useServices.js';
 import { useSyncManager } from '@/composables/useSyncManager';
 import { API_BASE_URL } from '@/config';
@@ -396,10 +449,15 @@ const actionsDropdown = ref(null);
 const isStatusManagerOpen = ref(false);
 const newStatusName = ref('');
 const statusError = ref('');
-const selectedUserUid = computed(() => selectedUser.value?.uid || null);
-const { allStatuses: allUserStatuses, addStatus, deleteStatus, updateStatus } = useStatusesForUser(selectedUserUid);
+const { globalStatuses: allUserStatuses, addGlobalStatus: addStatus, deleteGlobalStatus: deleteStatus, updateGlobalStatus: updateStatus, fetchGlobalStatuses } = useGlobalStatuses();
 const editingStatus = ref(null);
 const editedStatusName = ref('');
+
+// Gerenciamento de Modal de Pacotes
+const isPackageTypesModalOpen = ref(false);
+const editingPackageType = ref(false);
+const packageTypeForm = ref({ id: null, name: '', price: 0 });
+const { packageTypes: allPackageTypes, isLoading: isLoadingPackageTypes, fetchPackageTypes, addPackageType, updatePackageType, deletePackageType } = usePackageTypes();
 
 const isServiceCatalogueOpen = ref(false);
 const isContractModalOpen = ref(false);
@@ -536,8 +594,57 @@ const confirmDeleteUser = async () => {
     closeDeleteUserModal();
 };
 
-const openStatusManagerModal = async () => { isStatusManagerOpen.value = true; await nextTick(); animateModal(); };
+const openStatusManagerModal = async () => { 
+  await fetchGlobalStatuses(); 
+  isStatusManagerOpen.value = true; 
+  await nextTick(); 
+  animateModal(); 
+};
 const closeStatusManagerModal = () => { isStatusManagerOpen.value = false; newStatusName.value = ''; statusError.value = ''; cancelEditing(); };
+
+const openPackageTypesModal = async () => {
+  await fetchPackageTypes();
+  isPackageTypesModalOpen.value = true;
+  await nextTick();
+  animateModal();
+};
+const closePackageTypesModal = () => { 
+  isPackageTypesModalOpen.value = false; 
+  cancelEditPackageType();
+};
+const startNewPackageType = () => {
+  packageTypeForm.value = { id: null, name: '', price: 0 };
+  editingPackageType.value = true;
+};
+const editExistingPackageType = (pkg) => {
+  packageTypeForm.value = { id: pkg.id, name: pkg.name, price: pkg.price };
+  editingPackageType.value = true;
+};
+const cancelEditPackageType = () => {
+  editingPackageType.value = false;
+  packageTypeForm.value = { id: null, name: '', price: 0 };
+};
+const handleSavePackageType = async () => {
+  try {
+    if (packageTypeForm.value.id) {
+      await updatePackageType(packageTypeForm.value.id, { name: packageTypeForm.value.name, price: packageTypeForm.value.price });
+    } else {
+      await addPackageType({ name: packageTypeForm.value.name, price: packageTypeForm.value.price });
+    }
+    cancelEditPackageType();
+  } catch (err) {
+    alert("Erro ao salvar tipo de pacote: " + err.message);
+  }
+};
+const handleDeletePackageType = async (id) => {
+  if (confirm("Deseja mesmo excluir este tipo de pacote?")) {
+    try {
+      await deletePackageType(id);
+    } catch (err) {
+      alert("Erro ao excluir: " + err.message);
+    }
+  }
+};
 
 const handleAddNewStatus = async () => {
   statusError.value = '';
@@ -745,6 +852,41 @@ watch(() => syncState.value.isSyncing, (isSyncing, wasSyncing) => {
   border-bottom-color: #6366f1;
   background: #eef2ff;
 }
+/* Painel Visual de Cadastros Globais */
+.global-settings-panel {
+  background: #ffffff; border: 1px solid #e5e7eb; border-radius: 0.75rem;
+  padding: 1.25rem; margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
+}
+.panel-title {
+  font-size: 0.95rem; font-weight: 600; color: #4b5563;
+  margin-top: 0; margin-bottom: 1rem; border-bottom: 1px solid #f3f4f6; padding-bottom: 0.6rem;
+}
+.panel-buttons {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem;
+}
+.btn-global {
+  display: flex; align-items: center; gap: 1rem; padding: 1rem;
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.6rem;
+  cursor: pointer; transition: all 0.2s; text-align: left;
+}
+.btn-global:hover {
+  background: #f3f4f6; border-color: #d1d5db; transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+}
+.btn-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: 0.5rem; flex-shrink: 0; color: white;
+}
+.bg-indigo { background: #6366f1; }
+.bg-emerald { background: #10b981; }
+.bg-amber { background: #f59e0b; }
+.btn-icon svg { width: 22px; height: 22px; }
+.btn-info { display: flex; flex-direction: column; gap: 0.2rem; }
+.btn-title { font-weight: 600; font-size: 0.95rem; color: #111827; }
+.btn-desc { font-size: 0.8rem; color: #6b7280; line-height: 1.2; }
+
+/* Existing Styles */
 .table-container { background-color: #ffffff; border: 1px solid #eef0f3; border-radius: .625rem; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); overflow: hidden; }
 .table-wrapper { max-width: 100%; overflow-x: auto; }
 .users-table { width: 100%; min-width: 800px; border-collapse: collapse; }
