@@ -110,6 +110,14 @@
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               <input type="text" v-model="userSearchQuery" placeholder="Buscar por nome ou email..." class="search-input" />
             </div>
+            <div class="status-filter-wrapper">
+              <label class="filter-label">Status:</label>
+              <select v-model="userStatusFilter" class="status-filter-select">
+                <option value="all">Todos</option>
+                <option value="active">Ativos</option>
+                <option value="inactive">Inativos</option>
+              </select>
+            </div>
           </div>
 
           <div class="table-container" ref="tableContainer">
@@ -130,6 +138,7 @@
                     <tr v-for="n in 8" :key="'sk-'+n" class="is-skeleton">
                       <td><div class="sk sk-text" style="width: 60%"></div></td>
                       <td><div class="sk sk-text" style="width: 50%"></div></td>
+                      <td><div class="sk sk-pill" style="width: 60px"></div></td>
                       <td><div class="sk sk-pill" style="width: 80px"></div></td>
                       <td><div class="sk sk-btn" style="width: 90px"></div></td>
                       <td><div class="sk sk-text" style="width: 40%"></div></td>
@@ -148,6 +157,7 @@
                     <tr>
                       <th>Usuário</th>
                       <th>Nome</th>
+                      <th>Status</th>
                       <th>Permissão</th>
                       <th>Serviços Contratados</th>
                       <th>Data de Criação</th>
@@ -159,9 +169,15 @@
                       v-for="user in paginatedUsers"
                       :key="user.uid"
                       class="row-anim"
+                      :class="{ 'row-inactive': !user.active }"
                     >
                       <td data-label="Usuário">{{ user.mlNickname || user.email }}</td>
                       <td data-label="Nome">{{ user.name || '—' }}</td>
+                      <td data-label="Status">
+                        <span :class="['status-pill', user.active ? 'pill-active' : 'pill-inactive']">
+                          {{ user.active ? 'Ativo' : 'Inativo' }}
+                        </span>
+                      </td>
                       <td data-label="Permissão">
                         <select
                           class="role-select"
@@ -223,6 +239,12 @@
           <a @click="editUserStorage(activeMenu.user)">Editar Armazenamento</a>
           <a @click="editUserBilling(activeMenu.user)">Gerenciar Cobrança</a>
           <div class="dropdown-divider"></div>
+          <a v-if="activeMenu.user.active" @click="handleToggleActive(activeMenu.user)" class="action-suspend">
+            ⛔ Suspender Acesso
+          </a>
+          <a v-else @click="handleToggleActive(activeMenu.user)" class="action-activate">
+            ✅ Ativar Acesso
+          </a>
           <a @click="openDeleteUserModal(activeMenu.user)" class="action-delete">Excluir Usuário</a>
         </div>
 
@@ -428,7 +450,7 @@ import { useServices } from '@/composables/useServices.js';
 import { useSyncManager } from '@/composables/useSyncManager';
 import { API_BASE_URL } from '@/config';
 
-const { users, isLoading: isLoadingUsers, error: usersError, fetchUsers, updateUserRole, deleteUser } = useUsers();
+const { users, isLoading: isLoadingUsers, error: usersError, fetchUsers, updateUserRole, toggleUserActiveStatus, deleteUser } = useUsers();
 const { syncState } = useSyncManager();
 const {
   services: availableServices, isLoadingServices, isEditingService, currentService, isServiceModalOpen,
@@ -441,6 +463,7 @@ const currentView = ref('users');
 const selectedUser = ref(null);
 const activeMenu = ref({ user: null, style: {} });
 const userSearchQuery = ref('');
+const userStatusFilter = ref('all');
 const currentPage = ref(1);
 const itemsPerPage = ref(10);
 const tableContainer = ref(null);
@@ -473,13 +496,26 @@ const isSavingName = ref(false);
 const syncResults = ref({});
 
 const filteredUsers = computed(() => {
-  if (!userSearchQuery.value.trim()) return users.value;
-  const query = userSearchQuery.value.toLowerCase();
-  return users.value.filter(u => 
-    u.email.toLowerCase().includes(query) ||
-    (u.mlNickname && u.mlNickname.toLowerCase().includes(query)) ||
-    (u.name && u.name.toLowerCase().includes(query))
-  );
+  let list = users.value;
+
+  // Filtro por status ativo/inativo
+  if (userStatusFilter.value === 'active') {
+    list = list.filter(u => u.active !== false);
+  } else if (userStatusFilter.value === 'inactive') {
+    list = list.filter(u => u.active === false);
+  }
+
+  // Filtro por texto
+  if (userSearchQuery.value.trim()) {
+    const query = userSearchQuery.value.toLowerCase();
+    list = list.filter(u => 
+      u.email.toLowerCase().includes(query) ||
+      (u.mlNickname && u.mlNickname.toLowerCase().includes(query)) ||
+      (u.name && u.name.toLowerCase().includes(query))
+    );
+  }
+
+  return list;
 });
 const totalPages = computed(() => Math.ceil(filteredUsers.value.length / itemsPerPage.value));
 const paginatedUsers = computed(() =>
@@ -552,6 +588,14 @@ const editUserStorage = (user) => { selectedUser.value = user; setView('storage'
 const editUserBilling = (user) => { selectedUser.value = user; setView('billing'); };
 const openDeleteUserModal = (user) => { userToDelete.value = user; isDeleteUserModalOpen.value = true; activeMenu.value.user = null; };
 const closeDeleteUserModal = () => { isDeleteUserModalOpen.value = false; userToDelete.value = null; };
+
+const handleToggleActive = async (user) => {
+  activeMenu.value.user = null;
+  const result = await toggleUserActiveStatus(user.uid, user.active);
+  if (!result.success) {
+    alert(result.message || 'Erro ao alterar status do usuário.');
+  }
+};
 const closeSyncResultsModal = () => { isSyncResultsModalOpen.value = false; syncResults.value = {}; };
 
 const openEditNameModal = (user) => {
@@ -718,7 +762,7 @@ const animateModal = () => {
 
 onMounted(async () => { await fetchUsers(); nextTick(() => animateRows()); });
 watch([paginatedUsers, currentPage], () => nextTick(() => animateRows()));
-watch(userSearchQuery, () => { currentPage.value = 1; });
+watch([userSearchQuery, userStatusFilter], () => { currentPage.value = 1; });
 watch(() => syncState.value.isSyncing, (isSyncing, wasSyncing) => {
   if (wasSyncing && !isSyncing && syncState.value.progress === 100 && syncState.value.type !== 'error') {
     fetchUsers();
@@ -958,5 +1002,71 @@ watch(() => syncState.value.isSyncing, (isSyncing, wasSyncing) => {
 .user-details { margin-top: 1.5rem; }
 .details-list { background-color: #f9fafb; border-radius: 0.5rem; padding: 1rem; max-height: 200px; overflow-y: auto; }
 .detail-item { padding: 0.4rem 0; font-size: 0.85rem; border-bottom: 1px solid #e5e7eb; font-family: 'Monaco', monospace; }
+
+/* Status Filter and Pills */
+.status-filter-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 1rem;
+}
+.filter-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  white-space: nowrap;
+}
+.status-filter-select {
+  padding: 0.45rem 2rem 0.45rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  color: #374151;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1.25rem;
+  min-width: 120px;
+}
+.status-pill {
+  display: inline-flex;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.pill-active {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+.pill-inactive {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+.row-inactive {
+  opacity: 0.75;
+}
+.action-suspend {
+  color: #dc2626 !important;
+}
+.action-activate {
+  color: #16a34a !important;
+}
+
+@media (max-width: 768px) {
+  .status-filter-wrapper {
+    margin-left: 0;
+    margin-top: 0.5rem;
+    width: 100%;
+  }
+  .status-filter-select {
+    flex-grow: 1;
+  }
+}
 </style>
 

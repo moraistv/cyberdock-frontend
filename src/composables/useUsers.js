@@ -24,6 +24,7 @@ export function useUsers() {
         email: u.email,
         name: u.name || null,
         role: u.role,
+        active: u.active !== false, // padrao true
         createdAt: u.createdAt || u.created_at || null,
         mlNickname: u.mlNickname || null,
       }));
@@ -59,6 +60,30 @@ export function useUsers() {
   };
 
   /**
+   * Ativa ou inativa um usuário específico via API.
+   * @param {string} uid - O UID do usuário a ser atualizado.
+   * @param {boolean} currentStatus - O status ATUAL (iremos inverter no payload)
+   */
+  const toggleUserActiveStatus = async (uid, currentStatus) => {
+    const newStatus = !currentStatus;
+    try {
+      const response = await api.put(`/users/${uid}/active`, { active: newStatus });
+      
+      // Atualiza localmente
+      const userIndex = users.value.findIndex(u => u.uid === uid);
+      if (userIndex !== -1) {
+        users.value[userIndex].active = newStatus;
+      }
+      return { success: true, message: response.message || 'Status alterado com sucesso.' };
+    } catch (err) {
+      console.error(`Erro ao atualizar status para ${uid}:`, err);
+      // Reverter visualmente
+      await fetchUsers(); 
+      return { success: false, message: err.message || 'Falha ao atualizar status.' };
+    }
+  };
+
+  /**
    * Exclui um usuário específico via API.
    * @param {string} uid - O UID do usuário a ser excluído.
    */
@@ -80,6 +105,7 @@ export function useUsers() {
     error,
     fetchUsers,
     updateUserRole,
+    toggleUserActiveStatus,
     deleteUser, // Exporta a nova função
   };
 }
