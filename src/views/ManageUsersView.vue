@@ -10,22 +10,6 @@
             <p class="subtitle">Gerencie as permissões e os dados dos usuários do sistema.</p>
           </div>
           <div class="header-actions">
-            <button @click="handleSyncAllAccounts" :disabled="syncState.isSyncing || isLoadingUsers"
-              :class="['btn', 'sync-btn', 'btn-primary']" 
-              title="Clique para sincronizar todas as contas">
-              <svg v-if="syncState.isSyncing" class="sync-spinner"
-                  xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24"
-                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                  stroke-linejoin="round">
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-              </svg>
-              <span v-if="syncState.isSyncing">Sincronizando...</span>
-              <span v-else>Sincronizar Todas as Contas</span>
-              
-              <span v-if="syncState.newSalesCount > 0" class="new-sales-badge">
-                  {{ syncState.newSalesCount }}
-              </span>
-            </button>
              <!-- Botão para histórico geral -->
              <button @click="setView('history')" class="btn btn-secondary">
               Histórico de Serviços
@@ -223,8 +207,6 @@
         <UserStorageView v-if="currentView === 'storage' && selectedUser && !isMaster" :user-id="selectedUser.uid" />
         <MasterResumoCobranca v-if="currentView === 'billing'" :user-id="selectedUser.uid" />
         <ServiceHistory v-if="currentView === 'history'" />
-        <!-- Adicionando o novo componente para a visão geral de vendas do master -->
-        <MasterSalesTable v-if="currentView === 'master_sales'" />
 
 
         <!-- Dropdown de Ações -->
@@ -437,8 +419,6 @@ import SidebarComponent from '../components/SidebarComponent.vue';
 import TopbarComponent from '../components/TopbarComponent.vue';
 import UniversalModal from '../components/UniversalModal.vue';
 import UserSalesTable from '../components/UserSalesTable.vue';
-// Importando o novo componente de tabela de vendas do Master
-import MasterSalesTable from '../components/MasterSalesTable.vue';
 import UserStorageView from './UserStorageView.vue';
 import MasterResumoCobranca from './MasterResumoCobranca.vue';
 import ServiceHistory from './ServiceHistory.vue';
@@ -529,7 +509,7 @@ const breadcrumbTitle = computed(() => {
   if (currentView.value === 'storage') return `Armazenamento de ${displayName}`;
   if (currentView.value === 'billing') return `Resumo de Faturamento de ${displayName}`;
   if (currentView.value === 'history') return 'Histórico de Serviços';
-  if (currentView.value === 'master_sales') return 'Visão Geral de Vendas';
+  if (currentView.value === 'history') return 'Histórico de Serviços';
   return '';
 });
 
@@ -729,22 +709,7 @@ const handleRemoveClientService = async (contractId) => {
   await removeClientService(currentUser.value.uid, contractId);
 };
 
-const handleSyncAllAccounts = async () => {
-  if (syncState.value.isSyncing) return;
-  try {
-    await fetchUsers();
-    if (!users.value || users.value.length === 0) {
-      syncResults.value = { title: 'Atenção', message: 'Nenhum usuário encontrado.', type: 'warning' };
-      isSyncResultsModalOpen.value = true;
-      return;
-    }
-    // Lógica de sincronização... (sem alterações)
-    // ...
-  } catch (err) {
-    syncResults.value = { title: '❌ Erro Geral', message: err.message, type: 'error' };
-    isSyncResultsModalOpen.value = true;
-  }
-};
+
 
 const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++; };
 const prevPage = () => { if (currentPage.value > 1) currentPage.value--; };

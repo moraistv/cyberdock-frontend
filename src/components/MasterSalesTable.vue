@@ -255,7 +255,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick, reactive } from 'vue';
 import gsap from 'gsap';
-import { useSalesForUser } from '@/composables/useSalesForUser';
+import { useMasterSales } from '@/composables/useMasterSales';
 import { useUserStorage } from '@/composables/useUserStorage';
 import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
@@ -377,7 +377,7 @@ function showToast(message, type = 'info') {
 
 // ===== END UTILITY FUNCTIONS =====
 
-const { sales, isLoading, error, fetchSales, processSales: processSalesApi } = useSalesForUser(ref(null));
+const { sales, isLoading, error, fetchSales, processSales: processSalesApi } = useMasterSales();
 const { skus, loadStorageData } = useUserStorage(ref(null));
 const { systemStatuses } = useSystemStatus();
 const { generateLabelLinks, openLabel } = useLabels();
