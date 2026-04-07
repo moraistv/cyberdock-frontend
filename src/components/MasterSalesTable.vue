@@ -380,7 +380,7 @@ function showToast(message, type = 'info') {
 const { sales, isLoading, error, fetchSales, processSales: processSalesApi } = useMasterSales();
 const { skus, loadStorageData } = useUserStorage(ref(null));
 const { systemStatuses } = useSystemStatus();
-const { generateLabelLinks, openLabel } = useLabels();
+const { getLabelInfo: composableLabelInfo, downloadLabel } = useLabels();
 
 
 const salesTableBodyRef = ref(null);
@@ -655,16 +655,7 @@ function nextSalesPage() { if (salesCurrentPage.value < salesTotalPages.value) s
 function prevSalesPage() { if (salesCurrentPage.value > 1) salesCurrentPage.value--; }
 
 function getLabelInfo(sale) {
-    const result = generateLabelLinks(sale);
-    console.log('🔍 Debug etiqueta para venda:', {
-        saleId: sale.id,
-        sku: sale.sku,
-        status: sale?.raw_api_data?.status,
-        shipmentId: sale?.raw_api_data?.shipping?.id,
-        sellerId: sale?.seller_id,
-        canPrint: result.canPrint,
-        result: result
-    });
+    const result = composableLabelInfo(sale);
     return result;
 }
 
@@ -688,16 +679,16 @@ async function openLabelWithToken(sale, baseUrl) {
             const data = await response.json();
             const urlWithToken = `${baseUrl}&access_token=${data.access_token}`;
             console.log('✅ URL com token:', urlWithToken);
-            openLabel(urlWithToken);
+            window.open(urlWithToken);
         } else {
             console.error('❌ Erro ao obter token de acesso:', response.status);
             console.log('🔄 Tentando abrir sem token...');
-            openLabel(baseUrl);
+            window.open(baseUrl);
         }
     } catch (error) {
         console.error('❌ Erro ao obter token:', error);
         console.log('🔄 Tentando abrir sem token...');
-        openLabel(baseUrl);
+        window.open(baseUrl);
     }
 }
 
