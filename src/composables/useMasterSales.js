@@ -6,16 +6,40 @@ export function useMasterSales() {
   const sales = ref([]);
   const isLoading = ref(false);
   const error = ref(null);
+  const totalSales = ref(0);
+  const currentPage = ref(1);
+  const totalPages = ref(1);
+  const pageSize = ref(50);
   const api = useApi();
 
   let es = null; // SSE
 
-  const fetchSales = async () => {
+  const fetchSales = async (params = {}) => {
     isLoading.value = true;
     error.value = null;
     try {
-      const salesData = await api.get(`/sales/all`);
-      sales.value = Array.isArray(salesData) ? salesData : [];
+      const queryParams = new URLSearchParams();
+      queryParams.set('page', params.page || currentPage.value);
+      queryParams.set('limit', params.limit || pageSize.value);
+      if (params.search) queryParams.set('search', params.search);
+      if (params.shippingStatus) queryParams.set('shippingStatus', params.shippingStatus);
+      if (params.saleStatus) queryParams.set('saleStatus', params.saleStatus);
+      if (params.saleDateStart) queryParams.set('saleDateStart', params.saleDateStart);
+      if (params.saleDateEnd) queryParams.set('saleDateEnd', params.saleDateEnd);
+
+      const result = await api.get(`/sales/all?${queryParams.toString()}`);
+
+      if (result && result.data) {
+        sales.value = Array.isArray(result.data) ? result.data : [];
+        totalSales.value = result.total || 0;
+        currentPage.value = result.page || 1;
+        totalPages.value = result.totalPages || 1;
+      } else {
+        // Backward compatibility: if backend returns array directly
+        sales.value = Array.isArray(result) ? result : [];
+        totalSales.value = sales.value.length;
+        totalPages.value = 1;
+      }
     } catch (err) {
       console.error(`Erro ao buscar todas as vendas globais:`, err);
       error.value = 'Não foi possível carregar as vendas mestre globais.';
@@ -143,6 +167,10 @@ export function useMasterSales() {
     sales,
     isLoading,
     error,
+    totalSales,
+    currentPage,
+    totalPages,
+    pageSize,
     fetchSales,
     updateSaleStatus,
     processSales,

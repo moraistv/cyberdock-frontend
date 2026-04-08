@@ -111,29 +111,38 @@
 
         <!-- Container da Tabela de Vendas -->
         <div class="sales-table-container">
-            <div v-if="isLoading" class="loading-state">
-                <p>Carregando todas as vendas...</p>
+            <div v-if="isLoading && sales.length === 0" class="loading-state">
+                <p>Carregando vendas...</p>
             </div>
             <div v-else-if="error" class="error-state">
                 <p>{{ error }}</p>
             </div>
             <div v-else-if="sales.length === 0" class="empty-state">
-                <h3 class="empty-state-title">Nenhuma venda encontrada no sistema</h3>
-                <p class="empty-state-text">Parece que ainda não há vendas de nenhum usuário.</p>
-                <button @click="fetchSales" class="btn btn-primary empty-state-cta">Recarregar</button>
-            </div>
-            <div v-else-if="filteredUserSales.length === 0" class="empty-state">
-                <p>Nenhuma venda encontrada para os filtros selecionados.</p>
+                <h3 class="empty-state-title">Nenhuma venda encontrada</h3>
+                <p class="empty-state-text">Nenhum resultado para os filtros atuais.</p>
                 <button @click="clearFilters" class="btn btn-secondary">Limpar Filtros</button>
             </div>
             <div v-else>
-                <div class="sale-cards-list">
-                    <div v-for="sale in paginatedUserSales" :key="`${sale.id}-${sale.sku}`" 
+                <!-- Contador de resultados -->
+                <div class="sale-cards-counter">
+                    <span>Mostrando <strong>{{ sales.length }}</strong> de <strong>{{ totalSales }}</strong> vendas</span>
+                    <span v-if="isLoading" class="sale-cards-counter__loading">Atualizando...</span>
+                </div>
+                <div class="sale-cards-list" ref="salesTableBodyRef">
+                    <div v-for="sale in sales" :key="`${sale.id}-${sale.sku}`" 
                          class="sale-card"
-                         :class="{ 'sale-card--cancelled': sale.raw_api_data?.status === 'cancelled' }">
+                         :class="{ 'sale-card--cancelled': sale.sale_status === 'cancelled' }">
                         
                         <div class="sale-card__layout">
-                            <!-- Esquerda: Informações Principais -->
+                            <!-- Thumbnail do Produto -->
+                            <div class="sale-card__thumb">
+                                <img v-if="sale.product_thumbnail" :src="sale.product_thumbnail.replace('http://', 'https://')" :alt="sale.product_title" class="sale-card__thumb-img" loading="lazy" />
+                                <div v-else class="sale-card__thumb-placeholder">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                </div>
+                            </div>
+
+                            <!-- Centro: Informações Principais -->
                             <div class="sale-card__main">
                                 <!-- Topo: ID tag -->
                                 <div class="sale-card__id-row">
@@ -145,21 +154,32 @@
                                     <span class="sale-card__date-mobile">{{ formatDateTime(sale.sale_date) }}</span>
                                 </div>
                                 
-                                <!-- Título do Produto + Badges -->
+                                <!-- Título do Produto (clicável) + Logo ML + Conta -->
                                 <div class="sale-card__title-row">
-                                    <h3 class="sale-card__product-title" :title="sale.product_title">
+                                    <a v-if="sale.product_permalink" :href="sale.product_permalink" target="_blank" rel="noopener" class="sale-card__product-link" :title="sale.product_title">
+                                        {{ sale.product_title || 'Produto sem título' }}
+                                    </a>
+                                    <h3 v-else class="sale-card__product-title" :title="sale.product_title">
                                         {{ sale.product_title || 'Produto sem título' }}
                                     </h3>
                                     <div class="sale-card__badges">
-                                        <span class="sale-card__badge" :class="sale.channel?.toLowerCase() === 'ml' ? 'sale-card__badge--ml' : 'sale-card__badge--other'">{{ sale.channel || 'ML' }}</span>
+                                        <img v-if="sale.channel?.toLowerCase() === 'ml'" src="/img/ml-logo.svg" alt="Mercado Livre" class="sale-card__ml-logo" />
+                                        <span v-else class="sale-card__badge sale-card__badge--other">{{ sale.channel }}</span>
                                         <span class="sale-card__badge sale-card__badge--account">{{ sale.account_nickname }}</span>
                                     </div>
                                 </div>
 
-                                <!-- Specs: Status | SKU | QTD -->
+                                <!-- Specs: Status Venda | SKU | QTD -->
                                 <div class="sale-card__specs">
                                     <span class="sale-card__spec">
-                                        <span class="sale-card__spec-label">Status:</span>
+                                        <span class="sale-card__spec-label">Venda:</span>
+                                        <span class="sale-card__spec-value">
+                                            {{ getSaleStatusLabel(sale.sale_status) }}
+                                        </span>
+                                    </span>
+                                    <span class="sale-card__divider">|</span>
+                                    <span class="sale-card__spec">
+                                        <span class="sale-card__spec-label">Expedição:</span>
                                         <span class="sale-card__spec-value">
                                             <span :class="['status-badge', getStatusColorClass(sale.shipping_status)]"></span>
                                             {{ getStatusLabel(sale.shipping_status) }}
@@ -180,17 +200,17 @@
                                 <!-- Footer: Vendedor • Comprador • Modo Envio -->
                                 <div class="sale-card__footer">
                                     <span class="sale-card__footer-item" title="Vendedor Resp.">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                                         {{ sale.user_nickname || 'N/A' }}
                                     </span>
                                     <span class="sale-card__footer-dot">•</span>
                                     <span class="sale-card__footer-item" title="Comprador">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                                         {{ getCustomerName(sale) }}
                                     </span>
                                     <span class="sale-card__footer-dot">•</span>
                                     <span class="sale-card__footer-item" title="Modo Envio">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
                                         {{ sale.shipping_mode || 'N/A' }}
                                     </span>
                                 </div>
@@ -200,9 +220,9 @@
                             <div class="sale-card__aside">
                                 <div class="sale-card__date-block">
                                      <span class="sale-card__date-value">{{ formatDateTime(sale.sale_date) }}</span>
-                                     <span class="sale-card__exp-date" :class="{'sale-card__exp-date--late': isLate(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date)}">
+                                     <span class="sale-card__exp-date" :class="{'sale-card__exp-date--late': isLate(sale.sla_expected_date || sale.shipping_limit_date)}">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                                        Exp.: {{ formatDateTime(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date) || '—' }}
+                                        Exp.: {{ formatDateTime(sale.sla_expected_date || sale.shipping_limit_date) || '—' }}
                                      </span>
                                 </div>
                                 
@@ -230,10 +250,10 @@
                         </div>
                     </div>
                 </div>
-                <div class="pagination-controls" v-if="salesTotalPages > 1">
-                    <button @click="prevSalesPage" :disabled="salesCurrentPage === 1">Anterior</button>
-                    <span>Página {{ salesCurrentPage }} de {{ salesTotalPages }}</span>
-                    <button @click="nextSalesPage" :disabled="salesCurrentPage === salesTotalPages">Próximo</button>
+                <div class="pagination-controls" v-if="totalPages > 1">
+                    <button @click="goToPage(currentPage - 1)" :disabled="currentPage <= 1 || isLoading">Anterior</button>
+                    <span>Página {{ currentPage }} de {{ totalPages }} ({{ totalSales }} vendas)</span>
+                    <button @click="goToPage(currentPage + 1)" :disabled="currentPage >= totalPages || isLoading">Próximo</button>
                 </div>
             </div>
         </div>
@@ -250,8 +270,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, nextTick, reactive } from 'vue';
-import gsap from 'gsap';
+import { ref, onMounted, onUnmounted, computed, watch, reactive } from 'vue';
 import { useMasterSales } from '@/composables/useMasterSales';
 import { useUserStorage } from '@/composables/useUserStorage';
 import { useSystemStatus } from '@/composables/useSystemStatus';
@@ -267,22 +286,23 @@ import UniversalModal from './UniversalModal.vue';
  */
 function getCustomerName(sale) {
     try {
-        const buyer = sale?.raw_api_data?.buyer;
-        if (!buyer) return 'N/A';
+        // Use flat buyer fields from server-side extraction
+        if (sale.buyer_first_name && sale.buyer_last_name) {
+            return `${sale.buyer_first_name} ${sale.buyer_last_name}`.trim();
+        }
+        if (sale.buyer_first_name) return sale.buyer_first_name.trim();
+        if (sale.buyer_nickname) return sale.buyer_nickname.trim();
         
-        // Prioridade: nome completo > nickname > ID do comprador
-        if (buyer.first_name && buyer.last_name) {
+        // Fallback to raw_api_data if available
+        const buyer = sale?.raw_api_data?.buyer;
+        if (buyer?.first_name && buyer?.last_name) {
             return `${buyer.first_name} ${buyer.last_name}`.trim();
         }
-        if (buyer.nickname) {
-            return buyer.nickname.trim();
-        }
-        if (buyer.id) {
-            return `Cliente #${buyer.id}`;
-        }
+        if (buyer?.nickname) return buyer.nickname.trim();
+        if (buyer?.id) return `Cliente #${buyer.id}`;
+        
         return 'N/A';
     } catch (error) {
-        console.warn('Erro ao extrair nome do cliente:', error);
         return 'N/A';
     }
 }
@@ -374,16 +394,12 @@ function showToast(message, type = 'info') {
 
 // ===== END UTILITY FUNCTIONS =====
 
-const { sales, isLoading, error, fetchSales, processSales: processSalesApi } = useMasterSales();
+const { sales, isLoading, error, totalSales, currentPage, totalPages, fetchSales, processSales: processSalesApi } = useMasterSales();
 const { skus, loadStorageData } = useUserStorage(ref(null));
 const { systemStatuses } = useSystemStatus();
 const { getLabelInfo: composableLabelInfo, downloadLabel } = useLabels();
 
-
 const salesTableBodyRef = ref(null);
-
-const salesCurrentPage = ref(1);
-const salesItemsPerPage = ref(10);
 const isProcessing = ref(false);
 const isSummaryModalOpen = ref(false);
 const summaryModalTitle = ref('');
@@ -391,7 +407,6 @@ const summaryModalContent = ref('');
 
 const searchQuery = ref('');
 const showAdvancedFilters = ref(false);
-
 
 const selectedSaleStatusFilter = ref(null);
 const isSaleStatusDropdownOpen = ref(false);
@@ -406,109 +421,53 @@ const statusFilterDropdownRef = ref(null);
 const filters = reactive({
     saleDateStart: '',
     saleDateEnd: '',
-    shippingLimitStart: '',
-    shippingLimitEnd: '',
-    saleStatus: null,
-    shippingStatus: null,
 });
 
 const normalizeSku = (sku) => (sku || '').trim().toUpperCase();
-
-function parseFlexibleDate(value, { endOfDay = false } = {}) {
-    if (!value) return null;
-    let d = new Date(value.replace(/-/g, '/'));
-    if (!d || isNaN(d)) return null;
-    if (endOfDay) d.setHours(23, 59, 59, 999);
-    else d.setHours(0, 0, 0, 0);
-    return d;
-}
 
 const stockSkuSet = computed(() => {
     if (!Array.isArray(skus.value)) return new Set();
     return new Set(skus.value.map(s => normalizeSku(s.sku)));
 });
 
-const filteredUserSales = computed(() => {
-    let tempSales = sales.value;
-
-    if (selectedStatusFilter.value) {
-        tempSales = tempSales.filter(s => s.shipping_status === selectedStatusFilter.value);
-    }
-
-    if (selectedSaleStatusFilter.value) {
-        tempSales = tempSales.filter(s => (s.raw_api_data?.status || s.sale_status) === selectedSaleStatusFilter.value);
-    }
-
-    if (searchQuery.value) {
-        const query = searchQuery.value.toLowerCase();
-        tempSales = tempSales.filter(s =>
-            (s.product_title?.toLowerCase().includes(query)) ||
-            (s.sku?.toLowerCase().includes(query)) ||
-            (s.account_nickname?.toLowerCase().includes(query)) ||
-            (s.user_nickname?.toLowerCase().includes(query))
-        );
-    }
-
-    if (filters.saleDateStart) {
-        const start = parseFlexibleDate(filters.saleDateStart);
-        if (start) tempSales = tempSales.filter(s => new Date(s.sale_date) >= start);
-    }
-    if (filters.saleDateEnd) {
-        const end = parseFlexibleDate(filters.saleDateEnd, { endOfDay: true });
-        if (end) tempSales = tempSales.filter(s => new Date(s.sale_date) <= end);
-    }
-
-    if (filters.shippingLimitStart) {
-        const start = parseFlexibleDate(filters.shippingLimitStart);
-        if (start) tempSales = tempSales.filter(s => {
-            const limitDate = new Date(s.raw_api_data?.sla_data?.expected_date || s.shipping_limit_date);
-            return limitDate >= start;
-        });
-    }
-     if (filters.shippingLimitEnd) {
-        const end = parseFlexibleDate(filters.shippingLimitEnd, { endOfDay: true });
-        if (end) tempSales = tempSales.filter(s => {
-            const limitDate = new Date(s.raw_api_data?.sla_data?.expected_date || s.shipping_limit_date);
-            return limitDate <= end;
-        });
-    }
-
-    return tempSales;
-});
-
-const salesTotalPages = computed(() => Math.ceil(filteredUserSales.value.length / salesItemsPerPage.value) || 1);
-const paginatedUserSales = computed(() => {
-    const startIndex = (salesCurrentPage.value - 1) * salesItemsPerPage.value;
-    const paginated = filteredUserSales.value.slice(startIndex, startIndex + salesItemsPerPage.value);
-    
-    if (paginated.length > 0) {
-        console.log('🔍 Debug vendas carregadas:', {
-            totalSales: sales.value?.length || 0,
-            filteredSales: filteredUserSales.value?.length || 0,
-            paginatedSales: paginated.length,
-            firstSale: paginated[0] ? {
-                id: paginated[0].id,
-                sku: paginated[0].sku,
-                raw_api_data: paginated[0].raw_api_data,
-                seller_id: paginated[0].seller_id
-            } : null
-        });
-    }
-    
-    nextTick(() => {
-        if (salesTableBodyRef.value?.children.length) {
-            gsap.from(salesTableBodyRef.value.children, {
-                opacity: 0, y: 20, duration: 0.5, stagger: 0.08, ease: 'power3.out'
-            });
-        }
+// Debounce search
+let searchDebounce = null;
+function triggerServerFetch(resetPage = true) {
+    if (resetPage) currentPage.value = 1;
+    fetchSales({
+        page: currentPage.value,
+        search: searchQuery.value || undefined,
+        shippingStatus: selectedStatusFilter.value || undefined,
+        saleStatus: selectedSaleStatusFilter.value || undefined,
+        saleDateStart: filters.saleDateStart || undefined,
+        saleDateEnd: filters.saleDateEnd || undefined,
     });
-    return paginated;
+}
+
+watch(searchQuery, () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => triggerServerFetch(true), 400);
 });
 
-watch([searchQuery, selectedSaleStatusFilter, selectedStatusFilter, filters], () => { salesCurrentPage.value = 1; }, { deep: true });
+watch([selectedSaleStatusFilter, selectedStatusFilter], () => triggerServerFetch(true));
+watch([() => filters.saleDateStart, () => filters.saleDateEnd], () => triggerServerFetch(true));
 
-watch(selectedStatusFilter, (v) => { filters.shippingStatus = v ?? null; });
-watch(() => filters.shippingStatus, (v) => { selectedStatusFilter.value = v ?? null; });
+// Pagination
+function goToPage(page) {
+    if (page < 1 || page > totalPages.value) return;
+    currentPage.value = page;
+    triggerServerFetch(false);
+}
+
+const saleStatusOptions = computed(() => {
+    return [
+        { value: 'paid', label: 'Pago' },
+        { value: 'ready_to_ship', label: 'Pronto para Envio' },
+        { value: 'shipped', label: 'Enviado' },
+        { value: 'delivered', label: 'Entregue' },
+        { value: 'cancelled', label: 'Cancelado' },
+    ];
+});
 
 function isLate(dateString) {
     if (!dateString) return false;
@@ -524,24 +483,28 @@ function formatDateTime(dateString) {
     return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-const getStatusLabel = (s) => (systemStatuses.value.find(cs => cs.value === s)?.label || s || 'Pendente').replace(/_/g, ' ');
-
-const saleStatusOptions = computed(() => {
-    const set = new Set();
-    (sales.value || []).forEach(s => {
-        const v = s?.raw_api_data?.status || s?.sale_status || null;
-        if (v) set.add(String(v));
-    });
-    return Array.from(set)
-        .map(value => ({ value, label: getSaleStatusLabel(value) }))
-        .sort((a, b) => a.label.localeCompare(b.label));
-});
+const getStatusLabel = (s) => {
+    // First check system statuses 
+    const found = systemStatuses.value.find(cs => cs.value === s);
+    if (found) return found.label.replace(/_/g, ' ');
+    // PT-BR fallback
+    const ptMap = {
+        pending: 'Pendente', ready_to_ship: 'Pronto para Envio', shipped: 'Enviado',
+        delivered: 'Entregue', cancelled: 'Cancelado', handling: 'Em Manuseio',
+        'ready_to_print': 'Imprimir Etiqueta', 'ready_to_pack': 'Preparar Envio',
+        'in_transit': 'Em Trânsito', 'out_for_delivery': 'Saiu para Entrega',
+        null: 'Pendente', undefined: 'Pendente', '': 'Pendente',
+    };
+    const key = (s || '').toLowerCase();
+    return ptMap[key] || (key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '));
+};
 
 function getSaleStatusLabel(statusValue) {
     if (!statusValue) return 'Pendente';
     const map = {
         paid: 'Pago', ready_to_ship: 'Pronto para Envio', shipped: 'Enviado',
         delivered: 'Entregue', cancelled: 'Cancelado', canceled: 'Cancelado',
+        pending: 'Pendente', handling: 'Em Manuseio',
     };
     const key = String(statusValue).toLowerCase();
     return map[key] || (key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '));
@@ -549,14 +512,15 @@ function getSaleStatusLabel(statusValue) {
 
 function getStatusColorClass(statusValue) {
     const valueLower = (statusValue || '').toLowerCase();
-    if (valueLower === 'pendente') return 'status-badge-gray';
-    if (valueLower.includes('imprimir')) return 'status-badge-indigo';
-    if (valueLower.includes('preparar')) return 'status-badge-yellow';
+    if (valueLower === 'pendente' || valueLower === 'pending') return 'status-badge-gray';
+    if (valueLower.includes('imprimir') || valueLower.includes('print')) return 'status-badge-indigo';
+    if (valueLower.includes('preparar') || valueLower.includes('pack')) return 'status-badge-yellow';
     if (valueLower.includes('despachado')) return 'status-badge-red';
     if (valueLower.includes('embalado')) return 'status-badge-cyan';
-    if (valueLower.includes('aguardando')) return 'status-badge-purple';
-    if (valueLower.includes('enviado')) return 'status-badge-green';
+    if (valueLower.includes('aguardando') || valueLower.includes('handling')) return 'status-badge-purple';
+    if (valueLower.includes('enviado') || valueLower.includes('shipped') || valueLower.includes('transit')) return 'status-badge-green';
     if (valueLower.includes('coleta')) return 'status-badge-orange';
+    if (valueLower.includes('delivered') || valueLower.includes('entregue')) return 'status-badge-green';
     return 'status-badge-default';
 }
 
@@ -566,28 +530,23 @@ function applySaleStatusFilter(statusValue) { selectedSaleStatusFilter.value = s
 function toggleStatusDropdown() { isStatusDropdownOpen.value = !isStatusDropdownOpen.value; }
 function applyStatusFilter(statusValue) { 
     selectedStatusFilter.value = statusValue; 
-    filters.shippingStatus = statusValue ?? null; 
     isStatusDropdownOpen.value = false; 
 }
 
 function clearFilters() {
     filters.saleDateStart = '';
     filters.saleDateEnd = '';
-    filters.shippingLimitStart = '';
-    filters.shippingLimitEnd = '';
-    filters.saleStatus = null;
-    filters.shippingStatus = null;
     searchQuery.value = '';
     selectedStatusFilter.value = null;
     selectedSaleStatusFilter.value = null;
-    salesCurrentPage.value = 1;
+    triggerServerFetch(true);
 }
 
 async function processAllSales() {
     isProcessing.value = true;
     try {
         await loadStorageData();
-        const salesToProcess = filteredUserSales.value.filter(sale => {
+        const salesToProcess = sales.value.filter(sale => {
             const saleSku = normalizeSku(sale.sku);
             const isSkuInStock = saleSku && stockSkuSet.value.has(saleSku);
             return !sale.processed_at && isSkuInStock;
@@ -604,12 +563,12 @@ async function processAllSales() {
         summaryModalTitle.value = 'Resumo do Processamento';
         let contentHtml = `<p>O processamento de ${salesToProcess.length} vendas foi concluído.</p>`;
         if (results.success?.length > 0) {
-            contentHtml += `<div class="summary-section success"><h4>✅ ${results.success.length} Vendas Processadas</h4><ul>`;
+            contentHtml += `<div class="summary-section success"><h4>Processadas: ${results.success.length}</h4><ul>`;
             results.success.forEach(s => { contentHtml += `<li>Venda #${s.saleId} (SKU: ${s.sku})</li>`; });
             contentHtml += `</ul></div>`;
         }
         if (results.failed?.length > 0) {
-            contentHtml += `<div class="summary-section failed"><h4>❌ ${results.failed.length} Falharam</h4><ul>`;
+            contentHtml += `<div class="summary-section failed"><h4>Falharam: ${results.failed.length}</h4><ul>`;
             results.failed.forEach(f => { contentHtml += `<li>Venda #${f.saleId} (SKU: ${f.sku}): <strong>${f.reason}</strong></li>`; });
             contentHtml += `</ul></div>`;
         }
@@ -621,7 +580,7 @@ async function processAllSales() {
         summaryModalContent.value = `<p>Ocorreu um erro inesperado:</p><p class="error-text">${err.message}</p>`;
         isSummaryModalOpen.value = true;
     } finally {
-        await fetchSales();
+        triggerServerFetch(false);
         isProcessing.value = false;
     }
 }
@@ -632,21 +591,20 @@ function handleClickOutside(event) {
     if (statusFilterContainerRef.value && !statusFilterContainerRef.value.contains(target)) { isStatusDropdownOpen.value = false; }
 }
 
-
-
-function nextSalesPage() { if (salesCurrentPage.value < salesTotalPages.value) salesCurrentPage.value++; }
-function prevSalesPage() { if (salesCurrentPage.value > 1) salesCurrentPage.value--; }
-
 function getLabelInfo(sale) {
-    const result = composableLabelInfo(sale);
-    return result;
+    // With server-side data, shipping_id comes as a direct field
+    const saleWithShipping = {
+        ...sale,
+        raw_api_data: {
+            shipping: { id: sale.shipping_id },
+        }
+    };
+    return composableLabelInfo(saleWithShipping);
 }
-
-
 
 onMounted(() => { 
     document.addEventListener('click', handleClickOutside); 
-    fetchSales(); // Carrega as vendas do DB automaticamente ao abrir
+    triggerServerFetch(false);
 });
 onUnmounted(() => { document.removeEventListener('click', handleClickOutside); });
 
@@ -938,6 +896,28 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
     gap: 0.75rem;
 }
 
+/* Counter */
+.sale-cards-counter {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+    color: #64748b;
+}
+.sale-cards-counter strong {
+    color: #1e293b;
+}
+.sale-cards-counter__loading {
+    color: #3b82f6;
+    font-weight: 500;
+    animation: pulse-fade 1.2s ease-in-out infinite;
+}
+@keyframes pulse-fade {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
 .sale-card {
     background-color: #fff;
     border: 1px solid #e2e8f0;
@@ -961,6 +941,31 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
     gap: 1.5rem;
 }
 
+/* Thumbnail */
+.sale-card__thumb {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.sale-card__thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.sale-card__thumb-placeholder {
+    color: #cbd5e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .sale-card__main {
     flex: 1;
     min-width: 0;
@@ -982,7 +987,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
     background-color: #f1f5f9;
     color: #64748b;
     border-radius: 0.375rem;
-    font-size: 10px;
+    font-size: 11px;
     font-family: 'SFMono-Regular', Consolas, monospace;
     border: 1px solid #e2e8f0;
     cursor: pointer;
@@ -1015,16 +1020,25 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
     flex-wrap: wrap;
 }
 
-.sale-card__product-title {
-    font-size: 0.95rem;
+.sale-card__product-title,
+.sale-card__product-link {
+    font-size: 1.05rem;
     font-weight: 700;
     color: #1e293b;
     margin: 0;
-    max-width: 500px;
+    max-width: 550px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     line-height: 1.4;
+}
+.sale-card__product-link {
+    text-decoration: none;
+    transition: color 0.15s;
+}
+.sale-card__product-link:hover {
+    color: #3b82f6;
+    text-decoration: underline;
 }
 
 .sale-card__badges {
@@ -1035,19 +1049,22 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
     flex-shrink: 0;
 }
 
+/* ML Logo */
+.sale-card__ml-logo {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
 .sale-card__badge {
     padding: 0.125rem 0.5rem;
     border-radius: 0.25rem;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
     border: 1px solid;
     letter-spacing: 0.025em;
-}
-.sale-card__badge--ml {
-    background-color: #fffbeb;
-    color: #92400e;
-    border-color: #fde68a;
 }
 .sale-card__badge--other {
     background-color: #f8fafc;
@@ -1066,7 +1083,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
     align-items: center;
     flex-wrap: wrap;
     gap: 0.25rem 1rem;
-    font-size: 0.8125rem;
+    font-size: 0.9rem;
     color: #475569;
     margin-bottom: 0.75rem;
 }
@@ -1077,7 +1094,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
     gap: 0.25rem;
 }
 .sale-card__spec-label {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     color: #94a3b8;
 }
 .sale-card__spec-value {
@@ -1090,7 +1107,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
 .sale-card__spec-mono {
     font-family: 'SFMono-Regular', Consolas, monospace;
     color: #475569;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
 }
 .sale-card__divider {
     color: #cbd5e1;
@@ -1103,7 +1120,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
     align-items: center;
     flex-wrap: wrap;
     gap: 0.25rem 0.75rem;
-    font-size: 11px;
+    font-size: 12px;
     color: #64748b;
     text-transform: uppercase;
     font-weight: 500;
@@ -1142,13 +1159,13 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
 }
 
 .sale-card__date-value {
-    font-size: 0.875rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: #1e293b;
 }
 
 .sale-card__exp-date {
-    font-size: 11px;
+    font-size: 12px;
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
@@ -1195,10 +1212,15 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
 /* Responsive: mobile */
 @media (max-width: 768px) {
     .sale-card__layout {
-        flex-direction: column;
+        flex-wrap: wrap;
         gap: 1rem;
     }
+    .sale-card__thumb {
+        width: 44px;
+        height: 44px;
+    }
     .sale-card__aside {
+        width: 100%;
         align-items: flex-start;
         border-top: 1px solid #f1f5f9;
         padding-top: 0.75rem;
@@ -1214,7 +1236,8 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
     .sale-card__actions {
         justify-content: flex-start;
     }
-    .sale-card__product-title {
+    .sale-card__product-title,
+    .sale-card__product-link {
         max-width: 100%;
     }
 }
