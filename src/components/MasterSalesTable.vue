@@ -131,101 +131,116 @@
                     <table class="sales-table">
                         <thead>
                             <tr>
-                                <th>Usuário</th>
-                                <th>Canal</th>
-                                <th>Conta</th>
-                                <th>Cliente</th>
-                                <th>ID da Venda</th>
-                                <th>Data da Venda</th>
+                                <th>Origem</th>
+                                <th>Venda</th>
                                 <th>Produto</th>
-                                <th>SKU</th>
-                                <th>Qtd.</th>
-                                <th>Modo Envio</th>
-                                <th>Processada</th>
-                                <th>Data Limite</th>
-                                <th>Status</th>
-                                <th>Etiquetas</th>
+                                <th>Comprador</th>
+                                <th>Logística</th>
+                                <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody ref="salesTableBodyRef">
-                            <tr v-for="sale in paginatedUserSales" :key="`${sale.id}-${sale.sku}`" :class="{ 'cancelled-sale': sale.raw_api_data?.status === 'cancelled' }">
-                                <td data-label="Usuário">{{ sale.user_nickname || 'N/A' }}</td>
-                                <td data-label="Canal"><span class="channel-badge ml">{{ sale.channel }}</span></td>
-                                <td data-label="Conta">{{ sale.account_nickname }}</td>
-                                <td data-label="Cliente" class="customer-name-cell"
-                                    @mouseenter="showTooltip($event, getCustomerName(sale))" @mouseleave="hideTooltip">
-                                    {{ getCustomerName(sale) }}
-                                </td>
-                                <td data-label="ID da Venda" class="sale-id-cell" 
-                                    @click="copySaleId(sale.id)" 
-                                    :title="'Clique para copiar: ' + (sale.id || 'N/A')"
-                                    style="cursor: pointer; color: #3b82f6; text-decoration: underline;">
-                                    {{ sale.id || 'N/A' }}
-                                </td>
-                                <td data-label="Data da Venda">{{ formatDateTime(sale.sale_date) }}</td>
-                                <td data-label="Produto" class="product-title"
-                                    @mouseenter="showTooltip($event, sale.product_title)" @mouseleave="hideTooltip">
-                                    {{ sale.product_title }}
-                                </td>
-                                <td data-label="SKU" class="sku-cell"
-                                    @mouseenter="showTooltip($event, sale.sku || 'N/A')" @mouseleave="hideTooltip">
-                                    {{ sale.sku || 'N/A' }}
-                                </td>
-                                <td data-label="Qtd.">{{ sale.quantity }}</td>
-                                <td data-label="Modo Envio">{{ sale.shipping_mode || 'N/A' }}</td>
-                                <td data-label="Processada">
-                                    <span v-if="sale.processed_at" class="tag processed"
-                                        :title="`Processado em: ${formatDateTime(sale.processed_at)}`">Sim</span>
-                                    <span v-else class="tag unprocessed">Não</span>
-                                </td>
-                                <td data-label="Data Limite">{{ formatDateTime(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date) }}</td>
-                                <td data-label="Status">
-                                     <div class="status-select-trigger compact"
-                                        @mouseenter="showTooltip($event, getStatusLabel(sale.shipping_status))"
-                                        @mouseleave="hideTooltip">
-                                        <span :class="['status-badge', getStatusColorClass(sale.shipping_status)]"></span>
-                                        <span>{{ getStatusLabel(sale.shipping_status) }}</span>
-                                    </div>
-                                </td>
-                                <td data-label="Etiquetas">
-                                    <div class="label-actions">
-                                        <button 
-                                            v-if="getLabelInfo(sale).canPrint"
-                                            @click="openLabelWithToken(sale, getLabelInfo(sale).pdfUrl)"
-                                            class="btn-label pdf"
-                                            title="Imprimir Etiqueta PDF"
-                                        >
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="6,9 6,2 18,2 18,9"></polyline>
-                                                <path d="M6,18H4a2,2,0,0,1-2-2V11a2,2,0,0,1,2-2H20a2,2,0,0,1,2,2v5a2,2,0,0,1-2,2H18"></path>
-                                                <polyline points="6,14 18,14 18,18 6,18"></polyline>
-                                            </svg>
-                                            PDF
-                                        </button>
-                                        <button 
-                                            v-if="getLabelInfo(sale).canPrint"
-                                            @click="openLabelWithToken(sale, getLabelInfo(sale).zplUrl)"
-                                            class="btn-label zpl"
-                                            title="Imprimir Etiqueta ZPL"
-                                        >
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="6,9 6,2 18,2 18,9"></polyline>
-                                                <path d="M6,18H4a2,2,0,0,1-2-2V11a2,2,0,0,1,2-2H20a2,2,0,0,1,2,2v5a2,2,0,0,1-2,2H18"></path>
-                                                <polyline points="6,14 18,14 18,18 6,18"></polyline>
-                                            </svg>
-                                            ZPL
-                                        </button>
-                                        <span v-else class="label-unavailable">—</span>
-                                        
-                                        <!-- Debug info (temporário) -->
-                                        <div class="debug-info" style="font-size: 10px; color: #666; margin-top: 2px;">
-                                            Status: {{ sale?.raw_api_data?.status || 'N/A' }}<br>
-                                            Shipment: {{ sale?.raw_api_data?.shipping?.id || 'N/A' }}<br>
-                                            Seller: {{ sale?.seller_id || 'N/A' }}
+                            <template v-for="sale in paginatedUserSales" :key="`${sale.id}-${sale.sku}`">
+                                <tr :class="{ 'cancelled-sale': sale.raw_api_data?.status === 'cancelled' }">
+                                    <!-- Origem: Usuário, Canal, Conta -->
+                                    <td data-label="Origem">
+                                        <div class="font-medium text-slate-900">{{ sale.user_nickname || 'N/A' }}</div>
+                                        <div class="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                                            <span class="channel-badge" :style="{ transform: 'scale(0.85)', transformOrigin: 'left center' }" :class="sale.channel?.toLowerCase() || 'ml'">{{ sale.channel || 'ML' }}</span>
+                                            <span class="truncate" style="max-width: 120px;" :title="sale.account_nickname">{{ sale.account_nickname }}</span>
                                         </div>
-                                    </div>
-                                </td>
-                            </tr>
+                                    </td>
+                                    
+                                    <!-- Venda: ID, Data -->
+                                    <td data-label="Venda">
+                                        <div class="sale-id-cell font-medium text-blue-600 hover:text-blue-800 cursor-pointer" 
+                                            @click="copySaleId(sale.id)" 
+                                            :title="'Clique para copiar: ' + (sale.id || 'N/A')">
+                                            {{ sale.id || 'N/A' }}
+                                        </div>
+                                        <div class="text-xs text-slate-500 mt-1">{{ formatDateTime(sale.sale_date) }}</div>
+                                    </td>
+                                    
+                                    <!-- Produto: Título, SKU, Qtd -->
+                                    <td data-label="Produto">
+                                        <div class="product-title font-medium text-slate-800 truncate" 
+                                             style="max-width: 250px" 
+                                             @mouseenter="showTooltip($event, sale.product_title)" @mouseleave="hideTooltip">
+                                            {{ sale.product_title }}
+                                        </div>
+                                        <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                                            <span class="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200" title="SKU">SKU: {{ sale.sku || 'N/A' }}</span>
+                                            <span class="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 font-medium" title="Quantidade">Qtd: {{ sale.quantity }}</span>
+                                        </div>
+                                    </td>
+                                    
+                                    <!-- Comprador: Cliente -->
+                                    <td data-label="Comprador">
+                                        <div class="customer-name-cell font-medium text-slate-700 truncate" style="max-width: 180px;"
+                                            @mouseenter="showTooltip($event, getCustomerName(sale))" @mouseleave="hideTooltip">
+                                            {{ getCustomerName(sale) }}
+                                        </div>
+                                        <!-- Processada status visual indicator under customer -->
+                                        <div class="mt-1">
+                                            <span v-if="sale.processed_at" class="text-[10px] uppercase font-bold tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200" :title="`Processado em: ${formatDateTime(sale.processed_at)}`">✅ Processada</span>
+                                            <span v-else class="text-[10px] uppercase font-bold tracking-wider text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">⏳ Pendente</span>
+                                        </div>
+                                    </td>
+                                    
+                                    <!-- Logística: Status, Modo Envio, Limite -->
+                                    <td data-label="Logística">
+                                        <div class="status-select-trigger compact mb-1.5"
+                                            @mouseenter="showTooltip($event, getStatusLabel(sale.shipping_status))"
+                                            @mouseleave="hideTooltip">
+                                            <span :class="['status-badge', getStatusColorClass(sale.shipping_status)]"></span>
+                                            <span class="font-semibold text-sm">{{ getStatusLabel(sale.shipping_status) }}</span>
+                                        </div>
+                                        <div class="text-xs text-slate-500 flex flex-col gap-0.5">
+                                            <div><span class="font-medium">Modo:</span> {{ sale.shipping_mode || 'N/A' }}</div>
+                                            <div>
+                                                <span class="font-medium">Limite:</span> 
+                                                <span :class="{'text-red-600 font-semibold': isLate(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date)}">
+                                                    {{ formatDateTime(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date) || '—' }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    
+                                    <!-- Ações: Etiquetas -->
+                                    <td data-label="Ações">
+                                        <div class="label-actions flex flex-row gap-2 items-center">
+                                            <button 
+                                                v-if="getLabelInfo(sale).canPrint"
+                                                @click="downloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')"
+                                                class="btn-label pdf flex-1 justify-center !py-1.5"
+                                                title="Imprimir Etiqueta PDF"
+                                            >
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1">
+                                                    <polyline points="6,9 6,2 18,2 18,9"></polyline>
+                                                    <path d="M6,18H4a2,2,0,0,1-2-2V11a2,2,0,0,1,2-2H20a2,2,0,0,1,2,2v5a2,2,0,0,1-2,2H18"></path>
+                                                    <polyline points="6,14 18,14 18,18 6,18"></polyline>
+                                                </svg>
+                                                PDF
+                                            </button>
+                                            <button 
+                                                v-if="getLabelInfo(sale).canPrint"
+                                                @click="downloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')"
+                                                class="btn-label zpl flex-1 justify-center !py-1.5"
+                                                title="Imprimir Etiqueta ZPL"
+                                            >
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1">
+                                                    <polyline points="6,9 6,2 18,2 18,9"></polyline>
+                                                    <path d="M6,18H4a2,2,0,0,1-2-2V11a2,2,0,0,1,2-2H20a2,2,0,0,1,2,2v5a2,2,0,0,1-2,2H18"></path>
+                                                    <polyline points="6,14 18,14 18,18 6,18"></polyline>
+                                                </svg>
+                                                ZPL
+                                            </button>
+                                            <span v-if="!getLabelInfo(sale).canPrint" class="text-xs text-slate-400 italic">ND</span>
+                                        </div>
+                                        <!-- Debug info removido para layout mais limpo -->
+                                    </td>
+                                </tr>
+                            </template>
                         </tbody>
                     </table>
                 </div>
@@ -513,6 +528,13 @@ watch([searchQuery, selectedSaleStatusFilter, selectedStatusFilter, filters], ()
 
 watch(selectedStatusFilter, (v) => { filters.shippingStatus = v ?? null; });
 watch(() => filters.shippingStatus, (v) => { selectedStatusFilter.value = v ?? null; });
+
+function isLate(dateString) {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return false;
+    return date < new Date();
+}
 
 function formatDateTime(dateString) {
     if (!dateString) return 'N/A';
