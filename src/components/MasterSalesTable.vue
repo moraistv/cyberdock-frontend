@@ -127,91 +127,101 @@
                 <button @click="clearFilters" class="btn btn-secondary">Limpar Filtros</button>
             </div>
             <div v-else>
-                <div class="sales-list-container flex flex-col gap-3">
+                <div class="sale-cards-list">
                     <div v-for="sale in paginatedUserSales" :key="`${sale.id}-${sale.sku}`" 
-                         class="bg-white border border-slate-200 rounded-lg p-4 flex flex-col hover:shadow-sm transition-all duration-200"
-                         :class="{ 'opacity-60': sale.raw_api_data?.status === 'cancelled' }">
+                         class="sale-card"
+                         :class="{ 'sale-card--cancelled': sale.raw_api_data?.status === 'cancelled' }">
                         
-                        <div class="flex flex-col lg:flex-row justify-between gap-4">
+                        <div class="sale-card__layout">
                             <!-- Esquerda: Informações Principais -->
-                            <div class="flex-1 min-w-0">
+                            <div class="sale-card__main">
                                 <!-- Topo: ID tag -->
-                                <div class="flex items-center gap-2 mb-2">
-                                    <div class="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-mono border border-slate-200 cursor-pointer hover:bg-slate-200 transition-colors" @click="copySaleId(sale.id)" title="Copiar ID da Venda">
-                                        <span class="opacity-70">ID:</span>
-                                        <span class="font-semibold">{{ sale.id || 'N/A' }}</span>
+                                <div class="sale-card__id-row">
+                                    <div class="sale-card__id-tag" @click="copySaleId(sale.id)" title="Copiar ID da Venda">
+                                        <span class="sale-card__id-label">ID:</span>
+                                        <span class="sale-card__id-value">{{ sale.id || 'N/A' }}</span>
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                     </div>
-                                    <span class="text-xs text-slate-400 font-medium lg:hidden">{{ formatDateTime(sale.sale_date) }}</span>
+                                    <span class="sale-card__date-mobile">{{ formatDateTime(sale.sale_date) }}</span>
                                 </div>
                                 
-                                <!-- Main Title Area -->
-                                <div class="flex items-start md:items-center flex-col md:flex-row gap-2.5 mb-2">
-                                    <h3 class="text-base font-bold text-slate-800 line-clamp-1" :title="sale.product_title" style="max-width: 500px;">
+                                <!-- Título do Produto + Badges -->
+                                <div class="sale-card__title-row">
+                                    <h3 class="sale-card__product-title" :title="sale.product_title">
                                         {{ sale.product_title || 'Produto sem título' }}
                                     </h3>
-                                    <div class="flex flex-wrap gap-1.5 items-center shrink-0 mt-1 md:mt-0">
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase border" :class="sale.channel?.toLowerCase() === 'ml' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-slate-50 text-slate-700 border-slate-200'">{{ sale.channel || 'ML' }}</span>
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase border bg-indigo-50 text-indigo-700 border-indigo-200">{{ sale.account_nickname }}</span>
+                                    <div class="sale-card__badges">
+                                        <span class="sale-card__badge" :class="sale.channel?.toLowerCase() === 'ml' ? 'sale-card__badge--ml' : 'sale-card__badge--other'">{{ sale.channel || 'ML' }}</span>
+                                        <span class="sale-card__badge sale-card__badge--account">{{ sale.account_nickname }}</span>
                                     </div>
                                 </div>
 
-                                <!-- Subtitle / Specs -->
-                                <div class="flex items-center flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600 mb-3">
-                                    <span class="flex items-center gap-1">
-                                        <span class="text-xs text-slate-400">Status:</span> 
-                                        <span class="font-medium flex items-center group cursor-help" :title="sale.shipping_status">
-                                            <span :class="['w-2 h-2 rounded-full inline-block mr-1.5 shadow-sm', getStatusColorClass(sale.shipping_status)]"></span>
+                                <!-- Specs: Status | SKU | QTD -->
+                                <div class="sale-card__specs">
+                                    <span class="sale-card__spec">
+                                        <span class="sale-card__spec-label">Status:</span>
+                                        <span class="sale-card__spec-value">
+                                            <span :class="['status-badge', getStatusColorClass(sale.shipping_status)]"></span>
                                             {{ getStatusLabel(sale.shipping_status) }}
                                         </span>
                                     </span>
-                                    <span class="text-slate-300">|</span>
-                                    <span class="text-xs"><span class="text-slate-400 mr-1">SKU:</span><span class="font-mono text-slate-700">{{ sale.sku || 'N/A' }}</span></span>
-                                    <span class="text-slate-300">|</span>
-                                    <span class="text-xs"><span class="text-slate-400 mr-1">QTD:</span><span class="font-medium text-slate-800">{{ sale.quantity }}</span></span>
+                                    <span class="sale-card__divider">|</span>
+                                    <span class="sale-card__spec">
+                                        <span class="sale-card__spec-label">SKU:</span>
+                                        <span class="sale-card__spec-mono">{{ sale.sku || 'N/A' }}</span>
+                                    </span>
+                                    <span class="sale-card__divider">|</span>
+                                    <span class="sale-card__spec">
+                                        <span class="sale-card__spec-label">QTD:</span>
+                                        <span class="sale-card__spec-value">{{ sale.quantity }}</span>
+                                    </span>
                                 </div>
 
-                                <!-- Footer details -->
-                                <div class="flex items-center flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 uppercase font-medium tracking-wide">
-                                    <span class="flex items-center gap-1" title="Vendedor Resp."><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> {{ sale.user_nickname || 'N/A' }}</span>
-                                    <span class="opacity-50">•</span>
-                                    <span class="flex items-center gap-1" title="Comprador"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> {{ getCustomerName(sale) }}</span>
-                                    <span class="opacity-50">•</span>
-                                    <span class="flex items-center gap-1" title="Modo Envio"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg> {{ sale.shipping_mode || 'N/A' }}</span>
+                                <!-- Footer: Vendedor • Comprador • Modo Envio -->
+                                <div class="sale-card__footer">
+                                    <span class="sale-card__footer-item" title="Vendedor Resp.">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                        {{ sale.user_nickname || 'N/A' }}
+                                    </span>
+                                    <span class="sale-card__footer-dot">•</span>
+                                    <span class="sale-card__footer-item" title="Comprador">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                        {{ getCustomerName(sale) }}
+                                    </span>
+                                    <span class="sale-card__footer-dot">•</span>
+                                    <span class="sale-card__footer-item" title="Modo Envio">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                        {{ sale.shipping_mode || 'N/A' }}
+                                    </span>
                                 </div>
                             </div>
 
-                            <!-- Direita: Valores / Ações -->
-                            <div class="flex flex-col items-start lg:items-end justify-between shrink-0 mt-4 lg:mt-0 pt-4 lg:pt-0 border-t lg:border-t-0 border-slate-100 lg:w-[220px]">
-                                
-                                <div class="flex flex-col lg:items-end gap-1 mb-4 hidden lg:flex">
-                                     <span class="text-sm font-bold text-slate-800">{{ formatDateTime(sale.sale_date) }}</span>
-                                     <span class="text-[11px] flex items-center gap-1 font-medium" :class="{'text-red-600': isLate(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date), 'text-slate-500': !isLate(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date)}">
+                            <!-- Direita: Data / Status / Ações -->
+                            <div class="sale-card__aside">
+                                <div class="sale-card__date-block">
+                                     <span class="sale-card__date-value">{{ formatDateTime(sale.sale_date) }}</span>
+                                     <span class="sale-card__exp-date" :class="{'sale-card__exp-date--late': isLate(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date)}">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                                         Exp.: {{ formatDateTime(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date) || '—' }}
                                      </span>
                                 </div>
                                 
-                                <div class="flex items-center gap-2 flex-wrap lg:justify-end w-full">
-                                    <span v-if="sale.processed_at" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[10px] font-bold tracking-wider uppercase text-emerald-700 bg-emerald-50 border border-emerald-200">
+                                <div class="sale-card__actions">
+                                    <span v-if="sale.processed_at" class="sale-card__status-tag sale-card__status-tag--proc" :title="'Processado em: ' + formatDateTime(sale.processed_at)">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                         Proc
                                     </span>
-                                    <span v-else class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[10px] font-bold tracking-wider uppercase text-amber-700 bg-amber-50 border border-amber-200">
+                                    <span v-else class="sale-card__status-tag sale-card__status-tag--pend">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                                         Pend
                                     </span>
 
-                                    <!-- PDF Label -->
-                                    <button v-if="getLabelInfo(sale).canPrint" @click="downloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" 
-                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 rounded-md text-[11px] font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm focus:ring-2 focus:ring-slate-200 outline-none">
+                                    <button v-if="getLabelInfo(sale).canPrint" @click="downloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                                         PDF
                                     </button>
                                     
-                                    <!-- ZPL Label -->
-                                    <button v-if="getLabelInfo(sale).canPrint" @click="downloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" 
-                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 rounded-md text-[11px] font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm focus:ring-2 focus:ring-slate-200 outline-none">
+                                    <button v-if="getLabelInfo(sale).canPrint" @click="downloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
                                         ZPL
                                     </button>
@@ -918,5 +928,296 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
 .btn-label.zpl:hover { background-color: #e0f2fe; border-color: #7dd3fc; }
 .btn-label svg { width: 12px; height: 12px; }
 .label-unavailable { color: #9ca3af; font-size: 0.875rem; }
+
+/* ============================================= */
+/* CARD-BASED SALES LIST LAYOUT         */
+/* ============================================= */
+.sale-cards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.sale-card {
+    background-color: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.sale-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-color: #cbd5e1;
+}
+.sale-card--cancelled {
+    opacity: 0.55;
+    background-color: #fef2f2;
+    border-color: #fecaca;
+}
+
+.sale-card__layout {
+    display: flex;
+    justify-content: space-between;
+    gap: 1.5rem;
+}
+
+.sale-card__main {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ID Row */
+.sale-card__id-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.sale-card__id-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    background-color: #f1f5f9;
+    color: #64748b;
+    border-radius: 0.375rem;
+    font-size: 10px;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+.sale-card__id-tag:hover {
+    background-color: #e2e8f0;
+}
+
+.sale-card__id-label {
+    opacity: 0.65;
+}
+.sale-card__id-value {
+    font-weight: 600;
+}
+
+.sale-card__date-mobile {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-weight: 500;
+    display: none;
+}
+
+/* Title Row */
+.sale-card__title-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.sale-card__product-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+    max-width: 500px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.sale-card__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.sale-card__badge {
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    border: 1px solid;
+    letter-spacing: 0.025em;
+}
+.sale-card__badge--ml {
+    background-color: #fffbeb;
+    color: #92400e;
+    border-color: #fde68a;
+}
+.sale-card__badge--other {
+    background-color: #f8fafc;
+    color: #475569;
+    border-color: #e2e8f0;
+}
+.sale-card__badge--account {
+    background-color: #eef2ff;
+    color: #4338ca;
+    border-color: #c7d2fe;
+}
+
+/* Specs Row */
+.sale-card__specs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    font-size: 0.8125rem;
+    color: #475569;
+    margin-bottom: 0.75rem;
+}
+
+.sale-card__spec {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.sale-card__spec-label {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+.sale-card__spec-value {
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: #1e293b;
+}
+.sale-card__spec-mono {
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    color: #475569;
+    font-size: 0.75rem;
+}
+.sale-card__divider {
+    color: #cbd5e1;
+    user-select: none;
+}
+
+/* Footer */
+.sale-card__footer {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    font-size: 11px;
+    color: #64748b;
+    text-transform: uppercase;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+}
+
+.sale-card__footer-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.sale-card__footer-item svg {
+    flex-shrink: 0;
+}
+.sale-card__footer-dot {
+    opacity: 0.4;
+    user-select: none;
+}
+
+/* Aside (Right Column) */
+.sale-card__aside {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-shrink: 0;
+    min-width: 200px;
+}
+
+.sale-card__date-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.sale-card__date-value {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.sale-card__exp-date {
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 500;
+    color: #64748b;
+}
+.sale-card__exp-date--late {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+/* Actions */
+.sale-card__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.sale-card__status-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 0.375rem;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: 1px solid;
+}
+.sale-card__status-tag--proc {
+    color: #15803d;
+    background-color: #f0fdf4;
+    border-color: #bbf7d0;
+}
+.sale-card__status-tag--pend {
+    color: #b45309;
+    background-color: #fffbeb;
+    border-color: #fde68a;
+}
+
+/* Responsive: mobile */
+@media (max-width: 768px) {
+    .sale-card__layout {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .sale-card__aside {
+        align-items: flex-start;
+        border-top: 1px solid #f1f5f9;
+        padding-top: 0.75rem;
+        min-width: 0;
+    }
+    .sale-card__date-block {
+        align-items: flex-start;
+        display: none;
+    }
+    .sale-card__date-mobile {
+        display: inline;
+    }
+    .sale-card__actions {
+        justify-content: flex-start;
+    }
+    .sale-card__product-title {
+        max-width: 100%;
+    }
+}
 </style>
+
 
