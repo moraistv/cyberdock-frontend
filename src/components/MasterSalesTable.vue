@@ -7,7 +7,7 @@
                 <div class="filters-left-group">
                     <!-- Busca -->
                     <div class="search-wrapper">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none"
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                             class="search-icon">
                             <circle cx="11" cy="11" r="8"></circle>
@@ -21,7 +21,7 @@
                     <div class="filter-container" ref="saleStatusFilterContainerRef">
                         <button @click="toggleSaleStatusDropdown" class="btn btn-outline">
                             <span class="truncate pr-2">{{ selectedSaleStatusFilter ? `Venda: ${getSaleStatusLabel(selectedSaleStatusFilter)}` : 'Status da Venda' }}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
                                 <path d="m6 9 6 6 6-6"></path>
                             </svg>
                         </button>
@@ -41,7 +41,7 @@
                     <div class="filter-container" ref="statusFilterContainerRef">
                         <button @click="toggleStatusDropdown" class="btn btn-outline">
                             <span class="truncate pr-2">{{ selectedStatusFilter ? `Expedição: ${getStatusLabel(selectedStatusFilter)}` : 'Status de Expedição' }}</span>
-                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
                                 <path d="m6 9 6 6 6-6"></path>
                             </svg>
                         </button>
@@ -61,7 +61,7 @@
                 <div class="filters-right-group">
                     <!-- Botão para Filtros Avançados -->
                     <button @click="toggleAdvancedFilters" class="btn btn-ghost">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 h-4 w-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 h-4 w-4">
                             <path d="M3 6h18M7 12h10M10 18h4"></path>
                         </svg>
                         Filtros Avançados
