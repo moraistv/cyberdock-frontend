@@ -228,10 +228,6 @@
             </div>
         </div>
 
-        <div ref="tooltipRef" class="custom-tooltip">
-            <span class="tooltip-content"></span>
-            <div class="tooltip-arrow"></div>
-        </div>
 
         <UniversalModal :is-open="isSummaryModalOpen" :title="summaryModalTitle" @close="isSummaryModalOpen = false">
             <div class="summary-modal-content" v-html="summaryModalContent"></div>
@@ -375,8 +371,7 @@ const { getLabelInfo: composableLabelInfo, downloadLabel } = useLabels();
 
 
 const salesTableBodyRef = ref(null);
-const tooltipRef = ref(null);
-let hideTooltipTimeout = null;
+
 const salesCurrentPage = ref(1);
 const salesItemsPerPage = ref(10);
 const isProcessing = ref(false);
@@ -627,27 +622,7 @@ function handleClickOutside(event) {
     if (statusFilterContainerRef.value && !statusFilterContainerRef.value.contains(target)) { isStatusDropdownOpen.value = false; }
 }
 
-function showTooltip(event, text) {
-    const el = event.target;
-    if (!el || !text || el.scrollWidth <= el.clientWidth) return;
-    clearTimeout(hideTooltipTimeout);
-    const tooltip = tooltipRef.value;
-    if (!tooltip) return;
-    tooltip.querySelector('.tooltip-content').textContent = text;
-    const rect = el.getBoundingClientRect();
-    tooltip.style.left = `${rect.left + rect.width / 2}px`;
-    tooltip.style.top = `${rect.bottom + 8}px`;
-    tooltip.style.transform = 'translateX(-50%)';
-    gsap.to(tooltip, { autoAlpha: 1, y: 0, duration: 0.3, ease: 'power2.out' });
-}
 
-function hideTooltip() {
-    hideTooltipTimeout = setTimeout(() => {
-        if (tooltipRef.value) {
-            gsap.to(tooltipRef.value, { autoAlpha: 0, y: -10, duration: 0.2, ease: 'power2.in' });
-        }
-    }, 100);
-}
 
 function nextSalesPage() { if (salesCurrentPage.value < salesTotalPages.value) salesCurrentPage.value++; }
 function prevSalesPage() { if (salesCurrentPage.value > 1) salesCurrentPage.value--; }
