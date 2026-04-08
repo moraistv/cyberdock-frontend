@@ -395,7 +395,7 @@ function showToast(message, type = 'info') {
 const { sales, isLoading, error, fetchSales, processSales: processSalesApi } = useMasterSales();
 const { skus, loadStorageData } = useUserStorage(ref(null));
 const { systemStatuses } = useSystemStatus();
-const { getLabelInfo: composableLabelInfo } = useLabels();
+const { getLabelInfo: composableLabelInfo, downloadLabel } = useLabels();
 
 
 const salesTableBodyRef = ref(null);
@@ -681,38 +681,7 @@ function getLabelInfo(sale) {
     return result;
 }
 
-async function openLabelWithToken(sale, baseUrl) {
-    if (!baseUrl) return;
-    
-    console.log('🔗 Abrindo etiqueta:', {
-        saleId: sale.id,
-        sellerId: sale.seller_id,
-        baseUrl: baseUrl
-    });
-    
-    try {
-        const response = await fetch(`/api/ml/access-token/${sale.seller_id}`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            const urlWithToken = `${baseUrl}&access_token=${data.access_token}`;
-            console.log('✅ URL com token:', urlWithToken);
-            window.open(urlWithToken);
-        } else {
-            console.error('❌ Erro ao obter token de acesso:', response.status);
-            console.log('🔄 Tentando abrir sem token...');
-            window.open(baseUrl);
-        }
-    } catch (error) {
-        console.error('❌ Erro ao obter token:', error);
-        console.log('🔄 Tentando abrir sem token...');
-        window.open(baseUrl);
-    }
-}
+
 
 onMounted(() => { 
     document.addEventListener('click', handleClickOutside); 
