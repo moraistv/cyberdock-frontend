@@ -380,7 +380,7 @@ function showToast(message, type = 'info') {
 const { sales, isLoading, error, fetchSales, processSales: processSalesApi } = useMasterSales();
 const { skus, loadStorageData } = useUserStorage(ref(null));
 const { systemStatuses } = useSystemStatus();
-const { getLabelInfo: composableLabelInfo, downloadLabel } = useLabels();
+const { getLabelInfo: composableLabelInfo } = useLabels();
 
 
 const salesTableBodyRef = ref(null);
