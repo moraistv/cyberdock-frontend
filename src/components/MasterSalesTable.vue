@@ -692,7 +692,10 @@ async function openLabelWithToken(sale, baseUrl) {
     }
 }
 
-onMounted(() => { document.addEventListener('click', handleClickOutside); });
+onMounted(() => { 
+    document.addEventListener('click', handleClickOutside); 
+    fetchSales(); // Carrega as vendas do DB automaticamente ao abrir
+});
 onUnmounted(() => { document.removeEventListener('click', handleClickOutside); });
 
 </script>
