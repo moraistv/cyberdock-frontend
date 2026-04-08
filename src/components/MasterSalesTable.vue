@@ -127,122 +127,98 @@
                 <button @click="clearFilters" class="btn btn-secondary">Limpar Filtros</button>
             </div>
             <div v-else>
-                <div class="table-wrapper">
-                    <table class="sales-table">
-                        <thead>
-                            <tr>
-                                <th>Origem</th>
-                                <th>Venda</th>
-                                <th>Produto</th>
-                                <th>Comprador</th>
-                                <th>Logística</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody ref="salesTableBodyRef">
-                            <template v-for="sale in paginatedUserSales" :key="`${sale.id}-${sale.sku}`">
-                                <tr :class="{ 'cancelled-sale': sale.raw_api_data?.status === 'cancelled' }">
-                                    <!-- Origem: Usuário, Canal, Conta -->
-                                    <td data-label="Origem">
-                                        <div class="font-medium text-slate-900">{{ sale.user_nickname || 'N/A' }}</div>
-                                        <div class="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                                            <span class="channel-badge" :style="{ transform: 'scale(0.85)', transformOrigin: 'left center' }" :class="sale.channel?.toLowerCase() || 'ml'">{{ sale.channel || 'ML' }}</span>
-                                            <span class="truncate" style="max-width: 120px;" :title="sale.account_nickname">{{ sale.account_nickname }}</span>
-                                        </div>
-                                    </td>
+                <div class="sales-list-container flex flex-col gap-3">
+                    <div v-for="sale in paginatedUserSales" :key="`${sale.id}-${sale.sku}`" 
+                         class="bg-white border border-slate-200 rounded-lg p-4 flex flex-col hover:shadow-sm transition-all duration-200"
+                         :class="{ 'opacity-60': sale.raw_api_data?.status === 'cancelled' }">
+                        
+                        <div class="flex flex-col lg:flex-row justify-between gap-4">
+                            <!-- Esquerda: Informações Principais -->
+                            <div class="flex-1 min-w-0">
+                                <!-- Topo: ID tag -->
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div class="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-mono border border-slate-200 cursor-pointer hover:bg-slate-200 transition-colors" @click="copySaleId(sale.id)" title="Copiar ID da Venda">
+                                        <span class="opacity-70">ID:</span>
+                                        <span class="font-semibold">{{ sale.id || 'N/A' }}</span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                    </div>
+                                    <span class="text-xs text-slate-400 font-medium lg:hidden">{{ formatDateTime(sale.sale_date) }}</span>
+                                </div>
+                                
+                                <!-- Main Title Area -->
+                                <div class="flex items-start md:items-center flex-col md:flex-row gap-2.5 mb-2">
+                                    <h3 class="text-base font-bold text-slate-800 line-clamp-1" :title="sale.product_title" style="max-width: 500px;">
+                                        {{ sale.product_title || 'Produto sem título' }}
+                                    </h3>
+                                    <div class="flex flex-wrap gap-1.5 items-center shrink-0 mt-1 md:mt-0">
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase border" :class="sale.channel?.toLowerCase() === 'ml' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-slate-50 text-slate-700 border-slate-200'">{{ sale.channel || 'ML' }}</span>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase border bg-indigo-50 text-indigo-700 border-indigo-200">{{ sale.account_nickname }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Subtitle / Specs -->
+                                <div class="flex items-center flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600 mb-3">
+                                    <span class="flex items-center gap-1">
+                                        <span class="text-xs text-slate-400">Status:</span> 
+                                        <span class="font-medium flex items-center group cursor-help" :title="sale.shipping_status">
+                                            <span :class="['w-2 h-2 rounded-full inline-block mr-1.5 shadow-sm', getStatusColorClass(sale.shipping_status)]"></span>
+                                            {{ getStatusLabel(sale.shipping_status) }}
+                                        </span>
+                                    </span>
+                                    <span class="text-slate-300">|</span>
+                                    <span class="text-xs"><span class="text-slate-400 mr-1">SKU:</span><span class="font-mono text-slate-700">{{ sale.sku || 'N/A' }}</span></span>
+                                    <span class="text-slate-300">|</span>
+                                    <span class="text-xs"><span class="text-slate-400 mr-1">QTD:</span><span class="font-medium text-slate-800">{{ sale.quantity }}</span></span>
+                                </div>
+
+                                <!-- Footer details -->
+                                <div class="flex items-center flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 uppercase font-medium tracking-wide">
+                                    <span class="flex items-center gap-1" title="Vendedor Resp."><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> {{ sale.user_nickname || 'N/A' }}</span>
+                                    <span class="opacity-50">•</span>
+                                    <span class="flex items-center gap-1" title="Comprador"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> {{ getCustomerName(sale) }}</span>
+                                    <span class="opacity-50">•</span>
+                                    <span class="flex items-center gap-1" title="Modo Envio"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg> {{ sale.shipping_mode || 'N/A' }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Direita: Valores / Ações -->
+                            <div class="flex flex-col items-start lg:items-end justify-between shrink-0 mt-4 lg:mt-0 pt-4 lg:pt-0 border-t lg:border-t-0 border-slate-100 lg:w-[220px]">
+                                
+                                <div class="flex flex-col lg:items-end gap-1 mb-4 hidden lg:flex">
+                                     <span class="text-sm font-bold text-slate-800">{{ formatDateTime(sale.sale_date) }}</span>
+                                     <span class="text-[11px] flex items-center gap-1 font-medium" :class="{'text-red-600': isLate(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date), 'text-slate-500': !isLate(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date)}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                        Exp.: {{ formatDateTime(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date) || '—' }}
+                                     </span>
+                                </div>
+                                
+                                <div class="flex items-center gap-2 flex-wrap lg:justify-end w-full">
+                                    <span v-if="sale.processed_at" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[10px] font-bold tracking-wider uppercase text-emerald-700 bg-emerald-50 border border-emerald-200">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                        Proc
+                                    </span>
+                                    <span v-else class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[10px] font-bold tracking-wider uppercase text-amber-700 bg-amber-50 border border-amber-200">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                        Pend
+                                    </span>
+
+                                    <!-- PDF Label -->
+                                    <button v-if="getLabelInfo(sale).canPrint" @click="downloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" 
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 rounded-md text-[11px] font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm focus:ring-2 focus:ring-slate-200 outline-none">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                        PDF
+                                    </button>
                                     
-                                    <!-- Venda: ID, Data -->
-                                    <td data-label="Venda">
-                                        <div class="sale-id-cell font-medium text-blue-600 hover:text-blue-800 cursor-pointer" 
-                                            @click="copySaleId(sale.id)" 
-                                            :title="'Clique para copiar: ' + (sale.id || 'N/A')">
-                                            {{ sale.id || 'N/A' }}
-                                        </div>
-                                        <div class="text-xs text-slate-500 mt-1">{{ formatDateTime(sale.sale_date) }}</div>
-                                    </td>
-                                    
-                                    <!-- Produto: Título, SKU, Qtd -->
-                                    <td data-label="Produto">
-                                        <div class="product-title font-medium text-slate-800 truncate" 
-                                             style="max-width: 250px" 
-                                             @mouseenter="showTooltip($event, sale.product_title)" @mouseleave="hideTooltip">
-                                            {{ sale.product_title }}
-                                        </div>
-                                        <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
-                                            <span class="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200" title="SKU">SKU: {{ sale.sku || 'N/A' }}</span>
-                                            <span class="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 font-medium" title="Quantidade">Qtd: {{ sale.quantity }}</span>
-                                        </div>
-                                    </td>
-                                    
-                                    <!-- Comprador: Cliente -->
-                                    <td data-label="Comprador">
-                                        <div class="customer-name-cell font-medium text-slate-700 truncate" style="max-width: 180px;"
-                                            @mouseenter="showTooltip($event, getCustomerName(sale))" @mouseleave="hideTooltip">
-                                            {{ getCustomerName(sale) }}
-                                        </div>
-                                        <!-- Processada status visual indicator under customer -->
-                                        <div class="mt-1">
-                                            <span v-if="sale.processed_at" class="text-[10px] uppercase font-bold tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200" :title="`Processado em: ${formatDateTime(sale.processed_at)}`">✅ Processada</span>
-                                            <span v-else class="text-[10px] uppercase font-bold tracking-wider text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">⏳ Pendente</span>
-                                        </div>
-                                    </td>
-                                    
-                                    <!-- Logística: Status, Modo Envio, Limite -->
-                                    <td data-label="Logística">
-                                        <div class="status-select-trigger compact mb-1.5"
-                                            @mouseenter="showTooltip($event, getStatusLabel(sale.shipping_status))"
-                                            @mouseleave="hideTooltip">
-                                            <span :class="['status-badge', getStatusColorClass(sale.shipping_status)]"></span>
-                                            <span class="font-semibold text-sm">{{ getStatusLabel(sale.shipping_status) }}</span>
-                                        </div>
-                                        <div class="text-xs text-slate-500 flex flex-col gap-0.5">
-                                            <div><span class="font-medium">Modo:</span> {{ sale.shipping_mode || 'N/A' }}</div>
-                                            <div>
-                                                <span class="font-medium">Limite:</span> 
-                                                <span :class="{'text-red-600 font-semibold': isLate(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date)}">
-                                                    {{ formatDateTime(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date) || '—' }}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    
-                                    <!-- Ações: Etiquetas -->
-                                    <td data-label="Ações">
-                                        <div class="label-actions flex flex-row gap-2 items-center">
-                                            <button 
-                                                v-if="getLabelInfo(sale).canPrint"
-                                                @click="downloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')"
-                                                class="btn-label pdf flex-1 justify-center !py-1.5"
-                                                title="Imprimir Etiqueta PDF"
-                                            >
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1">
-                                                    <polyline points="6,9 6,2 18,2 18,9"></polyline>
-                                                    <path d="M6,18H4a2,2,0,0,1-2-2V11a2,2,0,0,1,2-2H20a2,2,0,0,1,2,2v5a2,2,0,0,1-2,2H18"></path>
-                                                    <polyline points="6,14 18,14 18,18 6,18"></polyline>
-                                                </svg>
-                                                PDF
-                                            </button>
-                                            <button 
-                                                v-if="getLabelInfo(sale).canPrint"
-                                                @click="downloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')"
-                                                class="btn-label zpl flex-1 justify-center !py-1.5"
-                                                title="Imprimir Etiqueta ZPL"
-                                            >
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1">
-                                                    <polyline points="6,9 6,2 18,2 18,9"></polyline>
-                                                    <path d="M6,18H4a2,2,0,0,1-2-2V11a2,2,0,0,1,2-2H20a2,2,0,0,1,2,2v5a2,2,0,0,1-2,2H18"></path>
-                                                    <polyline points="6,14 18,14 18,18 6,18"></polyline>
-                                                </svg>
-                                                ZPL
-                                            </button>
-                                            <span v-if="!getLabelInfo(sale).canPrint" class="text-xs text-slate-400 italic">ND</span>
-                                        </div>
-                                        <!-- Debug info removido para layout mais limpo -->
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
+                                    <!-- ZPL Label -->
+                                    <button v-if="getLabelInfo(sale).canPrint" @click="downloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" 
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 rounded-md text-[11px] font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm focus:ring-2 focus:ring-slate-200 outline-none">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
+                                        ZPL
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="pagination-controls" v-if="salesTotalPages > 1">
                     <button @click="prevSalesPage" :disabled="salesCurrentPage === 1">Anterior</button>
