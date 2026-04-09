@@ -784,7 +784,7 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
 // ML Data Helpers
 function getProductLink(sale) {
     if (sale.product_permalink) return sale.product_permalink;
-    if (sale.ml_item_id && sale.channel?.toUpperCase() === 'ML') {
+    if (sale.ml_item_id && String(sale.ml_item_id).toUpperCase().startsWith('MLB')) {
         const idStr = String(sale.ml_item_id);
         const match = idStr.match(/^MLB(\d+)$/i);
         const numId = match ? match[1] : idStr.replace('MLB', '');
@@ -796,7 +796,7 @@ function getProductLink(sale) {
 const loadedThumbs = reactive({});
 function loadThumbTrigger(sale) {
     if (sale.product_thumbnail) return '';
-    if (sale.ml_item_id && sale.channel?.toUpperCase() === 'ML') {
+    if (sale.ml_item_id && String(sale.ml_item_id).toUpperCase().startsWith('MLB')) {
         const idStr = String(sale.ml_item_id).toUpperCase();
         if (!loadedThumbs[idStr]) {
             loadedThumbs[idStr] = 'loading';
