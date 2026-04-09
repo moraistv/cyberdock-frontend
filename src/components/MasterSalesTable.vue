@@ -474,7 +474,7 @@ function showToast(message, type = 'info') {
 
 const { sales, isLoading, error, totalSales, currentPage, totalPages, fetchSales, processSales: processSalesApi } = useMasterSales();
 const { skus, loadStorageData } = useUserStorage();
-const { systemStatuses, fetchSystemStatuses } = useSystemStatus();
+const { systemStatuses } = useSystemStatus();
 const { downloadLabel, getLabelInfo: composableLabelInfo } = useLabels();
 const { get: apiGet } = useApi();
 
