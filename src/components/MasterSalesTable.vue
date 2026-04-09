@@ -136,10 +136,16 @@
                         <div class="sale-card__layout">
                             <!-- Thumbnail do Produto -->
                             <div class="sale-card__thumb">
-                                <img v-if="sale.product_thumbnail" :src="sale.product_thumbnail.replace('http://', 'https://')" :alt="sale.product_title" class="sale-card__thumb-img" loading="lazy" />
+                                <img v-if="sale.product_thumbnail || loadedThumbs[sale.ml_item_id] && loadedThumbs[sale.ml_item_id] !== 'loading'" 
+                                     :src="(sale.product_thumbnail || loadedThumbs[sale.ml_item_id]).replace('http://', 'https://')" 
+                                     :alt="sale.product_title" 
+                                     class="sale-card__thumb-img" 
+                                     loading="lazy" />
                                 <div v-else class="sale-card__thumb-placeholder">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                                 </div>
+                                <!-- Trigger image load -->
+                                <span style="display:none">{{ loadThumbTrigger(sale) }}</span>
                             </div>
 
                             <!-- Centro: Informações Principais -->
@@ -156,7 +162,7 @@
                                 
                                 <!-- Título do Produto (clicável) + Logo ML + Conta -->
                                 <div class="sale-card__title-row">
-                                    <a v-if="sale.product_permalink" :href="sale.product_permalink" target="_blank" rel="noopener" class="sale-card__product-link" :title="sale.product_title">
+                                    <a v-if="getProductLink(sale)" :href="getProductLink(sale)" target="_blank" rel="noopener" class="sale-card__product-link" :title="sale.product_title">
                                         {{ sale.product_title || 'Produto sem título' }}
                                     </a>
                                     <h3 v-else class="sale-card__product-title" :title="sale.product_title">
@@ -219,10 +225,12 @@
                             <!-- Direita: Data / Status / Ações -->
                             <div class="sale-card__aside">
                                 <div class="sale-card__date-block">
-                                     <span class="sale-card__date-value">{{ formatDateTime(sale.sale_date) }}</span>
-                                     <span class="sale-card__exp-date" :class="{'sale-card__exp-date--late': isLate(sale.sla_expected_date || sale.shipping_limit_date)}">
+                                     <span class="sale-card__date-value" :class="{'sale-card__date-value--late': isLate(sale.sla_expected_date || sale.shipping_limit_date)}" title="Prazo de Expedição">
+                                        {{ formatDateTime(sale.sla_expected_date || sale.shipping_limit_date) || '—' }}
+                                     </span>
+                                     <span class="sale-card__exp-date" title="Data da Venda">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                                        Exp.: {{ formatDateTime(sale.sla_expected_date || sale.shipping_limit_date) || '—' }}
+                                        Venda: {{ formatDateTime(sale.sale_date) }}
                                      </span>
                                 </div>
                                 
@@ -607,6 +615,44 @@ onMounted(() => {
     triggerServerFetch(false);
 });
 onUnmounted(() => { document.removeEventListener('click', handleClickOutside); });
+
+// ML Data Helpers
+function getProductLink(sale) {
+    if (sale.product_permalink) return sale.product_permalink;
+    if (sale.ml_item_id && sale.channel?.toUpperCase() === 'ML') {
+        const idStr = String(sale.ml_item_id);
+        const match = idStr.match(/^MLB(\d+)$/i);
+        const numId = match ? match[1] : idStr.replace('MLB', '');
+        return `https://produto.mercadolivre.com.br/MLB-${numId}`;
+    }
+    return null;
+}
+
+const loadedThumbs = reactive({});
+function loadThumbTrigger(sale) {
+    if (sale.product_thumbnail) return '';
+    if (sale.ml_item_id && sale.channel?.toUpperCase() === 'ML') {
+        const idStr = String(sale.ml_item_id).toUpperCase();
+        if (!loadedThumbs[idStr]) {
+            loadedThumbs[idStr] = 'loading';
+            fetch(`https://api.mercadolibre.com/items/${idStr}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.thumbnail) {
+                        loadedThumbs[idStr] = data.thumbnail;
+                    } else if (data && data.pictures && data.pictures.length > 0) {
+                        loadedThumbs[idStr] = data.pictures[0].url;
+                    } else {
+                        loadedThumbs[idStr] = null; // No image found
+                    }
+                })
+                .catch(err => {
+                    loadedThumbs[idStr] = null;
+                });
+        }
+    }
+    return '';
+}
 
 </script>
 
@@ -1164,6 +1210,10 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
     color: #1e293b;
 }
 
+.sale-card__date-value--late {
+    color: #dc2626;
+}
+
 .sale-card__exp-date {
     font-size: 12px;
     display: inline-flex;
@@ -1171,10 +1221,6 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
     gap: 0.25rem;
     font-weight: 500;
     color: #64748b;
-}
-.sale-card__exp-date--late {
-    color: #dc2626;
-    font-weight: 600;
 }
 
 /* Actions */
