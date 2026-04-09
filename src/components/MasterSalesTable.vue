@@ -869,7 +869,7 @@ function getThumbUrl(sale) {
     if (itId) {
         const idStr = String(itId).toUpperCase();
         const tb = loadedThumbs[idStr];
-        if (tb && tb !== 'loading') {
+        if (tb && tb !== 'loading' && tb !== 'error') {
             return tb.replace('http://', 'https://');
         }
     }
