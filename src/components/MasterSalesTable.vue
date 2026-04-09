@@ -844,11 +844,11 @@ function loadThumbTrigger(sale) {
                     } else if (data && data.pictures && data.pictures.length > 0) {
                         loadedThumbs[idStr] = data.pictures[0].url;
                     } else {
-                        loadedThumbs[idStr] = null;
+                        loadedThumbs[idStr] = 'error';
                     }
                 })
                 .catch(() => {
-                    loadedThumbs[idStr] = null;
+                    loadedThumbs[idStr] = 'error';
                 });
         }
     }
