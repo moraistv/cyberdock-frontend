@@ -828,7 +828,6 @@ function loadThumbTrigger(sale) {
 
     // Se não tiver ID direto, tenta achar nos dados brutos pelo SKU
     if (!itId && sale.raw_api_data?.order_items) {
-        console.log("DEBUG: raw_api_data format:", sale.raw_api_data);
         const itemObj = sale.raw_api_data.order_items.find(it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku);
         if (itemObj?.item?.id) itId = itemObj.item.id;
     }
