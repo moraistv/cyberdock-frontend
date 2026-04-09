@@ -31,6 +31,7 @@ export function useMasterSales() {
       if (params.shippingLimitStart) queryParams.set('shippingLimitStart', params.shippingLimitStart);
       if (params.shippingLimitEnd) queryParams.set('shippingLimitEnd', params.shippingLimitEnd);
       if (params.shippingMode) queryParams.set('shippingMode', params.shippingMode);
+      if (params.userNickname) queryParams.set('userNickname', params.userNickname);
 
       const result = await api.get(`/sales/all?${queryParams.toString()}`);
 

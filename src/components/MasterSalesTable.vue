@@ -80,20 +80,34 @@
                         </div>
                     </div>
 
-                </div>
-                <div class="filters-right-group">
-                    <button @click="toggleAdvancedFilters" class="btn btn-ghost" :class="{'btn-ghost--active': showAdvancedFilters || hasActiveAdvancedFilters}">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 h-4 w-4">
-                            <path d="M3 6h18M7 12h10M10 18h4"></path>
-                        </svg>
-                        Filtros Avançados
-                        <span v-if="hasActiveAdvancedFilters" class="filter-active-dot"></span>
-                    </button>
+                    <!-- Filtro de Usuário -->
+                    <div class="filter-container" ref="userFilterContainerRef">
+                        <button @click="isUserDropdownOpen = !isUserDropdownOpen" class="btn btn-outline">
+                            <span class="truncate pr-2">{{ selectedUserFilter ? `Usuário: ${selectedUserFilter}` : 'Usuário' }}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
+                                <path d="m6 9 6 6 6-6"></path>
+                            </svg>
+                        </button>
+                        <div v-if="isUserDropdownOpen" class="filter-popover">
+                            <div class="filter-popover-search">
+                                <input type="text" v-model="userSearchText" placeholder="Buscar usuário..." class="filter-popover-input" />
+                            </div>
+                            <ul class="filter-popover-list">
+                                <li @click="applyUserFilter(null)">
+                                    <span :class="{'font-bold': !selectedUserFilter}">Todos</span>
+                                </li>
+                                <li v-for="usr in filteredUserOptions" :key="usr" @click="applyUserFilter(usr)">
+                                    <span :class="{'font-bold': selectedUserFilter === usr}">{{ usr }}</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
-            <!-- Filtros Avançados -->
-            <div v-if="showAdvancedFilters" class="advanced-filters-content">
+            <!-- Filtros Extras (sempre visíveis) -->
+            <div class="advanced-filters-content">
                 <div class="advanced-filters-grid">
                     <!-- Busca por Cliente -->
                     <div class="filter-group">
@@ -484,7 +498,7 @@ const isSummaryModalOpen = ref(false);
 const summaryModalTitle = ref('');
 const summaryModalContent = ref('');
 
-const showAdvancedFilters = ref(false);
+// showAdvancedFilters removido — filtros sempre visíveis
 
 const selectedSaleStatusFilter = ref(null);
 const isSaleStatusDropdownOpen = ref(false);
@@ -500,6 +514,11 @@ const selectedAccountFilter = ref(null);
 const isAccountDropdownOpen = ref(false);
 const accountFilterContainerRef = ref(null);
 const accountSearchText = ref('');
+
+const selectedUserFilter = ref(null);
+const isUserDropdownOpen = ref(false);
+const userFilterContainerRef = ref(null);
+const userSearchText = ref('');
 
 const buyerSearch = ref('');
 let buyerDebounce = null;
@@ -529,13 +548,33 @@ const filteredAccountOptions = computed(() => {
     return accountOptions.value.filter(a => a.toLowerCase().includes(q));
 });
 
+const userOptions = computed(() => {
+    const set = new Set();
+    if (Array.isArray(sales.value)) {
+        sales.value.forEach(s => { if (s.user_nickname) set.add(s.user_nickname); });
+    }
+    return Array.from(set).sort();
+});
+
+const filteredUserOptions = computed(() => {
+    const q = userSearchText.value.toLowerCase();
+    if (!q) return userOptions.value;
+    return userOptions.value.filter(u => u.toLowerCase().includes(q));
+});
+
 const hasActiveAdvancedFilters = computed(() => {
-    return !!(filters.saleDateStart || filters.saleDateEnd || filters.shippingLimitStart || filters.shippingLimitEnd || buyerSearch.value);
+    return !!(filters.saleDateStart || filters.saleDateEnd || filters.shippingLimitStart || filters.shippingLimitEnd || buyerSearch.value || selectedUserFilter.value);
 });
 
 function applyAccountFilter(acc) {
     selectedAccountFilter.value = acc;
     isAccountDropdownOpen.value = false;
+    triggerServerFetch(true);
+}
+
+function applyUserFilter(usr) {
+    selectedUserFilter.value = usr;
+    isUserDropdownOpen.value = false;
     triggerServerFetch(true);
 }
 
@@ -618,6 +657,7 @@ function triggerServerFetch(resetPage = true) {
         shippingLimitStart: filters.shippingLimitStart || undefined,
         shippingLimitEnd: filters.shippingLimitEnd || undefined,
         shippingMode: filters.shippingMode || undefined,
+        userNickname: selectedUserFilter.value || undefined,
     });
 }
 
@@ -710,7 +750,7 @@ function getStatusColorClass(statusValue) {
     return 'status-badge-default';
 }
 
-function toggleAdvancedFilters() { showAdvancedFilters.value = !showAdvancedFilters.value; }
+// toggleAdvancedFilters removido — filtros sempre visíveis
 function toggleSaleStatusDropdown() { isSaleStatusDropdownOpen.value = !isSaleStatusDropdownOpen.value; }
 function applySaleStatusFilter(statusValue) { selectedSaleStatusFilter.value = statusValue; isSaleStatusDropdownOpen.value = false; }
 function toggleStatusDropdown() { isStatusDropdownOpen.value = !isStatusDropdownOpen.value; }
@@ -730,6 +770,7 @@ function clearFilters() {
     selectedStatusFilter.value = null;
     selectedSaleStatusFilter.value = null;
     selectedAccountFilter.value = null;
+    selectedUserFilter.value = null;
     activeSaleDatePreset.value = null;
     activeShipDatePreset.value = null;
     triggerServerFetch(true);
@@ -783,6 +824,7 @@ function handleClickOutside(event) {
     if (saleStatusFilterContainerRef.value && !saleStatusFilterContainerRef.value.contains(target)) { isSaleStatusDropdownOpen.value = false; }
     if (statusFilterContainerRef.value && !statusFilterContainerRef.value.contains(target)) { isStatusDropdownOpen.value = false; }
     if (accountFilterContainerRef.value && !accountFilterContainerRef.value.contains(target)) { isAccountDropdownOpen.value = false; }
+    if (userFilterContainerRef.value && !userFilterContainerRef.value.contains(target)) { isUserDropdownOpen.value = false; }
 }
 
 function getLabelInfo(sale) {
