@@ -226,8 +226,6 @@
                                 <div v-else class="sale-card__thumb-placeholder">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                                 </div>
-                                <!-- Trigger image load -->
-                                <span style="display:none">{{ loadThumbTrigger(sale) }}</span>
                             </div>
 
                             <!-- Centro: Informações Principais -->
@@ -366,7 +364,7 @@ import { useMasterSales } from '@/composables/useMasterSales';
 import { useUserStorage } from '@/composables/useUserStorage';
 import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
-import { useApi } from '@/composables/useApi';
+import { API_BASE_URL } from '@/config';
 import UniversalModal from './UniversalModal.vue';
 
 // ===== UTILITY FUNCTIONS FOR CUSTOMER DATA =====
@@ -490,7 +488,6 @@ const { sales, isLoading, error, totalSales, currentPage, totalPages, fetchSales
 const { skus, loadStorageData } = useUserStorage();
 const { systemStatuses } = useSystemStatus();
 const { downloadLabel, getLabelInfo: composableLabelInfo } = useLabels();
-const { get: apiGet } = useApi();
 
 const searchQuery = ref('');
 const isProcessing = ref(false);
@@ -861,59 +858,22 @@ function getProductLink(sale) {
     return null;
 }
 
-const loadedThumbs = reactive({});
-function loadThumbTrigger(sale) {
-    if (sale.product_thumbnail) return '';
-    
-    let itId = sale.ml_item_id;
-
-    // Se não tiver ID direto, tenta achar nos dados brutos pelo SKU
-    if (!itId && sale.raw_api_data?.order_items) {
-        const itemObj = sale.raw_api_data.order_items.find(it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku);
-        if (itemObj?.item?.id) itId = itemObj.item.id;
-    }
-
-    if (itId && String(itId).toUpperCase().startsWith('MLB')) {
-        const idStr = String(itId).toUpperCase();
-        if (!loadedThumbs[idStr]) {
-            loadedThumbs[idStr] = 'loading';
-            
-            // Usando o proxy do backend para evitar Erro 403 (PolicyAgent)
-            apiGet(`/ml/item-thumbnail/${idStr}`)
-                .then(data => {
-                    if (data && data.thumbnail) {
-                        loadedThumbs[idStr] = data.thumbnail;
-                    } else {
-                        loadedThumbs[idStr] = 'error';
-                    }
-                })
-                .catch(() => {
-                    loadedThumbs[idStr] = 'error';
-                });
-        }
-    }
-    return '';
-}
-
+// Thumbnail - usa o proxy do backend para servir imagens do ML sem 403
 function getThumbUrl(sale) {
-    if (sale.product_thumbnail) {
-        return sale.product_thumbnail.replace('http://', 'https://');
-    }
-
-    let itId = sale.ml_item_id;
-    if (!itId && sale.raw_api_data?.order_items) {
+    // Pega a URL original da thumbnail dos dados da venda
+    let thumbUrl = sale.product_thumbnail;
+    
+    // Fallback: tenta extrair do raw_api_data
+    if (!thumbUrl && sale.raw_api_data?.order_items) {
         const itemObj = sale.raw_api_data.order_items.find(it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku);
-        if (itemObj?.item?.id) itId = itemObj.item.id;
+        if (itemObj?.item?.thumbnail) thumbUrl = itemObj.item.thumbnail;
     }
-
-    if (itId) {
-        const idStr = String(itId).toUpperCase();
-        const tb = loadedThumbs[idStr];
-        if (tb && tb !== 'loading' && tb !== 'error') {
-            return tb.replace('http://', 'https://');
-        }
-    }
-    return null;
+    
+    if (!thumbUrl) return null;
+    
+    // Passa a URL pelo proxy do backend para evitar 403
+    const encodedUrl = encodeURIComponent(thumbUrl);
+    return `${API_BASE_URL}/ml/img-proxy?url=${encodedUrl}`;
 }
 
 </script>
