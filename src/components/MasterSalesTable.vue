@@ -352,6 +352,7 @@ import { useMasterSales } from '@/composables/useMasterSales';
 import { useUserStorage } from '@/composables/useUserStorage';
 import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
+import { useApi } from '@/composables/useApi';
 import UniversalModal from './UniversalModal.vue';
 
 // ===== UTILITY FUNCTIONS FOR CUSTOMER DATA =====
@@ -472,17 +473,17 @@ function showToast(message, type = 'info') {
 // ===== END UTILITY FUNCTIONS =====
 
 const { sales, isLoading, error, totalSales, currentPage, totalPages, fetchSales, processSales: processSalesApi } = useMasterSales();
-const { skus, loadStorageData } = useUserStorage(ref(null));
-const { systemStatuses } = useSystemStatus();
-const { getLabelInfo: composableLabelInfo, downloadLabel } = useLabels();
+const { skus, loadStorageData } = useUserStorage();
+const { statuses, fetchStatuses } = useSystemStatus();
+const { downloadLabel, getLabelInfo } = useLabels();
+const { get: apiGet } = useApi();
 
-const salesTableBodyRef = ref(null);
+const searchQuery = ref('');
 const isProcessing = ref(false);
 const isSummaryModalOpen = ref(false);
 const summaryModalTitle = ref('');
 const summaryModalContent = ref('');
 
-const searchQuery = ref('');
 const showAdvancedFilters = ref(false);
 
 const selectedSaleStatusFilter = ref(null);
@@ -836,13 +837,12 @@ function loadThumbTrigger(sale) {
         const idStr = String(itId).toUpperCase();
         if (!loadedThumbs[idStr]) {
             loadedThumbs[idStr] = 'loading';
-            fetch(`https://api.mercadolibre.com/items/${idStr}`)
-                .then(res => res.json())
+            
+            // Usando o proxy do backend para evitar Erro 403 (PolicyAgent)
+            apiGet(`/ml/item-thumbnail/${idStr}`)
                 .then(data => {
                     if (data && data.thumbnail) {
                         loadedThumbs[idStr] = data.thumbnail;
-                    } else if (data && data.pictures && data.pictures.length > 0) {
-                        loadedThumbs[idStr] = data.pictures[0].url;
                     } else {
                         loadedThumbs[idStr] = 'error';
                     }
