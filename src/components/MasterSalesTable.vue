@@ -104,6 +104,22 @@
                         <input id="buyer-search" type="text" v-model="buyerSearch" placeholder="Nome do comprador..." class="filter-text-input" />
                     </div>
 
+                    <!-- Filtro por Modo de Envio -->
+                    <div class="filter-group">
+                        <label for="shipping-mode-select">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                            Modo de Envio
+                        </label>
+                        <select id="shipping-mode-select" v-model="filters.shippingMode" class="filter-select">
+                            <option value="">Todos</option>
+                            <option value="me1">Correios (me1)</option>
+                            <option value="me2">Mercado Envios (me2)</option>
+                            <option value="fulfillment">FULL (fulfillment)</option>
+                            <option value="cross_docking">Coleta (cross docking)</option>
+                            <option value="custom">Personalizado (custom)</option>
+                        </select>
+                    </div>
+
                     <!-- Data da Venda -->
                     <div class="filter-group date-range-group">
                         <label>
@@ -275,7 +291,10 @@
                             <!-- Direita: Data / Status / Ações -->
                             <div class="sale-card__aside">
                                 <div class="sale-card__date-block">
-                                     <span class="sale-card__date-value" :class="{'sale-card__date-value--late': isLate(sale.sla_expected_date || sale.shipping_limit_date)}" title="Prazo de Expedição">
+                                     <span v-if="String(sale.shipping_mode).toLowerCase().includes('full')" class="sale-card__date-value" style="color: #6366f1; font-weight: 700;" title="Envio FULL">
+                                        FULL
+                                     </span>
+                                     <span v-else class="sale-card__date-value" :class="{'sale-card__date-value--late': isLate(sale.sla_expected_date || sale.shipping_limit_date)}" title="Prazo de Expedição">
                                         {{ formatDateTime(sale.sla_expected_date || sale.shipping_limit_date) || '—' }}
                                      </span>
                                      <span class="sale-card__exp-date" title="Data da Venda">
@@ -492,6 +511,7 @@ const filters = reactive({
     saleDateEnd: '',
     shippingLimitStart: '',
     shippingLimitEnd: '',
+    shippingMode: '',
 });
 
 const accountOptions = computed(() => {
@@ -596,6 +616,7 @@ function triggerServerFetch(resetPage = true) {
         buyer: buyerSearch.value || undefined,
         shippingLimitStart: filters.shippingLimitStart || undefined,
         shippingLimitEnd: filters.shippingLimitEnd || undefined,
+        shippingMode: filters.shippingMode || undefined,
     });
 }
 
@@ -609,7 +630,7 @@ watch(buyerSearch, () => {
     buyerDebounce = setTimeout(() => triggerServerFetch(true), 400);
 });
 
-watch([selectedSaleStatusFilter, selectedStatusFilter], () => triggerServerFetch(true));
+watch([selectedSaleStatusFilter, selectedStatusFilter, () => filters.shippingMode], () => triggerServerFetch(true));
 watch([() => filters.saleDateStart, () => filters.saleDateEnd, () => filters.shippingLimitStart, () => filters.shippingLimitEnd], () => {
     activeSaleDatePreset.value = null;
     activeShipDatePreset.value = null;
@@ -702,6 +723,7 @@ function clearFilters() {
     filters.saleDateEnd = '';
     filters.shippingLimitStart = '';
     filters.shippingLimitEnd = '';
+    filters.shippingMode = '';
     searchQuery.value = '';
     buyerSearch.value = '';
     selectedStatusFilter.value = null;
