@@ -26,6 +26,10 @@ export function useMasterSales() {
       if (params.saleStatus) queryParams.set('saleStatus', params.saleStatus);
       if (params.saleDateStart) queryParams.set('saleDateStart', params.saleDateStart);
       if (params.saleDateEnd) queryParams.set('saleDateEnd', params.saleDateEnd);
+      if (params.account) queryParams.set('account', params.account);
+      if (params.buyer) queryParams.set('buyer', params.buyer);
+      if (params.shippingLimitStart) queryParams.set('shippingLimitStart', params.shippingLimitStart);
+      if (params.shippingLimitEnd) queryParams.set('shippingLimitEnd', params.shippingLimitEnd);
 
       const result = await api.get(`/sales/all?${queryParams.toString()}`);
 

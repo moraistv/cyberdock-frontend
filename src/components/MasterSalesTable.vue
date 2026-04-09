@@ -2,7 +2,7 @@
     <div class="main-container">
         <!-- Painel de Filtros Melhorado -->
         <div class="filters-panel-v2">
-             <!-- Linha principal com filtros rápidos e ações primárias -->
+             <!-- Linha principal com filtros rápidos -->
             <div class="filters-main-row">
                 <div class="filters-left-group">
                     <!-- Busca -->
@@ -57,14 +57,37 @@
                         </div>
                     </div>
 
+                    <!-- Filtro de Conta -->
+                    <div class="filter-container" ref="accountFilterContainerRef">
+                        <button @click="isAccountDropdownOpen = !isAccountDropdownOpen" class="btn btn-outline">
+                            <span class="truncate pr-2">{{ selectedAccountFilter ? `Conta: ${selectedAccountFilter}` : 'Conta' }}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
+                                <path d="m6 9 6 6 6-6"></path>
+                            </svg>
+                        </button>
+                        <div v-if="isAccountDropdownOpen" class="filter-popover">
+                            <div class="filter-popover-search">
+                                <input type="text" v-model="accountSearchText" placeholder="Buscar conta..." class="filter-popover-input" />
+                            </div>
+                            <ul class="filter-popover-list">
+                                <li @click="applyAccountFilter(null)">
+                                    <span :class="{'font-bold': !selectedAccountFilter}">Todas</span>
+                                </li>
+                                <li v-for="acc in filteredAccountOptions" :key="acc" @click="applyAccountFilter(acc)">
+                                    <span :class="{'font-bold': selectedAccountFilter === acc}">{{ acc }}</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
                 </div>
                 <div class="filters-right-group">
-                    <!-- Botão para Filtros Avançados -->
-                    <button @click="toggleAdvancedFilters" class="btn btn-ghost">
+                    <button @click="toggleAdvancedFilters" class="btn btn-ghost" :class="{'btn-ghost--active': showAdvancedFilters || hasActiveAdvancedFilters}">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 h-4 w-4">
                             <path d="M3 6h18M7 12h10M10 18h4"></path>
                         </svg>
                         Filtros Avançados
+                        <span v-if="hasActiveAdvancedFilters" class="filter-active-dot"></span>
                     </button>
                 </div>
             </div>
@@ -72,23 +95,52 @@
             <!-- Filtros Avançados -->
             <div v-if="showAdvancedFilters" class="advanced-filters-content">
                 <div class="advanced-filters-grid">
-                    <!-- Filtro de Data da Venda -->
+                    <!-- Busca por Cliente -->
+                    <div class="filter-group">
+                        <label for="buyer-search">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            Cliente / Comprador
+                        </label>
+                        <input id="buyer-search" type="text" v-model="buyerSearch" placeholder="Nome do comprador..." class="filter-text-input" />
+                    </div>
+
+                    <!-- Data da Venda -->
                     <div class="filter-group date-range-group">
-                        <label for="sale-date-start">Data da Venda</label>
+                        <label>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            Data da Venda
+                        </label>
+                        <div class="quick-date-btns">
+                            <button @click="setDatePreset('sale', 'today')" :class="{'quick-btn--active': activeSaleDatePreset === 'today'}" class="quick-btn">Hoje</button>
+                            <button @click="setDatePreset('sale', 'yesterday')" :class="{'quick-btn--active': activeSaleDatePreset === 'yesterday'}" class="quick-btn">Ontem</button>
+                            <button @click="setDatePreset('sale', '7d')" :class="{'quick-btn--active': activeSaleDatePreset === '7d'}" class="quick-btn">7 dias</button>
+                            <button @click="setDatePreset('sale', '30d')" :class="{'quick-btn--active': activeSaleDatePreset === '30d'}" class="quick-btn">30 dias</button>
+                            <button @click="setDatePreset('sale', 'month')" :class="{'quick-btn--active': activeSaleDatePreset === 'month'}" class="quick-btn">Este mês</button>
+                        </div>
                         <div class="date-inputs">
-                            <input id="sale-date-start" type="date" v-model="filters.saleDateStart">
+                            <input type="date" v-model="filters.saleDateStart">
                             <span>até</span>
-                            <input id="sale-date-end" type="date" v-model="filters.saleDateEnd">
+                            <input type="date" v-model="filters.saleDateEnd">
                         </div>
                     </div>
 
-                    <!-- Filtro de Limite de Envio -->
+                    <!-- Prazo de Expedição -->
                     <div class="filter-group date-range-group">
-                        <label for="shipping-limit-start">Limite de Envio</label>
+                        <label>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            Prazo de Expedição
+                        </label>
+                        <div class="quick-date-btns">
+                            <button @click="setDatePreset('ship', 'today')" :class="{'quick-btn--active': activeShipDatePreset === 'today'}" class="quick-btn">Hoje</button>
+                            <button @click="setDatePreset('ship', 'yesterday')" :class="{'quick-btn--active': activeShipDatePreset === 'yesterday'}" class="quick-btn">Ontem</button>
+                            <button @click="setDatePreset('ship', 'tomorrow')" :class="{'quick-btn--active': activeShipDatePreset === 'tomorrow'}" class="quick-btn">Amanhã</button>
+                            <button @click="setDatePreset('ship', '7d')" :class="{'quick-btn--active': activeShipDatePreset === '7d'}" class="quick-btn">7 dias</button>
+                            <button @click="setDatePreset('ship', 'overdue')" :class="{'quick-btn--active': activeShipDatePreset === 'overdue'}" class="quick-btn quick-btn--danger">Atrasados</button>
+                        </div>
                         <div class="date-inputs">
-                            <input id="shipping-limit-start" type="date" v-model="filters.shippingLimitStart">
+                            <input type="date" v-model="filters.shippingLimitStart">
                             <span>até</span>
-                            <input id="shipping-limit-end" type="date" v-model="filters.shippingLimitEnd">
+                            <input type="date" v-model="filters.shippingLimitEnd">
                         </div>
                     </div>
                 </div>
@@ -136,8 +188,8 @@
                         <div class="sale-card__layout">
                             <!-- Thumbnail do Produto -->
                             <div class="sale-card__thumb">
-                                <img v-if="sale.product_thumbnail || loadedThumbs[sale.ml_item_id] && loadedThumbs[sale.ml_item_id] !== 'loading'" 
-                                     :src="(sale.product_thumbnail || loadedThumbs[sale.ml_item_id]).replace('http://', 'https://')" 
+                                <img v-if="getThumbUrl(sale)" 
+                                     :src="getThumbUrl(sale)" 
                                      :alt="sale.product_title" 
                                      class="sale-card__thumb-img" 
                                      loading="lazy" />
@@ -426,10 +478,103 @@ const isStatusDropdownOpen = ref(false);
 const statusFilterContainerRef = ref(null);
 const statusFilterDropdownRef = ref(null);
 
+const selectedAccountFilter = ref(null);
+const isAccountDropdownOpen = ref(false);
+const accountFilterContainerRef = ref(null);
+const accountSearchText = ref('');
+
+const buyerSearch = ref('');
+let buyerDebounce = null;
+
+const activeSaleDatePreset = ref(null);
+const activeShipDatePreset = ref(null);
+
 const filters = reactive({
     saleDateStart: '',
     saleDateEnd: '',
+    shippingLimitStart: '',
+    shippingLimitEnd: '',
 });
+
+const accountOptions = computed(() => {
+    const set = new Set();
+    if (Array.isArray(sales.value)) {
+        sales.value.forEach(s => { if (s.account_nickname) set.add(s.account_nickname); });
+    }
+    return Array.from(set).sort();
+});
+
+const filteredAccountOptions = computed(() => {
+    const q = accountSearchText.value.toLowerCase();
+    if (!q) return accountOptions.value;
+    return accountOptions.value.filter(a => a.toLowerCase().includes(q));
+});
+
+const hasActiveAdvancedFilters = computed(() => {
+    return !!(filters.saleDateStart || filters.saleDateEnd || filters.shippingLimitStart || filters.shippingLimitEnd || buyerSearch.value);
+});
+
+function applyAccountFilter(acc) {
+    selectedAccountFilter.value = acc;
+    isAccountDropdownOpen.value = false;
+    triggerServerFetch(true);
+}
+
+function formatDateLocal(d) {
+    return d.toISOString().slice(0, 10);
+}
+
+function setDatePreset(type, preset) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let start, end;
+
+    if (preset === 'today') {
+        start = end = formatDateLocal(today);
+    } else if (preset === 'yesterday') {
+        const d = new Date(today); d.setDate(d.getDate() - 1);
+        start = end = formatDateLocal(d);
+    } else if (preset === 'tomorrow') {
+        const d = new Date(today); d.setDate(d.getDate() + 1);
+        start = end = formatDateLocal(d);
+    } else if (preset === '7d') {
+        const d = new Date(today); d.setDate(d.getDate() - 7);
+        start = formatDateLocal(d); end = formatDateLocal(today);
+    } else if (preset === '30d') {
+        const d = new Date(today); d.setDate(d.getDate() - 30);
+        start = formatDateLocal(d); end = formatDateLocal(today);
+    } else if (preset === 'month') {
+        const d = new Date(today.getFullYear(), today.getMonth(), 1);
+        start = formatDateLocal(d); end = formatDateLocal(today);
+    } else if (preset === 'overdue') {
+        const d = new Date(2020, 0, 1);
+        const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+        start = formatDateLocal(d); end = formatDateLocal(yesterday);
+    }
+
+    if (type === 'sale') {
+        // Toggle off if same preset
+        if (activeSaleDatePreset.value === preset) {
+            activeSaleDatePreset.value = null;
+            filters.saleDateStart = '';
+            filters.saleDateEnd = '';
+        } else {
+            activeSaleDatePreset.value = preset;
+            filters.saleDateStart = start;
+            filters.saleDateEnd = end;
+        }
+    } else {
+        if (activeShipDatePreset.value === preset) {
+            activeShipDatePreset.value = null;
+            filters.shippingLimitStart = '';
+            filters.shippingLimitEnd = '';
+        } else {
+            activeShipDatePreset.value = preset;
+            filters.shippingLimitStart = start;
+            filters.shippingLimitEnd = end;
+        }
+    }
+}
 
 const normalizeSku = (sku) => (sku || '').trim().toUpperCase();
 
@@ -449,6 +594,10 @@ function triggerServerFetch(resetPage = true) {
         saleStatus: selectedSaleStatusFilter.value || undefined,
         saleDateStart: filters.saleDateStart || undefined,
         saleDateEnd: filters.saleDateEnd || undefined,
+        account: selectedAccountFilter.value || undefined,
+        buyer: buyerSearch.value || undefined,
+        shippingLimitStart: filters.shippingLimitStart || undefined,
+        shippingLimitEnd: filters.shippingLimitEnd || undefined,
     });
 }
 
@@ -457,8 +606,17 @@ watch(searchQuery, () => {
     searchDebounce = setTimeout(() => triggerServerFetch(true), 400);
 });
 
+watch(buyerSearch, () => {
+    clearTimeout(buyerDebounce);
+    buyerDebounce = setTimeout(() => triggerServerFetch(true), 400);
+});
+
 watch([selectedSaleStatusFilter, selectedStatusFilter], () => triggerServerFetch(true));
-watch([() => filters.saleDateStart, () => filters.saleDateEnd], () => triggerServerFetch(true));
+watch([() => filters.saleDateStart, () => filters.saleDateEnd, () => filters.shippingLimitStart, () => filters.shippingLimitEnd], () => {
+    activeSaleDatePreset.value = null;
+    activeShipDatePreset.value = null;
+    triggerServerFetch(true);
+});
 
 // Pagination
 function goToPage(page) {
@@ -544,9 +702,15 @@ function applyStatusFilter(statusValue) {
 function clearFilters() {
     filters.saleDateStart = '';
     filters.saleDateEnd = '';
+    filters.shippingLimitStart = '';
+    filters.shippingLimitEnd = '';
     searchQuery.value = '';
+    buyerSearch.value = '';
     selectedStatusFilter.value = null;
     selectedSaleStatusFilter.value = null;
+    selectedAccountFilter.value = null;
+    activeSaleDatePreset.value = null;
+    activeShipDatePreset.value = null;
     triggerServerFetch(true);
 }
 
@@ -597,6 +761,7 @@ function handleClickOutside(event) {
     const target = event.target;
     if (saleStatusFilterContainerRef.value && !saleStatusFilterContainerRef.value.contains(target)) { isSaleStatusDropdownOpen.value = false; }
     if (statusFilterContainerRef.value && !statusFilterContainerRef.value.contains(target)) { isStatusDropdownOpen.value = false; }
+    if (accountFilterContainerRef.value && !accountFilterContainerRef.value.contains(target)) { isAccountDropdownOpen.value = false; }
 }
 
 function getLabelInfo(sale) {
@@ -652,6 +817,20 @@ function loadThumbTrigger(sale) {
         }
     }
     return '';
+}
+
+function getThumbUrl(sale) {
+    if (sale.product_thumbnail) {
+        return sale.product_thumbnail.replace('http://', 'https://');
+    }
+    if (sale.ml_item_id) {
+        const idStr = String(sale.ml_item_id).toUpperCase();
+        const tb = loadedThumbs[idStr];
+        if (tb && tb !== 'loading') {
+            return tb.replace('http://', 'https://');
+        }
+    }
+    return null;
 }
 
 </script>
@@ -805,6 +984,83 @@ function loadThumbTrigger(sale) {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+.quick-date-btns {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.quick-btn {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quick-btn:hover {
+    background: #e2e8f0;
+}
+
+.quick-btn--active {
+    background: #3b82f6;
+    color: #fff;
+    border-color: #3b82f6;
+}
+
+.quick-btn--danger {
+    color: #dc2626;
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+.quick-btn--danger.quick-btn--active {
+    background: #dc2626;
+    color: white;
+}
+
+.filter-active-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background-color: #ef4444;
+    border-radius: 50%;
+    margin-left: 6px;
+}
+.btn-ghost--active {
+    background-color: #e0e7ff;
+    color: #4338ca;
+}
+
+.filter-popover-search {
+    padding: 0.5rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+.filter-popover-input {
+    width: 100%;
+    padding: 0.4rem;
+    font-size: 0.8rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+}
+.filter-popover-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+.filter-text-input {
+    width: 100%;
+}
+.filter-group label svg {
+    margin-right: 4px;
+    display: inline-block;
+    vertical-align: text-bottom;
 }
 
 .table-actions-bar {
