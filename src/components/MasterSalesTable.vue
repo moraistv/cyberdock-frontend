@@ -646,7 +646,7 @@ function loadThumbTrigger(sale) {
                         loadedThumbs[idStr] = null; // No image found
                     }
                 })
-                .catch(err => {
+                .catch(() => {
                     loadedThumbs[idStr] = null;
                 });
         }
