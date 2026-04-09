@@ -562,9 +562,7 @@ const filteredUserOptions = computed(() => {
     return userOptions.value.filter(u => u.toLowerCase().includes(q));
 });
 
-const hasActiveAdvancedFilters = computed(() => {
-    return !!(filters.saleDateStart || filters.saleDateEnd || filters.shippingLimitStart || filters.shippingLimitEnd || buyerSearch.value || selectedUserFilter.value);
-});
+
 
 function applyAccountFilter(acc) {
     selectedAccountFilter.value = acc;
