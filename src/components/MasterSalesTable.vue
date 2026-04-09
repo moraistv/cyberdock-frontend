@@ -210,8 +210,6 @@
                                     </div>
                                     <span class="sale-card__date-mobile">{{ formatDateTime(sale.sale_date) }}</span>
                                 </div>
-                                <span style="font-size: 10px; color: red;">DEBUG - ml_item_id: {{ sale.ml_item_id || 'NULO' }}, channel: {{ sale.channel || 'NULO' }}, raw: {{ !!sale.raw_api_data }}</span>
-                                
                                 <!-- Título do Produto (clicável) + Logo ML + Conta -->
                                 <div class="sale-card__title-row">
                                     <a v-if="getProductLink(sale)" :href="getProductLink(sale)" target="_blank" rel="noopener" class="sale-card__product-link" :title="sale.product_title">
@@ -784,6 +782,13 @@ onUnmounted(() => { document.removeEventListener('click', handleClickOutside); }
 // ML Data Helpers
 function getProductLink(sale) {
     if (sale.product_permalink) return sale.product_permalink;
+    
+    // Tenta extrair do raw_api_data se disponível
+    if (sale.raw_api_data?.order_items) {
+        const item = sale.raw_api_data.order_items.find(it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku);
+        if (item?.item?.permalink) return item.item.permalink;
+    }
+
     if (sale.ml_item_id && String(sale.ml_item_id).toUpperCase().startsWith('MLB')) {
         const idStr = String(sale.ml_item_id);
         const match = idStr.match(/^MLB(\d+)$/i);
@@ -796,8 +801,17 @@ function getProductLink(sale) {
 const loadedThumbs = reactive({});
 function loadThumbTrigger(sale) {
     if (sale.product_thumbnail) return '';
-    if (sale.ml_item_id && String(sale.ml_item_id).toUpperCase().startsWith('MLB')) {
-        const idStr = String(sale.ml_item_id).toUpperCase();
+    
+    let itId = sale.ml_item_id;
+
+    // Se não tiver ID direto, tenta achar nos dados brutos pelo SKU
+    if (!itId && sale.raw_api_data?.order_items) {
+        const itemObj = sale.raw_api_data.order_items.find(it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku);
+        if (itemObj?.item?.id) itId = itemObj.item.id;
+    }
+
+    if (itId && String(itId).toUpperCase().startsWith('MLB')) {
+        const idStr = String(itId).toUpperCase();
         if (!loadedThumbs[idStr]) {
             loadedThumbs[idStr] = 'loading';
             fetch(`https://api.mercadolibre.com/items/${idStr}`)
@@ -808,7 +822,7 @@ function loadThumbTrigger(sale) {
                     } else if (data && data.pictures && data.pictures.length > 0) {
                         loadedThumbs[idStr] = data.pictures[0].url;
                     } else {
-                        loadedThumbs[idStr] = null; // No image found
+                        loadedThumbs[idStr] = null;
                     }
                 })
                 .catch(() => {
@@ -823,8 +837,15 @@ function getThumbUrl(sale) {
     if (sale.product_thumbnail) {
         return sale.product_thumbnail.replace('http://', 'https://');
     }
-    if (sale.ml_item_id) {
-        const idStr = String(sale.ml_item_id).toUpperCase();
+
+    let itId = sale.ml_item_id;
+    if (!itId && sale.raw_api_data?.order_items) {
+        const itemObj = sale.raw_api_data.order_items.find(it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku);
+        if (itemObj?.item?.id) itId = itemObj.item.id;
+    }
+
+    if (itId) {
+        const idStr = String(itId).toUpperCase();
         const tb = loadedThumbs[idStr];
         if (tb && tb !== 'loading') {
             return tb.replace('http://', 'https://');
