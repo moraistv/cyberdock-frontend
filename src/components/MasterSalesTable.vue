@@ -292,10 +292,10 @@
                             <div class="sale-card__aside">
                                 <div class="sale-card__date-block">
                                      <span v-if="String(sale.shipping_mode).toLowerCase().includes('full')" class="sale-card__date-value" style="color: #6366f1; font-weight: 700;" title="Envio FULL">
-                                        FULL
+                                        LIMITE ENVIO: FULL
                                      </span>
                                      <span v-else class="sale-card__date-value" :class="{'sale-card__date-value--late': isLate(sale.sla_expected_date || sale.shipping_limit_date)}" title="Prazo de Expedição">
-                                        {{ formatDateTime(sale.sla_expected_date || sale.shipping_limit_date) || '—' }}
+                                        LIMITE ENVIO: {{ formatDateTime(sale.sla_expected_date || sale.shipping_limit_date) || '—' }}
                                      </span>
                                      <span class="sale-card__exp-date" title="Data da Venda">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
@@ -828,6 +828,7 @@ function loadThumbTrigger(sale) {
 
     // Se não tiver ID direto, tenta achar nos dados brutos pelo SKU
     if (!itId && sale.raw_api_data?.order_items) {
+        console.log("DEBUG: raw_api_data format:", sale.raw_api_data);
         const itemObj = sale.raw_api_data.order_items.find(it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku);
         if (itemObj?.item?.id) itId = itemObj.item.id;
     }
