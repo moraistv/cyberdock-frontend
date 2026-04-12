@@ -19,7 +19,7 @@
 
                     <!-- Filtro rápido: Status da Venda -->
                     <div class="filter-container" ref="saleStatusFilterContainerRef">
-                        <button @click="toggleSaleStatusDropdown" class="btn btn-outline">
+                        <button @click="toggleSaleStatusDropdown" :class="['btn', 'btn-outline', { 'btn-outline--active': selectedSaleStatusFilter }]">
                             <span class="truncate pr-2">{{ selectedSaleStatusFilter ? `Venda: ${getSaleStatusLabel(selectedSaleStatusFilter)}` : 'Status da Venda' }}</span>
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
                                 <path d="m6 9 6 6 6-6"></path>
@@ -39,7 +39,7 @@
 
                     <!-- Filtro rápido: Status de Expedição -->
                     <div class="filter-container" ref="statusFilterContainerRef">
-                        <button @click="toggleStatusDropdown" class="btn btn-outline">
+                        <button @click="toggleStatusDropdown" :class="['btn', 'btn-outline', { 'btn-outline--active': selectedStatusFilter }]">
                             <span class="truncate pr-2">{{ selectedStatusFilter ? `Expedição: ${getStatusLabel(selectedStatusFilter)}` : 'Status de Expedição' }}</span>
                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
                                 <path d="m6 9 6 6 6-6"></path>
@@ -59,7 +59,7 @@
 
                     <!-- Filtro de Conta -->
                     <div class="filter-container" ref="accountFilterContainerRef">
-                        <button @click="isAccountDropdownOpen = !isAccountDropdownOpen" class="btn btn-outline">
+                        <button @click="isAccountDropdownOpen = !isAccountDropdownOpen" :class="['btn', 'btn-outline', { 'btn-outline--active': selectedAccountFilter }]">
                             <span class="truncate pr-2">{{ selectedAccountFilter ? `Conta: ${selectedAccountFilter}` : 'Conta' }}</span>
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
                                 <path d="m6 9 6 6 6-6"></path>
@@ -82,7 +82,7 @@
 
                     <!-- Filtro de Usuário -->
                     <div class="filter-container" ref="userFilterContainerRef">
-                        <button @click="isUserDropdownOpen = !isUserDropdownOpen" class="btn btn-outline">
+                        <button @click="isUserDropdownOpen = !isUserDropdownOpen" :class="['btn', 'btn-outline', { 'btn-outline--active': selectedUserFilter }]">
                             <span class="truncate pr-2">{{ selectedUserFilter ? `Usuário: ${selectedUserFilter}` : 'Usuário' }}</span>
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
                                 <path d="m6 9 6 6 6-6"></path>
@@ -109,29 +109,21 @@
             <!-- Filtros Extras (sempre visíveis) -->
             <div class="advanced-filters-content">
                 <div class="advanced-filters-grid">
-                    <!-- Busca por Cliente -->
-                    <div class="filter-group">
-                        <label for="buyer-search">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                            Cliente / Comprador
-                        </label>
-                        <input id="buyer-search" type="text" v-model="buyerSearch" placeholder="Nome do comprador..." class="filter-text-input" />
-                    </div>
+                    <!-- Busca por Cliente removida (demanda 03) -->
 
-                    <!-- Filtro por Modo de Envio -->
+                    <!-- Filtro por Modo de Envio (Multi-select) -->
                     <div class="filter-group">
-                        <label for="shipping-mode-select">
+                        <label>
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
                             Modo de Envio
                         </label>
-                        <select id="shipping-mode-select" v-model="filters.shippingMode" class="filter-select">
-                            <option value="">Todos</option>
-                            <option value="me1">Correios (me1)</option>
-                            <option value="me2">Mercado Envios (me2)</option>
-                            <option value="fulfillment">FULL (fulfillment)</option>
-                            <option value="cross_docking">Coleta (cross docking)</option>
-                            <option value="custom">Personalizado (custom)</option>
-                        </select>
+                        <div class="shipping-mode-chips">
+                            <button v-for="opt in shippingModeOptions" :key="opt.value"
+                                @click="toggleShippingMode(opt.value)"
+                                :class="['quick-btn', { 'quick-btn--active': selectedShippingModes.includes(opt.value) }]">
+                                {{ opt.label }}
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Data da Venda -->
@@ -165,7 +157,7 @@
                             <button @click="setDatePreset('ship', 'yesterday')" :class="{'quick-btn--active': activeShipDatePreset === 'yesterday'}" class="quick-btn">Ontem</button>
                             <button @click="setDatePreset('ship', 'tomorrow')" :class="{'quick-btn--active': activeShipDatePreset === 'tomorrow'}" class="quick-btn">Amanhã</button>
                             <button @click="setDatePreset('ship', '7d')" :class="{'quick-btn--active': activeShipDatePreset === '7d'}" class="quick-btn">7 dias</button>
-                            <button @click="setDatePreset('ship', 'overdue')" :class="{'quick-btn--active': activeShipDatePreset === 'overdue'}" class="quick-btn quick-btn--danger">Atrasados</button>
+                            <button disabled title="Em breve: lógica de atraso com status vinculado" :class="{'quick-btn--active': activeShipDatePreset === 'overdue'}" class="quick-btn quick-btn--danger quick-btn--disabled">Atrasados</button>
                         </div>
                         <div class="date-inputs">
                             <input type="date" v-model="filters.shippingLimitStart">
@@ -525,12 +517,32 @@ let buyerDebounce = null;
 const activeSaleDatePreset = ref(null);
 const activeShipDatePreset = ref(null);
 
+const selectedShippingModes = ref([]);
+const shippingModeOptions = [
+    { value: 'FULL', label: 'FULL' },
+    { value: 'FLEX', label: 'FLEX' },
+    { value: 'Correios', label: 'Correios' },
+    { value: 'Agência', label: 'Agência' },
+    { value: 'Coleta', label: 'Coleta' },
+    { value: 'Envio Padrão', label: 'Envio Padrão' },
+    { value: 'Outros', label: 'Outros' },
+];
+
+function toggleShippingMode(mode) {
+    const idx = selectedShippingModes.value.indexOf(mode);
+    if (idx === -1) {
+        selectedShippingModes.value.push(mode);
+    } else {
+        selectedShippingModes.value.splice(idx, 1);
+    }
+    triggerServerFetch(true);
+}
+
 const filters = reactive({
     saleDateStart: '',
     saleDateEnd: '',
     shippingLimitStart: '',
     shippingLimitEnd: '',
-    shippingMode: '',
 });
 
 const accountOptions = computed(() => {
@@ -650,10 +662,9 @@ function triggerServerFetch(resetPage = true) {
         saleDateStart: filters.saleDateStart || undefined,
         saleDateEnd: filters.saleDateEnd || undefined,
         account: selectedAccountFilter.value || undefined,
-        buyer: buyerSearch.value || undefined,
         shippingLimitStart: filters.shippingLimitStart || undefined,
         shippingLimitEnd: filters.shippingLimitEnd || undefined,
-        shippingMode: filters.shippingMode || undefined,
+        shippingMode: selectedShippingModes.value.length > 0 ? selectedShippingModes.value.join(',') : undefined,
         userNickname: selectedUserFilter.value || undefined,
     });
 }
@@ -663,12 +674,7 @@ watch(searchQuery, () => {
     searchDebounce = setTimeout(() => triggerServerFetch(true), 400);
 });
 
-watch(buyerSearch, () => {
-    clearTimeout(buyerDebounce);
-    buyerDebounce = setTimeout(() => triggerServerFetch(true), 400);
-});
-
-watch([selectedSaleStatusFilter, selectedStatusFilter, () => filters.shippingMode], () => triggerServerFetch(true));
+watch([selectedSaleStatusFilter, selectedStatusFilter], () => triggerServerFetch(true));
 watch([() => filters.saleDateStart, () => filters.saleDateEnd, () => filters.shippingLimitStart, () => filters.shippingLimitEnd], () => {
     activeSaleDatePreset.value = null;
     activeShipDatePreset.value = null;
@@ -761,9 +767,8 @@ function clearFilters() {
     filters.saleDateEnd = '';
     filters.shippingLimitStart = '';
     filters.shippingLimitEnd = '';
-    filters.shippingMode = '';
+    selectedShippingModes.value = [];
     searchQuery.value = '';
-    buyerSearch.value = '';
     selectedStatusFilter.value = null;
     selectedSaleStatusFilter.value = null;
     selectedAccountFilter.value = null;
@@ -1069,6 +1074,16 @@ function getThumbUrl(sale) {
     background: #dc2626;
     color: white;
 }
+.quick-btn--disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+.shipping-mode-chips {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
 
 .filter-active-dot {
     display: inline-block;
@@ -1173,6 +1188,15 @@ function getThumbUrl(sale) {
 .btn-outline:hover:not(:disabled) {
     background-color: #f9fafb;
     border-color: #9ca3af;
+}
+.btn-outline--active {
+    background-color: #eef2ff;
+    color: #4338ca;
+    border-color: #a5b4fc;
+}
+.btn-outline--active:hover:not(:disabled) {
+    background-color: #e0e7ff;
+    border-color: #818cf8;
 }
 
 .btn-ghost {
