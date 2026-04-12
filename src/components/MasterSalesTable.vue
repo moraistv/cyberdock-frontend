@@ -249,7 +249,6 @@
                                     <div class="sale-card__badges">
                                         <img v-if="sale.channel?.toLowerCase() === 'ml'" src="/img/ml-logo.svg" alt="Mercado Livre" class="sale-card__ml-logo" />
                                         <span v-else class="sale-card__badge sale-card__badge--other">{{ sale.channel }}</span>
-                                        <span class="sale-card__badge sale-card__badge--account">{{ sale.account_nickname }}</span>
                                     </div>
                                 </div>
 
@@ -283,9 +282,12 @@
 
                                 <!-- Footer: Vendedor • Comprador • Modo Envio -->
                                 <div class="sale-card__footer">
-                                    <span class="sale-card__footer-item" title="Vendedor Resp.">
+                                    <span class="sale-card__footer-item" title="Vendedor Resp. e Conta">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                                        {{ sale.user_nickname || 'N/A' }}
+                                        {{ sale.user_nickname || 'N/A' }} 
+                                        <span class="sale-card__account-tag" v-if="sale.account_nickname">
+                                            ({{ sale.account_nickname }})
+                                        </span>
                                     </span>
                                     <span class="sale-card__footer-dot">•</span>
                                     <span class="sale-card__footer-item" title="Comprador">
@@ -1416,10 +1418,10 @@ function getThumbUrl(sale) {
     color: #475569;
     border-color: #e2e8f0;
 }
-.sale-card__badge--account {
-    background-color: #eef2ff;
-    color: #4338ca;
-    border-color: #c7d2fe;
+.sale-card__account-tag {
+    font-weight: 600;
+    color: #4f46e5;
+    margin-left: 0.25rem;
 }
 
 /* Specs Row */
