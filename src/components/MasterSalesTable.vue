@@ -511,8 +511,7 @@ const isUserDropdownOpen = ref(false);
 const userFilterContainerRef = ref(null);
 const userSearchText = ref('');
 
-const buyerSearch = ref('');
-let buyerDebounce = null;
+
 
 const activeSaleDatePreset = ref(null);
 const activeShipDatePreset = ref(null);
