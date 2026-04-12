@@ -940,6 +940,9 @@ function getThumbUrl(sale) {
     width: 100%;
     transition: box-shadow 0.2s, border-color 0.2s;
 }
+.search-input:hover {
+    border-color: #9ca3af;
+}
 .search-input:focus {
     outline: none;
     border-color: #4f46e5;
@@ -1027,6 +1030,17 @@ function getThumbUrl(sale) {
     border-radius: 0.5rem;
     border: 1px solid #d1d5db;
     background-color: #fff;
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+.filter-group input:hover,
+.filter-group select:hover {
+    border-color: #9ca3af;
+}
+.filter-group input:focus,
+.filter-group select:focus {
+    outline: none;
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
 }
 
 .date-inputs {
