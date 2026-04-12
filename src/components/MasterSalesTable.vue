@@ -140,9 +140,9 @@
                             <button @click="setDatePreset('sale', 'month')" :class="{'quick-btn--active': activeSaleDatePreset === 'month'}" class="quick-btn">Este mês</button>
                         </div>
                         <div class="date-inputs">
-                            <input type="date" v-model="filters.saleDateStart">
+                            <input type="date" v-model="filters.saleDateStart" @input="activeSaleDatePreset = null">
                             <span>até</span>
-                            <input type="date" v-model="filters.saleDateEnd">
+                            <input type="date" v-model="filters.saleDateEnd" @input="activeSaleDatePreset = null">
                         </div>
                     </div>
 
@@ -160,9 +160,9 @@
                             <button disabled title="Em breve: lógica de atraso com status vinculado" :class="{'quick-btn--active': activeShipDatePreset === 'overdue'}" class="quick-btn quick-btn--danger quick-btn--disabled">Atrasados</button>
                         </div>
                         <div class="date-inputs">
-                            <input type="date" v-model="filters.shippingLimitStart">
+                            <input type="date" v-model="filters.shippingLimitStart" @input="activeShipDatePreset = null">
                             <span>até</span>
-                            <input type="date" v-model="filters.shippingLimitEnd">
+                            <input type="date" v-model="filters.shippingLimitEnd" @input="activeShipDatePreset = null">
                         </div>
                     </div>
                 </div>
@@ -675,8 +675,6 @@ watch(searchQuery, () => {
 
 watch([selectedSaleStatusFilter, selectedStatusFilter], () => triggerServerFetch(true));
 watch([() => filters.saleDateStart, () => filters.saleDateEnd, () => filters.shippingLimitStart, () => filters.shippingLimitEnd], () => {
-    activeSaleDatePreset.value = null;
-    activeShipDatePreset.value = null;
     triggerServerFetch(true);
 });
 
