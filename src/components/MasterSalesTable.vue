@@ -781,11 +781,8 @@ function clearFilters() {
 async function processAllSales() {
     isProcessing.value = true;
     try {
-        await loadStorageData();
         const salesToProcess = sales.value.filter(sale => {
-            const saleSku = normalizeSku(sale.sku);
-            const isSkuInStock = saleSku && stockSkuSet.value.has(saleSku);
-            return !sale.processed_at && isSkuInStock;
+            return !sale.processed_at && sale.is_sku_mapped;
         });
 
         if (salesToProcess.length === 0) {
