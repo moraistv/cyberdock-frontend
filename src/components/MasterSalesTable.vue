@@ -266,6 +266,16 @@
                                         <span class="sale-card__spec-mono">{{ sale.sku || 'N/A' }}</span>
                                     </span>
                                     <span class="sale-card__divider">|</span>
+                                    <span class="sale-card__spec" style="display: flex; align-items: center; gap: 0.25rem;">
+                                        <span class="sale-card__spec-label" title="Indica se o SKU está mapeado no armazenamento">Mapeado:</span>
+                                        <span v-if="isSkuInStock(sale.sku)" class="sale-card__spec-value" style="color: #10b981; font-weight: 600; font-size: 0.8rem;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:2px; vertical-align: text-top;"><polyline points="20 6 9 17 4 12"></polyline></svg>Sim
+                                        </span>
+                                        <span v-else class="sale-card__spec-value" style="color: #ef4444; font-weight: 600; font-size: 0.8rem;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:2px; vertical-align: text-top;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>Não
+                                        </span>
+                                    </span>
+                                    <span class="sale-card__divider">|</span>
                                     <span class="sale-card__spec">
                                         <span class="sale-card__spec-label">QTD:</span>
                                         <span class="sale-card__spec-value">{{ sale.quantity }}</span>
@@ -648,6 +658,11 @@ const stockSkuSet = computed(() => {
     if (!Array.isArray(skus.value)) return new Set();
     return new Set(skus.value.map(s => normalizeSku(s.sku)));
 });
+
+const isSkuInStock = (sku) => {
+    const s = normalizeSku(sku);
+    return s && stockSkuSet.value.has(s);
+};
 
 // Debounce search
 let searchDebounce = null;
