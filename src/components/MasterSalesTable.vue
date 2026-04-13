@@ -268,7 +268,7 @@
                                     <span class="sale-card__divider">|</span>
                                     <span class="sale-card__spec" style="display: flex; align-items: center; gap: 0.25rem;">
                                         <span class="sale-card__spec-label" title="Indica se o SKU está mapeado no armazenamento">Mapeado:</span>
-                                        <span v-if="isSkuInStock(sale.sku)" class="sale-card__spec-value" style="color: #10b981; font-weight: 600; font-size: 0.8rem;">
+                                        <span v-if="sale.is_sku_mapped" class="sale-card__spec-value" style="color: #10b981; font-weight: 600; font-size: 0.8rem;">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:2px; vertical-align: text-top;"><polyline points="20 6 9 17 4 12"></polyline></svg>Sim
                                         </span>
                                         <span v-else class="sale-card__spec-value" style="color: #ef4444; font-weight: 600; font-size: 0.8rem;">
@@ -365,7 +365,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, reactive } from 'vue';
 import { useMasterSales } from '@/composables/useMasterSales';
-import { useUserStorage } from '@/composables/useUserStorage';
 import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
 import { API_BASE_URL } from '@/config';
@@ -489,7 +488,6 @@ function showToast(message, type = 'info') {
 // ===== END UTILITY FUNCTIONS =====
 
 const { sales, isLoading, error, totalSales, currentPage, totalPages, fetchSales, processSales: processSalesApi } = useMasterSales();
-const { skus, loadStorageData } = useUserStorage();
 const { systemStatuses } = useSystemStatus();
 const { downloadLabel, getLabelInfo: composableLabelInfo } = useLabels();
 
@@ -652,17 +650,7 @@ function setDatePreset(type, preset) {
     }
 }
 
-const normalizeSku = (sku) => (sku || '').trim().toUpperCase();
 
-const stockSkuSet = computed(() => {
-    if (!Array.isArray(skus.value)) return new Set();
-    return new Set(skus.value.map(s => normalizeSku(s.sku)));
-});
-
-const isSkuInStock = (sku) => {
-    const s = normalizeSku(sku);
-    return s && stockSkuSet.value.has(s);
-};
 
 // Debounce search
 let searchDebounce = null;
