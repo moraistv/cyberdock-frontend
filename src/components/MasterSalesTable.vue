@@ -176,8 +176,14 @@
                 <div class="table-actions-left">
                     <button @click="processAllSales" class="btn btn-primary" :disabled="isProcessing">
                         <span v-if="isProcessing">Processando...</span>
+                        <span v-else-if="selectedSaleIds.size > 0">Processar {{ selectedSaleIds.size }} Selecionadas</span>
                         <span v-else>Processar Vendas Filtradas</span>
                     </button>
+                    <div v-if="selectedSaleIds.size > 0" class="batch-action-bar">
+                        <span class="batch-action-text">{{ selectedSaleIds.size }} selecionadas</span>
+                        <button @click="selectAll" class="btn-text" :disabled="isProcessing">Selecionar Todas</button>
+                        <button @click="deselectAll" class="btn-text" :disabled="isProcessing">Desmarcar</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -208,6 +214,15 @@
                          :class="{ 'sale-card--cancelled': sale.sale_status === 'cancelled' }">
                         
                         <div class="sale-card__layout">
+                            <!-- Chceckbox para lote -->
+                            <div v-if="!sale.processed_at && sale.is_sku_mapped" class="sale-card__checkbox-container" @click.stop>
+                                <input type="checkbox" 
+                                       :checked="selectedSaleIds.has(getSaleKey(sale))" 
+                                       @change="toggleSaleSelection(sale)" 
+                                       class="sale-card__checkbox"
+                                       :disabled="isProcessing">
+                            </div>
+                            
                             <!-- Thumbnail do Produto -->
                             <div class="sale-card__thumb">
                                 <img v-if="getThumbUrl(sale)" 
@@ -320,6 +335,14 @@
                                 </div>
                                 
                                 <div class="sale-card__actions">
+                                    <button v-if="!sale.processed_at && sale.is_sku_mapped" 
+                                            @click="processSingleSale(sale)" 
+                                            class="btn-label btn-process-single" 
+                                            :disabled="isProcessing"
+                                            title="Processar Abatimento de Estoque">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                                        Processar
+                                    </button>
                                     <span v-if="sale.processed_at" class="sale-card__status-tag sale-card__status-tag--proc" :title="'Processado em: ' + formatDateTime(sale.processed_at)">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                         Proc
@@ -496,6 +519,38 @@ const isProcessing = ref(false);
 const isSummaryModalOpen = ref(false);
 const summaryModalTitle = ref('');
 const summaryModalContent = ref('');
+
+// Batch Selection State
+const selectedSaleIds = reactive(new Set());
+
+// Helper to uniquely identify a sale across multiple accounts
+const getSaleKey = (s) => `${s.id}::${s.sku}::${s.uid}`;
+
+// Computed lists of sales that can be processed
+const processableSales = computed(() => {
+    return sales.value.filter(sale => !sale.processed_at && sale.is_sku_mapped);
+});
+
+// Selection methods
+function toggleSaleSelection(sale) {
+    const key = getSaleKey(sale);
+    if (selectedSaleIds.has(key)) {
+        selectedSaleIds.delete(key);
+    } else {
+        selectedSaleIds.add(key);
+    }
+}
+
+function selectAll() {
+    processableSales.value.forEach(sale => {
+        selectedSaleIds.add(getSaleKey(sale));
+    });
+}
+
+function deselectAll() {
+    selectedSaleIds.clear();
+}
+
 
 // showAdvancedFilters removido — filtros sempre visíveis
 
@@ -781,9 +836,14 @@ function clearFilters() {
 async function processAllSales() {
     isProcessing.value = true;
     try {
-        const salesToProcess = sales.value.filter(sale => {
-            return !sale.processed_at && sale.is_sku_mapped;
-        });
+        let salesToProcess = [];
+        
+        // If there are selected items, process only those. Otherwise, process all filtered processable.
+        if (selectedSaleIds.size > 0) {
+            salesToProcess = processableSales.value.filter(sale => selectedSaleIds.has(getSaleKey(sale)));
+        } else {
+            salesToProcess = processableSales.value;
+        }
 
         if (salesToProcess.length === 0) {
             summaryModalTitle.value = 'Nenhuma Venda para Processar';
@@ -793,6 +853,10 @@ async function processAllSales() {
         }
 
         const results = await processSalesApi(salesToProcess);
+        
+        // Clear selection after process attempt
+        deselectAll();
+        
         summaryModalTitle.value = 'Resumo do Processamento';
         let contentHtml = `<p>O processamento de ${salesToProcess.length} vendas foi concluído.</p>`;
         if (results.success?.length > 0) {
@@ -814,6 +878,31 @@ async function processAllSales() {
         isSummaryModalOpen.value = true;
     } finally {
         triggerServerFetch(false);
+        isProcessing.value = false;
+    }
+}
+
+async function processSingleSale(sale) {
+    if (isProcessing.value) return;
+    isProcessing.value = true;
+    try {
+        const results = await processSalesApi([sale]);
+        
+        if (results.failed?.length > 0) {
+            summaryModalTitle.value = 'Erro ao Processar Venda';
+            summaryModalContent.value = `<div class="summary-section failed"><h4>Falha no Processamento</h4><p>Venda #${sale.id} (SKU: ${sale.sku}): <strong>${results.failed[0].reason}</strong></p></div>`;
+            isSummaryModalOpen.value = true;
+        } else {
+            showToast('Venda processada com sucesso!', 'success');
+            // Optimistic update
+            sale.processed_at = new Date().toISOString();
+            selectedSaleIds.delete(getSaleKey(sale));
+        }
+    } catch (err) {
+        summaryModalTitle.value = 'Erro ao Processar Venda';
+        summaryModalContent.value = `<p>Ocorreu um erro inesperado:</p><p class="error-text">${err.message}</p>`;
+        isSummaryModalOpen.value = true;
+    } finally {
         isProcessing.value = false;
     }
 }
@@ -1319,8 +1408,22 @@ function getThumbUrl(sale) {
 
 .sale-card__layout {
     display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: 1.5rem;
+}
+
+.sale-card__checkbox-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sale-card__checkbox {
+    width: 1.25rem;
+    height: 1.25rem;
+    cursor: pointer;
+    accent-color: #3b82f6;
 }
 
 /* Thumbnail */
@@ -1590,6 +1693,58 @@ function getThumbUrl(sale) {
     background-color: #fffbeb;
     border-color: #fde68a;
 }
+
+.btn-process-single {
+    background-color: #eef2ff;
+    border-color: #c7d2fe;
+    color: #4f46e5;
+    padding: 0.25rem 0.6rem;
+}
+.btn-process-single:hover:not(:disabled) {
+    background-color: #e0e7ff;
+    border-color: #a5b4fc;
+}
+
+/* ============================================= */
+/* BATCH ACTION BAR */
+/* ============================================= */
+
+.batch-action-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background-color: #f1f5f9;
+    padding: 0.35rem 1rem;
+    border-radius: 9999px;
+    border: 1px solid #cbd5e1;
+    font-size: 0.875rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-left: 1rem;
+}
+
+.batch-action-text {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.btn-text {
+    background: none;
+    border: none;
+    color: #3b82f6;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    font-size: 0.875rem;
+}
+.btn-text:hover:not(:disabled) {
+    color: #2563eb;
+    text-decoration: underline;
+}
+.btn-text:disabled {
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+
 
 /* Responsive: mobile */
 @media (max-width: 768px) {
