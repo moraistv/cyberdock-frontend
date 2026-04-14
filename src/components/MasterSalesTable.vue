@@ -510,9 +510,18 @@ function showToast(message, type = 'info') {
 
 // ===== END UTILITY FUNCTIONS =====
 
-const { sales, isLoading, error, totalSales, currentPage, totalPages, fetchSales, processSales: processSalesApi } = useMasterSales();
+const { 
+    sales, isLoading, error, totalSales, currentPage, totalPages, 
+    fetchSales, processSales: processSalesApi, 
+    globalAccountOptions, globalUserOptions, fetchFilterOptions 
+} = useMasterSales();
+
 const { systemStatuses } = useSystemStatus();
 const { downloadLabel, getLabelInfo: composableLabelInfo } = useLabels();
+
+onMounted(async () => {
+    await fetchFilterOptions();
+});
 
 const searchQuery = ref('');
 const isProcessing = ref(false);
@@ -607,35 +616,17 @@ const filters = reactive({
     shippingLimitEnd: '',
 });
 
-const accountOptions = computed(() => {
-    const set = new Set();
-    if (Array.isArray(sales.value)) {
-        sales.value.forEach(s => { if (s.account_nickname) set.add(s.account_nickname); });
-    }
-    return Array.from(set).sort();
-});
-
 const filteredAccountOptions = computed(() => {
     const q = accountSearchText.value.toLowerCase();
-    if (!q) return accountOptions.value;
-    return accountOptions.value.filter(a => a.toLowerCase().includes(q));
-});
-
-const userOptions = computed(() => {
-    const set = new Set();
-    if (Array.isArray(sales.value)) {
-        sales.value.forEach(s => { if (s.user_nickname) set.add(s.user_nickname); });
-    }
-    return Array.from(set).sort();
+    if (!q) return globalAccountOptions.value;
+    return globalAccountOptions.value.filter(a => a.toLowerCase().includes(q));
 });
 
 const filteredUserOptions = computed(() => {
     const q = userSearchText.value.toLowerCase();
-    if (!q) return userOptions.value;
-    return userOptions.value.filter(u => u.toLowerCase().includes(q));
+    if (!q) return globalUserOptions.value;
+    return globalUserOptions.value.filter(u => u.toLowerCase().includes(q));
 });
-
-
 
 function applyAccountFilter(acc) {
     selectedAccountFilter.value = acc;

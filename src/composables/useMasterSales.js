@@ -12,7 +12,20 @@ export function useMasterSales() {
   const pageSize = ref(50);
   const api = useApi();
 
+  const globalAccountOptions = ref([]);
+  const globalUserOptions = ref([]);
+
   let es = null; // SSE
+
+  const fetchFilterOptions = async () => {
+    try {
+      const res = await api.get('/sales/filter-options');
+      globalAccountOptions.value = res.accounts || [];
+      globalUserOptions.value = res.users || [];
+    } catch (err) {
+      console.error('Erro ao buscar as opções globais de filtro:', err);
+    }
+  };
 
   const fetchSales = async (params = {}) => {
     isLoading.value = true;
@@ -181,5 +194,8 @@ export function useMasterSales() {
     updateSaleStatus,
     processSales,
     subscribeToSync,
+    globalAccountOptions,
+    globalUserOptions,
+    fetchFilterOptions
   };
 }
