@@ -208,12 +208,6 @@ const fetchAllAccounts = async () => {
     } else {
       const processedMlData = mlData.map((acc) => {
         let finalAccount = { ...acc };
-        if (finalAccount.status === 'active' && finalAccount.expires_in && finalAccount.connected_at) {
-          const expirationTime = new Date(finalAccount.connected_at).getTime() + finalAccount.expires_in * 1000;
-          const threeDays = 3 * 24 * 60 * 60 * 1000;
-          const isExpiringSoon = expirationTime - Date.now() < threeDays;
-          if (isExpiringSoon) finalAccount.status = 'attention';
-        }
         return addExtraProperties(finalAccount);
       });
       accounts.value.mercadoLivre = processedMlData;
