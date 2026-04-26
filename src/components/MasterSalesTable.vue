@@ -1,5 +1,14 @@
 <template>
     <div class="main-container">
+        <!-- Banner de erro de etiqueta -->
+        <Transition name="label-error-fade">
+            <div v-if="labelError" class="label-error-banner">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>{{ labelError }}</span>
+                <button class="label-error-close" @click="labelError = null">&times;</button>
+            </div>
+        </Transition>
+
         <!-- Painel de Filtros Melhorado -->
         <div class="filters-panel-v2">
              <!-- Linha principal com filtros rápidos -->
@@ -352,12 +361,12 @@
                                         Pend
                                     </span>
 
-                                    <button v-if="getLabelInfo(sale).canPrint" @click="downloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
+                                    <button v-if="getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                                         PDF
                                     </button>
                                     
-                                    <button v-if="getLabelInfo(sale).canPrint" @click="downloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
+                                    <button v-if="getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
                                         ZPL
                                     </button>
@@ -518,6 +527,17 @@ const {
 
 const { systemStatuses } = useSystemStatus();
 const { downloadLabel, getLabelInfo: composableLabelInfo } = useLabels();
+const labelError = ref(null);
+
+async function handleDownloadLabel(shipmentId, sellerId, type) {
+    labelError.value = null;
+    try {
+        await downloadLabel(shipmentId, sellerId, type);
+    } catch (err) {
+        labelError.value = err?.message || 'Não foi possível baixar a etiqueta. Tente novamente.';
+        setTimeout(() => { labelError.value = null; }, 8000);
+    }
+}
 
 onMounted(async () => {
     await fetchFilterOptions();
@@ -1768,6 +1788,47 @@ function getThumbUrl(sale) {
     .sale-card__product-link {
         max-width: 100%;
     }
+}
+/* Label Error Banner */
+.label-error-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: #fff1f1;
+    border: 1px solid #fca5a5;
+    color: #b91c1c;
+    border-radius: 8px;
+    padding: 0.65rem 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+.label-error-banner svg {
+    flex-shrink: 0;
+}
+.label-error-banner span {
+    flex: 1;
+}
+.label-error-close {
+    background: none;
+    border: none;
+    color: #b91c1c;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    line-height: 1;
+}
+.label-error-close:hover {
+    opacity: 0.7;
+}
+.label-error-fade-enter-active,
+.label-error-fade-leave-active {
+    transition: all 0.3s ease;
+}
+.label-error-fade-enter-from,
+.label-error-fade-leave-to {
+    opacity: 0;
+    transform: translateY(-8px);
 }
 </style>
 
