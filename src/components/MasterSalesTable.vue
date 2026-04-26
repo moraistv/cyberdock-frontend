@@ -1789,46 +1789,56 @@ function getThumbUrl(sale) {
         max-width: 100%;
     }
 }
-/* Label Error Banner */
+/* Label Error Toast (Bottom Right) */
 .label-error-banner {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    background: #fff1f1;
-    border: 1px solid #fca5a5;
-    color: #b91c1c;
-    border-radius: 8px;
-    padding: 0.65rem 1rem;
-    margin-bottom: 0.75rem;
-    font-size: 0.85rem;
+    gap: 0.75rem;
+    background: #fff;
+    border-left: 4px solid #ef4444;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    color: #1e293b;
+    border-radius: 6px;
+    padding: 1rem 1.25rem;
+    max-width: 400px;
+    font-size: 0.9rem;
     font-weight: 500;
 }
 .label-error-banner svg {
     flex-shrink: 0;
+    color: #ef4444;
+    width: 20px;
+    height: 20px;
 }
 .label-error-banner span {
     flex: 1;
+    line-height: 1.4;
 }
 .label-error-close {
     background: none;
     border: none;
-    color: #b91c1c;
-    font-size: 1.2rem;
+    color: #94a3b8;
+    font-size: 1.25rem;
     cursor: pointer;
-    padding: 0 0.25rem;
+    padding: 0.25rem;
     line-height: 1;
+    transition: color 0.2s;
 }
 .label-error-close:hover {
-    opacity: 0.7;
+    color: #ef4444;
 }
 .label-error-fade-enter-active,
 .label-error-fade-leave-active {
-    transition: all 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 .label-error-fade-enter-from,
 .label-error-fade-leave-to {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateX(100%) scale(0.9);
 }
 </style>
 
