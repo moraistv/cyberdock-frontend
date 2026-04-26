@@ -66,7 +66,7 @@ export function useApi() {
       }
 
       const msg =
-        (data && (data.error || data.message)) ||
+        (data && (data.message || data.error)) ||
         `Erro ${res.status} ${res.statusText}`;
 
       console.error('💥 [useApi] Erro final:', msg);
