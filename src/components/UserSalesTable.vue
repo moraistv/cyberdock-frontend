@@ -1,15 +1,5 @@
 <template>
     <div class="main-container">
-
-        <!-- Banner de erro de etiqueta -->
-        <Transition name="label-error-fade">
-            <div v-if="labelError" class="label-error-banner">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <span>{{ labelError }}</span>
-                <button class="label-error-close" @click="labelError = null">&times;</button>
-            </div>
-        </Transition>
-
         <!-- Painel de Filtros Melhorado -->
         <div class="filters-panel-v2">
             <!-- Linha principal com filtros rápidos e ações primárias -->
@@ -270,22 +260,25 @@
             </div>
             <div v-else>
                 <div class="sale-cards-counter">
-                    <span>Mostrando <strong>{{ sales.length }}</strong> de <strong>{{ totalSales }}</strong> vendas</span>
+                    <span>Mostrando <strong>{{ filteredUserSales.length }}</strong> de <strong>{{ sales.length }}</strong> vendas</span>
                     <span v-if="isLoading" class="sale-cards-counter__loading">Atualizando...</span>
                 </div>
                 <div class="sale-cards-list" ref="salesTableBodyRef">
                     <div v-for="sale in paginatedUserSales" :key="`${sale.id}-${sale.sku}`" 
                          class="sale-card"
-                         :class="{ 'sale-card--cancelled': sale.sale_status === 'cancelled' }">
+                         :class="{ 
+                            'sale-card--cancelled': userRole === 'master' && (sale.raw_api_data?.status === 'cancelled'),
+                            'sale-card--unprocessed': !sale.processed_at
+                         }">
                         
                         <div class="sale-card__layout">
-                            <!-- Chceckbox para lote -->
-                            <div v-if="!sale.processed_at && stockSkuSet.has(normalizeSku(sale.sku))" class="sale-card__checkbox-container" @click.stop>
+                            <!-- Checkbox para lote -->
+                            <div class="sale-card__checkbox-container" @click.stop>
                                 <input type="checkbox" 
                                        :checked="isSaleSelected(sale)" 
                                        @change="toggleSelectSale(sale, $event.target.checked)" 
                                        class="sale-card__checkbox"
-                                       :disabled="isProcessing">
+                                       title="Selecionar venda" />
                             </div>
                             
                             <!-- Thumbnail do Produto -->
@@ -310,34 +303,24 @@
                                     </div>
                                     <span class="sale-card__date-mobile">{{ formatDateTime(sale.sale_date) }}</span>
                                 </div>
-                                <!-- Título do Produto (clicável) + Logo ML + Conta -->
+                                
+                                <!-- Título do Produto -->
                                 <div class="sale-card__title-row">
-                                    <a v-if="getProductLink(sale)" :href="getProductLink(sale)" target="_blank" rel="noopener" class="sale-card__product-link" :title="sale.product_title">
-                                        {{ sale.product_title || 'Produto sem título' }}
-                                    </a>
-                                    <h3 v-else class="sale-card__product-title" :title="sale.product_title">
+                                    <h3 class="sale-card__product-title" :title="sale.product_title">
                                         {{ sale.product_title || 'Produto sem título' }}
                                     </h3>
                                     <div class="sale-card__badges">
-                                        <img v-if="sale.channel?.toLowerCase() === 'ml'" src="/img/ml-logo.svg" alt="Mercado Livre" class="sale-card__ml-logo" />
-                                        <span v-else class="sale-card__badge sale-card__badge--other">{{ sale.channel }}</span>
+                                        <span class="channel-badge ml">{{ sale.channel }}</span>
                                     </div>
                                 </div>
 
                                 <!-- Specs: Status Venda | SKU | QTD -->
                                 <div class="sale-card__specs">
                                     <span class="sale-card__spec">
-                                        <span class="sale-card__spec-label">Venda:</span>
+                                        <span class="sale-card__spec-label">Processada:</span>
                                         <span class="sale-card__spec-value">
-                                            {{ getSaleStatusLabel(sale.sale_status) }}
-                                        </span>
-                                    </span>
-                                    <span class="sale-card__divider">|</span>
-                                    <span class="sale-card__spec">
-                                        <span class="sale-card__spec-label">Expedição:</span>
-                                        <span class="sale-card__spec-value">
-                                            <span :class="['status-badge', getStatusColorClass(sale.shipping_status)]"></span>
-                                            {{ getStatusLabel(sale.shipping_status) }}
+                                            <span v-if="sale.processed_at" class="tag processed" :title="`Processado em: ${formatDateTime(sale.processed_at)}`">Sim</span>
+                                            <span v-else class="tag unprocessed">Pendente</span>
                                         </span>
                                     </span>
                                     <span class="sale-card__divider">|</span>
@@ -347,13 +330,9 @@
                                     </span>
                                     <span class="sale-card__divider">|</span>
                                     <span class="sale-card__spec" style="display: flex; align-items: center; gap: 0.25rem;">
-                                        <span class="sale-card__spec-label" title="Indica se o SKU está mapeado no armazenamento">Mapeado:</span>
-                                        <span v-if="stockSkuSet.has(normalizeSku(sale.sku))" class="sale-card__spec-value" style="color: #10b981; font-weight: 600; font-size: 0.8rem;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:2px; vertical-align: text-top;"><polyline points="20 6 9 17 4 12"></polyline></svg>Sim
-                                        </span>
-                                        <span v-else class="sale-card__spec-value" style="color: #ef4444; font-weight: 600; font-size: 0.8rem;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:2px; vertical-align: text-top;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>Não
-                                        </span>
+                                        <span class="sale-card__spec-label">Gerenciar:</span>
+                                        <span v-if="stockSkuSet.has(normalizeSku(sale.sku))" class="tag processed">Sim</span>
+                                        <span v-else class="tag unprocessed">Não</span>
                                     </span>
                                     <span class="sale-card__divider">|</span>
                                     <span class="sale-card__spec">
@@ -362,24 +341,23 @@
                                     </span>
                                 </div>
 
-                                <!-- Footer: Vendedor • Comprador • Modo Envio -->
+                                <!-- Footer: Conta • Cliente • Nickname • Modo Envio -->
                                 <div class="sale-card__footer">
-                                    <span class="sale-card__footer-item" title="Vendedor Resp. e Conta">
+                                    <span class="sale-card__footer-item" title="Conta">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                                        {{ sale.user_nickname || 'N/A' }} 
-                                        <span class="sale-card__account-tag" v-if="sale.account_nickname">
-                                            ({{ sale.account_nickname }})
-                                        </span>
+                                        {{ sale.account_nickname || 'N/A' }}
                                     </span>
                                     <span class="sale-card__footer-dot">•</span>
-                                    <span class="sale-card__footer-item" title="Comprador">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                                        {{ getCustomerName(sale) }}
+                                    <span class="sale-card__footer-item" title="Cliente">
+                                        <strong>Cliente:</strong> {{ getCustomerName(sale) }}
+                                    </span>
+                                    <span class="sale-card__footer-dot">•</span>
+                                    <span class="sale-card__footer-item" title="Nickname">
+                                        <strong>Nick:</strong> {{ getBuyerNickname(sale) }}
                                     </span>
                                     <span class="sale-card__footer-dot">•</span>
                                     <span class="sale-card__footer-item" title="Modo Envio">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                                        {{ sale.shipping_mode || 'N/A' }}
+                                        <strong>Envio:</strong> {{ sale.shipping_mode || 'N/A' }}
                                     </span>
                                 </div>
                             </div>
@@ -387,44 +365,55 @@
                             <!-- Direita: Data / Status / Ações -->
                             <div class="sale-card__aside">
                                 <div class="sale-card__date-block">
-                                     <span v-if="String(sale.shipping_mode).toLowerCase().includes('full')" class="sale-card__date-value" style="color: #6366f1; font-weight: 700;" title="Envio FULL">
-                                        LIMITE ENVIO: FULL
-                                     </span>
-                                     <span v-else class="sale-card__date-value" :class="{'sale-card__date-value--late': isLate(sale.sla_expected_date || sale.shipping_limit_date)}" title="Prazo de Expedição">
-                                        LIMITE ENVIO: {{ formatDateTime(sale.sla_expected_date || sale.shipping_limit_date) || '—' }}
+                                     <span class="sale-card__date-value" title="Data Limite">
+                                        LIMITE: {{ formatDateTime(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date) || '—' }}
                                      </span>
                                      <span class="sale-card__exp-date" title="Data da Venda">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                                         Venda: {{ formatDateTime(sale.sale_date) }}
                                      </span>
                                 </div>
                                 
                                 <div class="sale-card__actions">
-                                    <button v-if="!sale.processed_at && stockSkuSet.has(normalizeSku(sale.sku))" 
-                                            @click="processSingleSale(sale)" 
-                                            class="btn-label btn-process-single" 
-                                            :disabled="isProcessing"
-                                            title="Processar Abatimento de Estoque">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-                                        Processar
-                                    </button>
-                                    <span v-if="sale.processed_at" class="sale-card__status-tag sale-card__status-tag--proc" :title="'Processado em: ' + formatDateTime(sale.processed_at)">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                        Proc
-                                    </span>
-                                    <span v-else class="sale-card__status-tag sale-card__status-tag--pend">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                                        Pend
-                                    </span>
+                                    <!-- Etiquetas -->
+                                    <div class="label-actions">
+                                        <button v-if="getRealLabelStatus(sale).canDownload"
+                                            @click="downloadShippingLabel(sale, 'pdf')" class="btn-label pdf"
+                                            :title="`Baixar Etiqueta PDF - ${getRealLabelStatus(sale).reason}`">
+                                            PDF
+                                        </button>
+                                        <button v-if="getRealLabelStatus(sale).canDownload"
+                                            @click="downloadShippingLabel(sale, 'zpl')" class="btn-label zpl"
+                                            :title="`Baixar Etiqueta ZPL - ${getRealLabelStatus(sale).reason}`">
+                                            ZPL
+                                        </button>
+                                        <button v-if="getLabelInfo(sale).canPrint"
+                                            @click="checkSingleLabelAvailability(sale)" class="btn-label check"
+                                            :title="`Verificar disponibilidade da etiqueta`"
+                                            :disabled="isCheckingSingleLabel">
+                                            Verificar
+                                        </button>
+                                        <button @click="debugLabelAvailability(sale)" class="btn-label debug"
+                                            :title="`Debug detalhado da etiqueta`">
+                                            Debug
+                                        </button>
+                                        <div class="label-indicator" :class="getRealLabelStatus(sale).status"
+                                            :data-tooltip="getRealLabelStatus(sale).reason"
+                                            :title="getRealLabelStatus(sale).reason">
+                                            <span class="indicator-dot"></span>
+                                        </div>
+                                    </div>
 
-                                    <button v-if="getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                                        PDF
-                                    </button>
-                                    
-                                    <button v-if="getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
-                                        ZPL
+                                    <!-- Alteração de Status -->
+                                    <button class="status-select-trigger" @click="openStatusModal(sale)">
+                                        <div class="status-cell">
+                                            <span :class="['status-badge', getStatusColorClass(sale.shipping_status)]"></span>
+                                            <span>{{ getStatusLabel(sale.shipping_status) }}</span>
+                                        </div>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24"
+                                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" class="status-arrow">
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
                                     </button>
                                 </div>
                             </div>
@@ -502,6 +491,7 @@
 </template>
 
 <script setup>
+/* eslint-disable no-unused-vars */
 import { defineProps, ref, onMounted, onUnmounted, computed, watch, nextTick, toRefs, reactive } from 'vue';
 import gsap from 'gsap';
 import { useSalesForUser } from '@/composables/useSalesForUser';
@@ -513,6 +503,7 @@ import ToastNotification from './ToastNotification.vue';
 import { useUserAccounts } from '@/composables/useUserAccounts';
 import { useSyncManager } from '@/composables/useSyncManager';
 import { useAuth } from '@/composables/useAuth';
+import { API_BASE_URL } from '@/config';
 
 
 
@@ -528,16 +519,6 @@ const { sales, isLoading, error, fetchSales, updateSaleStatus, processSales: pro
 const { skus, loadStorageData } = useUserStorage(userIdRef);
 const { systemStatuses } = useSystemStatus();
 const { getLabelInfo, downloadLabel, checkLabelAvailability } = useLabels();
-const labelError = ref(null);
-async function handleDownloadLabel(shipmentId, sellerId, type) {
-    labelError.value = null;
-    try {
-        await downloadLabel(shipmentId, sellerId, type);
-    } catch (err) {
-        labelError.value = err?.message || 'Não foi possível baixar a etiqueta. Tente novamente.';
-        setTimeout(() => { labelError.value = null; }, 8000);
-    }
-}
 const { userRole } = useAuth();
 
 const salesTableBodyRef = ref(null);
@@ -648,503 +629,16 @@ const filters = reactive({
     shippingStatus: null,
 });
 
-<template>
-    <div class="main-container">
-        <!-- Banner de erro de etiqueta -->
-        <Transition name="label-error-fade">
-            <div v-if="labelError" class="label-error-banner">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <span>{{ labelError }}</span>
-                <button class="label-error-close" @click="labelError = null">&times;</button>
-            </div>
-        </Transition>
-
-        <!-- Painel de Filtros Melhorado -->
-        <div class="filters-panel-v2">
-             <!-- Linha principal com filtros rápidos -->
-            <div class="filters-main-row">
-                <div class="filters-left-group">
-                    <!-- Busca -->
-                    <div class="search-wrapper">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                            class="search-icon">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
-                        <input type="text" v-model="searchQuery" placeholder="Buscar por produto, SKU, usuário..."
-                            class="search-input">
-                    </div>
-
-                    <!-- Filtro rápido: Status da Venda -->
-                    <div class="filter-container" ref="saleStatusFilterContainerRef">
-                        <button @click="toggleSaleStatusDropdown" :class="['btn', 'btn-outline', { 'btn-outline--active': selectedSaleStatusFilter }]">
-                            <span class="truncate pr-2">{{ selectedSaleStatusFilter ? `Venda: ${getSaleStatusLabel(selectedSaleStatusFilter)}` : 'Status da Venda' }}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
-                                <path d="m6 9 6 6 6-6"></path>
-                            </svg>
-                        </button>
-                        <div v-if="isSaleStatusDropdownOpen" ref="saleStatusFilterDropdownRef" class="filter-popover">
-                            <ul class="filter-popover-list">
-                                <li @click="applySaleStatusFilter(null)">
-                                    <span :class="{'font-bold': !selectedSaleStatusFilter}">Todos</span>
-                                </li>
-                                <li v-for="status in saleStatusOptions" :key="status.value" @click="applySaleStatusFilter(status.value)">
-                                     <span :class="{'font-bold': selectedSaleStatusFilter === status.value}">{{ status.label }}</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <!-- Filtro rápido: Status de Expedição -->
-                    <div class="filter-container" ref="statusFilterContainerRef">
-                        <button @click="toggleStatusDropdown" :class="['btn', 'btn-outline', { 'btn-outline--active': selectedStatusFilter }]">
-                            <span class="truncate pr-2">{{ selectedStatusFilter ? `Expedição: ${getStatusLabel(selectedStatusFilter)}` : 'Status de Expedição' }}</span>
-                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
-                                <path d="m6 9 6 6 6-6"></path>
-                            </svg>
-                        </button>
-                        <div v-if="isStatusDropdownOpen" ref="statusFilterDropdownRef" class="filter-popover">
-                            <ul class="filter-popover-list">
-                                <li @click="applyStatusFilter(null)">
-                                    <span :class="{'font-bold': !selectedStatusFilter}">Todos</span>
-                                </li>
-                                <li v-for="status in systemStatuses" :key="status.value" @click="applyStatusFilter(status.value)">
-                                    <span :class="{'font-bold': selectedStatusFilter === status.value}">{{ status.label }}</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <!-- Filtro de Conta -->
-                    <div class="filter-container" ref="accountFilterContainerRef">
-                        <button @click="isAccountDropdownOpen = !isAccountDropdownOpen" :class="['btn', 'btn-outline', { 'btn-outline--active': selectedAccountFilter }]">
-                            <span class="truncate pr-2">{{ selectedAccountFilter ? `Conta: ${selectedAccountFilter}` : 'Conta' }}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
-                                <path d="m6 9 6 6 6-6"></path>
-                            </svg>
-                        </button>
-                        <div v-if="isAccountDropdownOpen" class="filter-popover">
-                            <div class="filter-popover-search">
-                                <input type="text" v-model="accountSearchText" placeholder="Buscar conta..." class="filter-popover-input" />
-                            </div>
-                            <ul class="filter-popover-list">
-                                <li @click="applyAccountFilter(null)">
-                                    <span :class="{'font-bold': !selectedAccountFilter}">Todas</span>
-                                </li>
-                                <li v-for="acc in filteredAccountOptions" :key="acc" @click="applyAccountFilter(acc)">
-                                    <span :class="{'font-bold': selectedAccountFilter === acc}">{{ acc }}</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <!-- Filtro de Usuário -->
-                    <div class="filter-container" ref="userFilterContainerRef">
-                        <button @click="isUserDropdownOpen = !isUserDropdownOpen" :class="['btn', 'btn-outline', { 'btn-outline--active': selectedUserFilter }]">
-                            <span class="truncate pr-2">{{ selectedUserFilter ? `Usuário: ${selectedUserFilter}` : 'Usuário' }}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
-                                <path d="m6 9 6 6 6-6"></path>
-                            </svg>
-                        </button>
-                        <div v-if="isUserDropdownOpen" class="filter-popover">
-                            <div class="filter-popover-search">
-                                <input type="text" v-model="userSearchText" placeholder="Buscar usuário..." class="filter-popover-input" />
-                            </div>
-                            <ul class="filter-popover-list">
-                                <li @click="applyUserFilter(null)">
-                                    <span :class="{'font-bold': !selectedUserFilter}">Todos</span>
-                                </li>
-                                <li v-for="usr in filteredUserOptions" :key="usr" @click="applyUserFilter(usr)">
-                                    <span :class="{'font-bold': selectedUserFilter === usr}">{{ usr }}</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-            <!-- Filtros Extras (sempre visíveis) -->
-            <div class="advanced-filters-content">
-                <div class="advanced-filters-grid">
-                    <!-- Busca por Cliente removida (demanda 03) -->
-
-                    <!-- Filtro por Modo de Envio (Multi-select) -->
-                    <div class="filter-group">
-                        <label>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                            Modo de Envio
-                        </label>
-                        <div class="shipping-mode-chips">
-                            <button v-for="opt in shippingModeOptions" :key="opt.value"
-                                @click="toggleShippingMode(opt.value)"
-                                :class="['quick-btn', { 'quick-btn--active': selectedShippingModes.includes(opt.value) }]">
-                                {{ opt.label }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Data da Venda -->
-                    <div class="filter-group date-range-group">
-                        <label>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                            Data da Venda
-                        </label>
-                        <div class="quick-date-btns">
-                            <button @click="setDatePreset('sale', 'today')" :class="{'quick-btn--active': activeSaleDatePreset === 'today'}" class="quick-btn">Hoje</button>
-                            <button @click="setDatePreset('sale', 'yesterday')" :class="{'quick-btn--active': activeSaleDatePreset === 'yesterday'}" class="quick-btn">Ontem</button>
-                            <button @click="setDatePreset('sale', '7d')" :class="{'quick-btn--active': activeSaleDatePreset === '7d'}" class="quick-btn">7 dias</button>
-                            <button @click="setDatePreset('sale', '30d')" :class="{'quick-btn--active': activeSaleDatePreset === '30d'}" class="quick-btn">30 dias</button>
-                            <button @click="setDatePreset('sale', 'month')" :class="{'quick-btn--active': activeSaleDatePreset === 'month'}" class="quick-btn">Este mês</button>
-                        </div>
-                        <div class="date-inputs">
-                            <input type="date" v-model="filters.saleDateStart" @input="activeSaleDatePreset = null">
-                            <span>até</span>
-                            <input type="date" v-model="filters.saleDateEnd" @input="activeSaleDatePreset = null">
-                        </div>
-                    </div>
-
-                    <!-- Prazo de Expedição -->
-                    <div class="filter-group date-range-group">
-                        <label>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                            Prazo de Expedição
-                        </label>
-                        <div class="quick-date-btns">
-                            <button @click="setDatePreset('ship', 'today')" :class="{'quick-btn--active': activeShipDatePreset === 'today'}" class="quick-btn">Hoje</button>
-                            <button @click="setDatePreset('ship', 'yesterday')" :class="{'quick-btn--active': activeShipDatePreset === 'yesterday'}" class="quick-btn">Ontem</button>
-                            <button @click="setDatePreset('ship', 'tomorrow')" :class="{'quick-btn--active': activeShipDatePreset === 'tomorrow'}" class="quick-btn">Amanhã</button>
-                            <button @click="setDatePreset('ship', '7d')" :class="{'quick-btn--active': activeShipDatePreset === '7d'}" class="quick-btn">7 dias</button>
-                            <button disabled title="Em breve: lógica de atraso com status vinculado" :class="{'quick-btn--active': activeShipDatePreset === 'overdue'}" class="quick-btn quick-btn--danger quick-btn--disabled">Atrasados</button>
-                        </div>
-                        <div class="date-inputs">
-                            <input type="date" v-model="filters.shippingLimitStart" @input="activeShipDatePreset = null">
-                            <span>até</span>
-                            <input type="date" v-model="filters.shippingLimitEnd" @input="activeShipDatePreset = null">
-                        </div>
-                    </div>
-                </div>
-                 <div class="advanced-filters-actions">
-                    <button @click="clearFilters" class="btn btn-secondary">Limpar Filtros</button>
-                </div>
-            </div>
-
-            <!-- Ações da Tabela -->
-            <div class="table-actions-bar">
-                <div class="table-actions-left">
-                    <button @click="processAllSales" class="btn btn-primary" :disabled="isProcessing">
-                        <span v-if="isProcessing">Processando...</span>
-                        <span v-else-if="selectedSaleIds.size > 0">Processar {{ selectedSaleIds.size }} Selecionadas</span>
-                        <span v-else>Processar Vendas Filtradas</span>
-                    </button>
-                    <div v-if="selectedSaleIds.size > 0" class="batch-action-bar">
-                        <span class="batch-action-text">{{ selectedSaleIds.size }} selecionadas</span>
-                        <button @click="selectAll" class="btn-text" :disabled="isProcessing">Selecionar Todas</button>
-                        <button @click="deselectAll" class="btn-text" :disabled="isProcessing">Desmarcar</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-
-        <!-- Container da Tabela de Vendas -->
-        <div class="sales-table-container">
-            <div v-if="isLoading && sales.length === 0" class="loading-state">
-                <p>Carregando vendas...</p>
-            </div>
-            <div v-else-if="error" class="error-state">
-                <p>{{ error }}</p>
-            </div>
-            <div v-else-if="sales.length === 0" class="empty-state">
-                <h3 class="empty-state-title">Nenhuma venda encontrada</h3>
-                <p class="empty-state-text">Nenhum resultado para os filtros atuais.</p>
-                <button @click="clearFilters" class="btn btn-secondary">Limpar Filtros</button>
-            </div>
-            <div v-else>
-                <!-- Contador de resultados -->
-                <div class="sale-cards-counter">
-                    <span>Mostrando <strong>{{ sales.length }}</strong> de <strong>{{ totalSales }}</strong> vendas</span>
-                    <span v-if="isLoading" class="sale-cards-counter__loading">Atualizando...</span>
-                </div>
-                <div class="sale-cards-list" ref="salesTableBodyRef">
-                    <div v-for="sale in sales" :key="`${sale.id}-${sale.sku}`" 
-                         class="sale-card"
-                         :class="{ 'sale-card--cancelled': sale.sale_status === 'cancelled' }">
-                        
-                        <div class="sale-card__layout">
-                            <!-- Chceckbox para lote -->
-                            <div v-if="!sale.processed_at && sale.is_sku_mapped" class="sale-card__checkbox-container" @click.stop>
-                                <input type="checkbox" 
-                                       :checked="selectedSaleIds.has(getSaleKey(sale))" 
-                                       @change="toggleSaleSelection(sale)" 
-                                       class="sale-card__checkbox"
-                                       :disabled="isProcessing">
-                            </div>
-                            
-                            <!-- Thumbnail do Produto -->
-                            <div class="sale-card__thumb">
-                                <img v-if="getThumbUrl(sale)" 
-                                     :src="getThumbUrl(sale)" 
-                                     :alt="sale.product_title" 
-                                     class="sale-card__thumb-img" 
-                                     loading="lazy" />
-                                <div v-else class="sale-card__thumb-placeholder">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                                </div>
-                            </div>
-
-                            <!-- Centro: Informações Principais -->
-                            <div class="sale-card__main">
-                                <!-- Topo: ID tag -->
-                                <div class="sale-card__id-row">
-                                    <div class="sale-card__id-tag" @click="copySaleId(sale.id)" title="Copiar ID da Venda">
-                                        <span class="sale-card__id-label">ID:</span>
-                                        <span class="sale-card__id-value">{{ sale.id || 'N/A' }}</span>
-                                    </div>
-                                    <span class="sale-card__date-mobile">{{ formatDateTime(sale.sale_date) }}</span>
-                                </div>
-                                <!-- Título do Produto (clicável) + Logo ML + Conta -->
-                                <div class="sale-card__title-row">
-                                    <a v-if="getProductLink(sale)" :href="getProductLink(sale)" target="_blank" rel="noopener" class="sale-card__product-link" :title="sale.product_title">
-                                        {{ sale.product_title || 'Produto sem título' }}
-                                    </a>
-                                    <h3 v-else class="sale-card__product-title" :title="sale.product_title">
-                                        {{ sale.product_title || 'Produto sem título' }}
-                                    </h3>
-                                    <div class="sale-card__badges">
-                                        <img v-if="sale.channel?.toLowerCase() === 'ml'" src="/img/ml-logo.svg" alt="Mercado Livre" class="sale-card__ml-logo" />
-                                        <span v-else class="sale-card__badge sale-card__badge--other">{{ sale.channel }}</span>
-                                    </div>
-                                </div>
-
-                                <!-- Specs: Status Venda | SKU | QTD -->
-                                <div class="sale-card__specs">
-                                    <span class="sale-card__spec">
-                                        <span class="sale-card__spec-label">Venda:</span>
-                                        <span class="sale-card__spec-value">
-                                            {{ getSaleStatusLabel(sale.sale_status) }}
-                                        </span>
-                                    </span>
-                                    <span class="sale-card__divider">|</span>
-                                    <span class="sale-card__spec">
-                                        <span class="sale-card__spec-label">Expedição:</span>
-                                        <span class="sale-card__spec-value">
-                                            <span :class="['status-badge', getStatusColorClass(sale.shipping_status)]"></span>
-                                            {{ getStatusLabel(sale.shipping_status) }}
-                                        </span>
-                                    </span>
-                                    <span class="sale-card__divider">|</span>
-                                    <span class="sale-card__spec">
-                                        <span class="sale-card__spec-label">SKU:</span>
-                                        <span class="sale-card__spec-mono">{{ sale.sku || 'N/A' }}</span>
-                                    </span>
-                                    <span class="sale-card__divider">|</span>
-                                    <span class="sale-card__spec" style="display: flex; align-items: center; gap: 0.25rem;">
-                                        <span class="sale-card__spec-label" title="Indica se o SKU está mapeado no armazenamento">Mapeado:</span>
-                                        <span v-if="sale.is_sku_mapped" class="sale-card__spec-value" style="color: #10b981; font-weight: 600; font-size: 0.8rem;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:2px; vertical-align: text-top;"><polyline points="20 6 9 17 4 12"></polyline></svg>Sim
-                                        </span>
-                                        <span v-else class="sale-card__spec-value" style="color: #ef4444; font-weight: 600; font-size: 0.8rem;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:2px; vertical-align: text-top;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>Não
-                                        </span>
-                                    </span>
-                                    <span class="sale-card__divider">|</span>
-                                    <span class="sale-card__spec">
-                                        <span class="sale-card__spec-label">QTD:</span>
-                                        <span class="sale-card__spec-value">{{ sale.quantity }}</span>
-                                    </span>
-                                </div>
-
-                                <!-- Footer: Vendedor • Comprador • Modo Envio -->
-                                <div class="sale-card__footer">
-                                    <span class="sale-card__footer-item" title="Vendedor Resp. e Conta">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                                        {{ sale.user_nickname || 'N/A' }} 
-                                        <span class="sale-card__account-tag" v-if="sale.account_nickname">
-                                            ({{ sale.account_nickname }})
-                                        </span>
-                                    </span>
-                                    <span class="sale-card__footer-dot">•</span>
-                                    <span class="sale-card__footer-item" title="Comprador">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                                        {{ getCustomerName(sale) }}
-                                    </span>
-                                    <span class="sale-card__footer-dot">•</span>
-                                    <span class="sale-card__footer-item" title="Modo Envio">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                                        {{ sale.shipping_mode || 'N/A' }}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <!-- Direita: Data / Status / Ações -->
-                            <div class="sale-card__aside">
-                                <div class="sale-card__date-block">
-                                     <span v-if="String(sale.shipping_mode).toLowerCase().includes('full')" class="sale-card__date-value" style="color: #6366f1; font-weight: 700;" title="Envio FULL">
-                                        LIMITE ENVIO: FULL
-                                     </span>
-                                     <span v-else class="sale-card__date-value" :class="{'sale-card__date-value--late': isLate(sale.sla_expected_date || sale.shipping_limit_date)}" title="Prazo de Expedição">
-                                        LIMITE ENVIO: {{ formatDateTime(sale.sla_expected_date || sale.shipping_limit_date) || '—' }}
-                                     </span>
-                                     <span class="sale-card__exp-date" title="Data da Venda">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                                        Venda: {{ formatDateTime(sale.sale_date) }}
-                                     </span>
-                                </div>
-                                
-                                <div class="sale-card__actions">
-                                    <button v-if="!sale.processed_at && sale.is_sku_mapped" 
-                                            @click="processSingleSale(sale)" 
-                                            class="btn-label btn-process-single" 
-                                            :disabled="isProcessing"
-                                            title="Processar Abatimento de Estoque">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-                                        Processar
-                                    </button>
-                                    <span v-if="sale.processed_at" class="sale-card__status-tag sale-card__status-tag--proc" :title="'Processado em: ' + formatDateTime(sale.processed_at)">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                        Proc
-                                    </span>
-                                    <span v-else class="sale-card__status-tag sale-card__status-tag--pend">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                                        Pend
-                                    </span>
-
-                                    <button v-if="getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                                        PDF
-                                    </button>
-                                    
-                                    <button v-if="getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
-                                        ZPL
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="pagination-controls" v-if="totalPages > 1">
-                    <button @click="goToPage(currentPage - 1)" :disabled="currentPage <= 1 || isLoading">Anterior</button>
-                    <span>Página {{ currentPage }} de {{ totalPages }} ({{ totalSales }} vendas)</span>
-                    <button @click="goToPage(currentPage + 1)" :disabled="currentPage >= totalPages || isLoading">Próximo</button>
-                </div>
-            </div>
-        </div>
-
-
-        <UniversalModal :is-open="isSummaryModalOpen" :title="summaryModalTitle" @close="isSummaryModalOpen = false">
-            <div class="summary-modal-content" v-html="summaryModalContent"></div>
-            <div class="modal-actions">
-                <button @click="isSummaryModalOpen = false" class="btn btn-primary">Fechar</button>
-            </div>
-        </UniversalModal>
-
-    </div>
-</template>
-
-<script setup>
-import { ref, onMounted, onUnmounted, computed, watch, reactive } from 'vue';
-import { useMasterSales } from '@/composables/useMasterSales';
-import { useSystemStatus } from '@/composables/useSystemStatus';
-import { useLabels } from '@/composables/useLabels';
-import { API_BASE_URL } from '@/config';
-import UniversalModal from './UniversalModal.vue';
-
-// ===== UTILITY FUNCTIONS FOR CUSTOMER DATA =====
-
-/**
- * Extrai o nome do cliente dos dados da API do Mercado Livre
- * @param {Object} sale - Objeto da venda contendo raw_api_data
- * @returns {string} Nome do cliente ou 'N/A' se não disponível
- */
-function getCustomerName(sale) {
-    try {
-        // Use flat buyer fields from server-side extraction
-        if (sale.buyer_first_name && sale.buyer_last_name) {
-            return `${sale.buyer_first_name} ${sale.buyer_last_name}`.trim();
-        }
-        if (sale.buyer_first_name) return sale.buyer_first_name.trim();
-        if (sale.buyer_nickname) return sale.buyer_nickname.trim();
-        
-        // Fallback to raw_api_data if available
-        const buyer = sale?.raw_api_data?.buyer;
-        if (buyer?.first_name && buyer?.last_name) {
-            return `${buyer.first_name} ${buyer.last_name}`.trim();
-        }
-        if (buyer?.nickname) return buyer.nickname.trim();
-        if (buyer?.id) return `Cliente #${buyer.id}`;
-        
-        return 'N/A';
-    } catch (error) {
-        return 'N/A';
+function getThumbUrl(sale) {
+    let thumbUrl = sale.product_thumbnail;
+    if (!thumbUrl && sale.raw_api_data?.order_items) {
+        const itemObj = sale.raw_api_data.order_items.find(it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku);
+        if (itemObj?.item?.thumbnail) thumbUrl = itemObj.item.thumbnail;
     }
+    if (!thumbUrl) return null;
+    const encodedUrl = encodeURIComponent(thumbUrl);
+    return `${API_BASE_URL}/ml/img-proxy?url=${encodedUrl}`;
 }
-
-/**
- * Copia o ID da venda para a área de transferência
- * @param {number|string} saleId - ID da venda a ser copiado
- */
-async function copySaleId(saleId) {
-    try {
-        if (!saleId) {
-            throw new Error('ID da venda não disponível');
-        }
-        
-        const idString = saleId.toString();
-        
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(idString);
-            showToast('ID copiado para a área de transferência', 'success');
-        } else {
-            // Fallback para navegadores antigos
-            const textArea = document.createElement('textarea');
-            textArea.value = idString;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-999999px';
-            textArea.style.top = '-999999px';
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            
-            const successful = document.execCommand('copy');
-            document.body.removeChild(textArea);
-            
-            if (successful) {
-                showToast('ID copiado para a área de transferência', 'success');
-            } else {
-                throw new Error('Falha ao copiar usando fallback');
-            }
-        }
-    } catch (error) {
-        console.error('Erro ao copiar ID:', error);
-        showToast('Erro ao copiar ID da venda', 'error');
-    }
-}
-
-/**
- * Exibe uma notificação toast simples
- * @param {string} message - Mensagem a ser exibida
- * @param {string} type - Tipo da notificação ('success', 'error', 'info')
- */
-function showToast(message, type = 'info') {
-    // Implementação simples usando alert por enquanto
-    // TODO: Integrar com sistema de toast existente
-    if (type === 'error') {
-        console.error(message);
-    } else {
-        console.log(message);
-    }
-    
-    // Criar um toast visual simples
-    const toast = document.createElement('div');
-    toast.textContent = message;
-    toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#ef4444' : '#10b981'};
 
 const normalizeSku = (sku) => (sku || '').trim().toUpperCase();
 
@@ -3705,7 +3199,6 @@ onUnmounted(() => {
 .debug-table tr:hover {
     background-color: #f9fafb;
 }
-
 .sale-cards-counter {
     display: flex;
     align-items: center;
@@ -3733,6 +3226,7 @@ onUnmounted(() => {
     border-radius: 0.75rem;
     padding: 1rem 1.25rem;
     transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    margin-bottom: 0.75rem;
 }
 .sale-card:hover {
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -3742,6 +3236,9 @@ onUnmounted(() => {
     opacity: 0.55;
     background-color: #fef2f2;
     border-color: #fecaca;
+}
+.sale-card--unprocessed {
+    border-left: 4px solid #b45309;
 }
 
 .sale-card__layout {
@@ -3843,8 +3340,7 @@ onUnmounted(() => {
     flex-wrap: wrap;
 }
 
-.sale-card__product-title,
-.sale-card__product-link {
+.sale-card__product-title {
     font-size: 1.05rem;
     font-weight: 700;
     color: #1e293b;
@@ -3855,14 +3351,6 @@ onUnmounted(() => {
     white-space: nowrap;
     line-height: 1.4;
 }
-.sale-card__product-link {
-    text-decoration: none;
-    transition: color 0.15s;
-}
-.sale-card__product-link:hover {
-    color: #3b82f6;
-    text-decoration: underline;
-}
 
 .sale-card__badges {
     display: flex;
@@ -3870,34 +3358,6 @@ onUnmounted(() => {
     gap: 0.375rem;
     align-items: center;
     flex-shrink: 0;
-}
-
-/* ML Logo */
-.sale-card__ml-logo {
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    flex-shrink: 0;
-}
-
-.sale-card__badge {
-    padding: 0.125rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    border: 1px solid;
-    letter-spacing: 0.025em;
-}
-.sale-card__badge--other {
-    background-color: #f8fafc;
-    color: #475569;
-    border-color: #e2e8f0;
-}
-.sale-card__account-tag {
-    font-weight: 600;
-    color: #4f46e5;
-    margin-left: 0.25rem;
 }
 
 /* Specs Row */
@@ -3987,10 +3447,6 @@ onUnmounted(() => {
     color: #1e293b;
 }
 
-.sale-card__date-value--late {
-    color: #dc2626;
-}
-
 .sale-card__exp-date {
     font-size: 12px;
     display: inline-flex;
@@ -4008,81 +3464,6 @@ onUnmounted(() => {
     flex-wrap: wrap;
     justify-content: flex-end;
 }
-
-.sale-card__status-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.25rem 0.625rem;
-    border-radius: 0.375rem;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    border: 1px solid;
-}
-.sale-card__status-tag--proc {
-    color: #15803d;
-    background-color: #f0fdf4;
-    border-color: #bbf7d0;
-}
-.sale-card__status-tag--pend {
-    color: #b45309;
-    background-color: #fffbeb;
-    border-color: #fde68a;
-}
-
-.btn-process-single {
-    background-color: #eef2ff;
-    border-color: #c7d2fe;
-    color: #4f46e5;
-    padding: 0.25rem 0.6rem;
-}
-.btn-process-single:hover:not(:disabled) {
-    background-color: #e0e7ff;
-    border-color: #a5b4fc;
-}
-
-/* ============================================= */
-/* BATCH ACTION BAR */
-/* ============================================= */
-
-.batch-action-bar {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    background-color: #f1f5f9;
-    padding: 0.35rem 1rem;
-    border-radius: 9999px;
-    border: 1px solid #cbd5e1;
-    font-size: 0.875rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    margin-left: 1rem;
-}
-
-.batch-action-text {
-    font-weight: 600;
-    color: #0f172a;
-}
-
-.btn-text {
-    background: none;
-    border: none;
-    color: #3b82f6;
-    font-weight: 500;
-    cursor: pointer;
-    padding: 0 0.25rem;
-    font-size: 0.875rem;
-}
-.btn-text:hover:not(:disabled) {
-    color: #2563eb;
-    text-decoration: underline;
-}
-.btn-text:disabled {
-    color: #94a3b8;
-    cursor: not-allowed;
-}
-
 
 /* Responsive: mobile */
 @media (max-width: 768px) {
@@ -4111,61 +3492,8 @@ onUnmounted(() => {
     .sale-card__actions {
         justify-content: flex-start;
     }
-    .sale-card__product-title,
-    .sale-card__product-link {
+    .sale-card__product-title {
         max-width: 100%;
     }
 }
-/* Label Error Toast (Bottom Right) */
-.label-error-banner {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    background: #fff;
-    border-left: 4px solid #ef4444;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-    color: #1e293b;
-    border-radius: 6px;
-    padding: 1rem 1.25rem;
-    max-width: 400px;
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-.label-error-banner svg {
-    flex-shrink: 0;
-    color: #ef4444;
-    width: 20px;
-    height: 20px;
-}
-.label-error-banner span {
-    flex: 1;
-    line-height: 1.4;
-}
-.label-error-close {
-    background: none;
-    border: none;
-    color: #94a3b8;
-    font-size: 1.25rem;
-    cursor: pointer;
-    padding: 0.25rem;
-    line-height: 1;
-    transition: color 0.2s;
-}
-.label-error-close:hover {
-    color: #ef4444;
-}
-.label-error-fade-enter-active,
-.label-error-fade-leave-active {
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-.label-error-fade-enter-from,
-.label-error-fade-leave-to {
-    opacity: 0;
-    transform: translateX(100%) scale(0.9);
-}
-
 </style>
