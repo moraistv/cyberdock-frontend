@@ -180,91 +180,123 @@
                         <p>Nenhuma venda encontrada para os filtros selecionados.</p>
                     </div>
                     <div v-else>
-                        <table class="sales-table">
-                            <thead>
-                                <tr>
-                                    <th>Canal</th>
-                                    <th>Conta</th>
-                                    <th>Cliente</th>
-                                    <th>ID da Venda</th>
-                                    <th>Data da Venda</th>
-                                    <th>Produto</th>
-                                    <th>SKU</th>
-                                    <th>Qtd.</th>
-                                    <th>Modo Envio</th>
-                                    <th>Processada</th>
-                                    <th>Data Limite</th>
-                                    <th>Pacotes</th>
-                                    <th>Status</th>
-                                    <th v-if="userRole === 'master'">JSON</th>
-                                </tr>
-                            </thead>
-                            <tbody ref="tableBodyRef">
-                                <!-- INÍCIO DA ALTERAÇÃO: Adicionar classe para venda cancelada -->
-                                <tr v-for="sale in paginatedSales" :key="`${sale.id}-${sale.sku}`"
-                                    :class="{ 'cancelled-sale': sale.unified_status === 'cancelled' }">
-                                    <td data-label="Canal">
-                                        <span class="channel-badge ml" :class="{ 'clickable': userRole === 'master' }"
-                                            @click="userRole === 'master' ? showJsonModal(sale) : null"
-                                            :title="userRole === 'master' ? 'Ver JSON da Venda' : 'Canal de Venda'">
-                                            {{ sale.channel }}
-                                        </span>
-                                    </td>
-                                    <td data-label="Conta">{{ sale.account_nickname }}</td>
-                                    <td data-label="Cliente" class="customer-name-cell"
-                                        @mouseenter="showTooltip($event, getCustomerName(sale))" @mouseleave="hideTooltip">
-                                        {{ getCustomerName(sale) }}
-                                    </td>
-                                    <td data-label="ID da Venda" class="sale-id-cell" 
-                                        @click="copySaleId(sale.id)" 
-                                        :title="'Clique para copiar: ' + (sale.id || 'N/A')"
-                                        style="cursor: pointer; color: #3b82f6; text-decoration: underline;">
-                                        {{ sale.id || 'N/A' }}
-                                    </td>
-                                    <td data-label="Data da Venda">{{ formatDateTime(sale.sale_date) }}</td>
-                                    <td data-label="Produto" class="product-title"
-                                        @mouseenter="showTooltip($event, sale.product_title)" @mouseleave="hideTooltip">
-                                        {{ sale.product_title }}</td>
-                                    <td data-label="SKU" class="sku-cell"
-                                        @mouseenter="showTooltip($event, sale.sku || 'N/A')" @mouseleave="hideTooltip">
-                                        {{ truncateText(sale.sku, 20) }}</td>
-                                    <td data-label="Qtd.">{{ sale.quantity }}</td>
-                                    <td data-label="Modo Envio">{{ sale.shipping_mode || 'N/A' }}</td>
-                                    <td data-label="Processada">
-                                        <span v-if="sale.processed_at" class="tag processed"
-                                            :title="`Processado em: ${formatDateTime(sale.processed_at)}`">Sim</span>
-                                        <span v-else class="tag unprocessed">Não</span>
-                                    </td>
-                                    <td data-label="Data Limite">{{
-                                        formatDateTime(sale.raw_api_data?.sla_data?.expected_date ||
-                                            sale.shipping_limit_date) }}</td>
-                                    <td data-label="Pacotes">{{ sale.packages }}</td>
-                                    <td data-label="Status">
-                                        <!-- INÍCIO DA ALTERAÇÃO: Usar 'unified_status' para exibir o status -->
-                                        <div class="status-cell">
-                                            <span
-                                                :class="['status-badge', getStatusColorClass(sale.unified_status)]"></span>
-                                            <span>{{ getStatusLabel(sale.unified_status) }}</span>
+                        <!-- Contador de resultados -->
+                        <div class="sale-cards-counter">
+                            <span>Mostrando <strong>{{ filteredSales.length }}</strong> de <strong>{{ sales.length }}</strong> vendas</span>
+                            <span v-if="isLoading" class="sale-cards-counter__loading">Atualizando...</span>
+                        </div>
+                        <div class="sale-cards-list" ref="tableBodyRef">
+                            <div v-for="sale in paginatedSales" :key="`${sale.id}-${sale.sku}`"
+                                 class="sale-card"
+                                 :class="{ 'sale-card--cancelled': sale.unified_status === 'cancelled' }">
+
+                                <div class="sale-card__layout">
+                                    <!-- Thumbnail do Produto -->
+                                    <div class="sale-card__thumb">
+                                        <img v-if="getThumbUrl(sale)"
+                                             :src="getThumbUrl(sale)"
+                                             :alt="sale.product_title"
+                                             class="sale-card__thumb-img"
+                                             loading="lazy" />
+                                        <div v-else class="sale-card__thumb-placeholder">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                                         </div>
-                                        <!-- FIM DA ALTERAÇÃO -->
-                                    </td>
-                                    <td v-if="userRole === 'master'" data-label="JSON">
-                                        <button @click="showJsonModal(sale)" class="btn-json"
-                                            title="Ver JSON da API"><svg xmlns="http://www.w3.org/2000/svg" width="24"
-                                                height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                                <path d="M20 16v-8l3 8v-8" />
-                                                <path d="M15 8a2 2 0 0 1 2 2v4a2 2 0 1 1 -4 0v-4a2 2 0 0 1 2 -2z" />
-                                                <path d="M1 10h3v4h-2a2 2 0 0 1 -2 -2v-2z" />
-                                                <path
-                                                    d="M7 15a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-2a1 1 0 0 0 -1 -1h-1a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1h1a1 1 0 0 1 1 1" />
-                                            </svg></button>
-                                    </td>
-                                </tr>
-                                <!-- FIM DA ALTERAÇÃO -->
-                            </tbody>
-                        </table>
+                                    </div>
+
+                                    <!-- Centro: Informações Principais -->
+                                    <div class="sale-card__main">
+                                        <!-- ID + Data Mobile -->
+                                        <div class="sale-card__id-row">
+                                            <div class="sale-card__id-tag" @click="copySaleId(sale.id)" title="Copiar ID da Venda">
+                                                <span class="sale-card__id-label">ID:</span>
+                                                <span class="sale-card__id-value">{{ sale.id || 'N/A' }}</span>
+                                            </div>
+                                            <span class="sale-card__date-mobile">{{ formatDateTime(sale.sale_date) }}</span>
+                                        </div>
+
+                                        <!-- Título do Produto -->
+                                        <div class="sale-card__title-row">
+                                            <h3 class="sale-card__product-title" :title="sale.product_title">
+                                                {{ sale.product_title || 'Produto sem título' }}
+                                            </h3>
+                                            <div class="sale-card__badges">
+                                                <span class="channel-badge ml"
+                                                    :class="{ clickable: userRole === 'master' }"
+                                                    @click="userRole === 'master' ? showJsonModal(sale) : null"
+                                                    :title="userRole === 'master' ? 'Ver JSON da Venda' : 'Canal de Venda'">
+                                                    {{ sale.channel }}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <!-- Specs: Status | SKU | Qtd | Processada -->
+                                        <div class="sale-card__specs">
+                                            <span class="sale-card__spec">
+                                                <span class="sale-card__spec-label">Status:</span>
+                                                <span class="sale-card__spec-value">
+                                                    <span :class="['status-badge', getStatusColorClass(sale.unified_status)]"></span>
+                                                    {{ getStatusLabel(sale.unified_status) }}
+                                                </span>
+                                            </span>
+                                            <span class="sale-card__divider">|</span>
+                                            <span class="sale-card__spec">
+                                                <span class="sale-card__spec-label">SKU:</span>
+                                                <span class="sale-card__spec-mono">{{ sale.sku || 'N/A' }}</span>
+                                            </span>
+                                            <span class="sale-card__divider">|</span>
+                                            <span class="sale-card__spec">
+                                                <span class="sale-card__spec-label">QTD:</span>
+                                                <span class="sale-card__spec-value">{{ sale.quantity }}</span>
+                                            </span>
+                                            <span class="sale-card__divider">|</span>
+                                            <span class="sale-card__spec">
+                                                <span class="sale-card__spec-label">Processada:</span>
+                                                <span v-if="sale.processed_at" class="tag processed" :title="`Processado em: ${formatDateTime(sale.processed_at)}`">Sim</span>
+                                                <span v-else class="tag unprocessed">Não</span>
+                                            </span>
+                                        </div>
+
+                                        <!-- Footer: Conta • Cliente • Envio • Pacotes -->
+                                        <div class="sale-card__footer">
+                                            <span class="sale-card__footer-item" title="Conta">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                                {{ sale.account_nickname || 'N/A' }}
+                                            </span>
+                                            <span class="sale-card__footer-dot">•</span>
+                                            <span class="sale-card__footer-item" title="Cliente">
+                                                <strong>Cliente:</strong> {{ getCustomerName(sale) }}
+                                            </span>
+                                            <span class="sale-card__footer-dot">•</span>
+                                            <span class="sale-card__footer-item" title="Modo Envio">
+                                                <strong>Envio:</strong> {{ sale.shipping_mode || 'N/A' }}
+                                            </span>
+                                            <span v-if="sale.packages" class="sale-card__footer-dot">•</span>
+                                            <span v-if="sale.packages" class="sale-card__footer-item">
+                                                <strong>Pacotes:</strong> {{ sale.packages }}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Aside: Datas + JSON -->
+                                    <div class="sale-card__aside">
+                                        <div class="sale-card__date-block">
+                                            <span class="sale-card__date-value" title="Data Limite de Envio">
+                                                LIMITE: {{ formatDateTime(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date) || '—' }}
+                                            </span>
+                                            <span class="sale-card__exp-date" title="Data da Venda">
+                                                Venda: {{ formatDateTime(sale.sale_date) }}
+                                            </span>
+                                        </div>
+                                        <div class="sale-card__actions">
+                                            <button v-if="userRole === 'master'" @click="showJsonModal(sale)" class="btn-json" title="Ver JSON da API">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 16v-8l3 8v-8"/><path d="M15 8a2 2 0 0 1 2 2v4a2 2 0 1 1 -4 0v-4a2 2 0 0 1 2 -2z"/><path d="M1 10h3v4h-2a2 2 0 0 1 -2 -2v-2z"/><path d="M7 15a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-2a1 1 0 0 0 -1 -1h-1a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1h1a1 1 0 0 1 1 1"/></svg>
+                                                JSON
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="pagination-controls" v-if="totalPages > 1">
                             <button @click="prevPage" :disabled="currentPage === 1">Anterior</button>
                             <span>Página {{ currentPage }} de {{ totalPages }}</span>
@@ -359,7 +391,9 @@
 </template>
 
 <script setup>
+/* eslint-disable no-unused-vars */
 import { ref, onMounted, onUnmounted, computed, watch, nextTick, reactive } from 'vue';
+import { API_BASE_URL } from '@/config';
 import SidebarComponent from '../components/SidebarComponent.vue';
 import TopbarComponent from '../components/TopbarComponent.vue';
 import UniversalModal from '../components/UniversalModal.vue';
@@ -371,6 +405,21 @@ import { useStatusesForUser } from '@/composables/useStatusesForUser';
 import { useSyncManager } from '@/composables/useSyncManager';
 
 // ===== UTILITY FUNCTIONS FOR CUSTOMER DATA =====
+
+/**
+ * Retorna URL da thumbnail do produto via proxy do backend
+ */
+function getThumbUrl(sale) {
+    let thumbUrl = sale.product_thumbnail;
+    if (!thumbUrl && sale.raw_api_data?.order_items) {
+        const itemObj = sale.raw_api_data.order_items.find(
+            it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku
+        );
+        if (itemObj?.item?.thumbnail) thumbUrl = itemObj.item.thumbnail;
+    }
+    if (!thumbUrl) return null;
+    return `${API_BASE_URL}/ml/img-proxy?url=${encodeURIComponent(thumbUrl)}`;
+}
 
 /**
  * Extrai o nome do cliente dos dados da API do Mercado Livre
@@ -1689,5 +1738,222 @@ function hideTooltip() {
 /* Posicionamento relativo para o botão de sincronização */
 .sync-btn {
     position: relative;
+}
+
+/* ============================================= */
+/* LAYOUT DE CARDS - TABELA DE VENDAS            */
+/* ============================================= */
+
+.sale-cards-counter {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+    color: #64748b;
+}
+.sale-cards-counter strong { color: #1e293b; }
+.sale-cards-counter__loading {
+    color: #3b82f6;
+    font-weight: 500;
+    animation: pulse-fade 1.2s ease-in-out infinite;
+}
+@keyframes pulse-fade {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+.sale-cards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.sale-card {
+    background-color: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.sale-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    border-color: #cbd5e1;
+}
+.sale-card--cancelled {
+    opacity: 0.6;
+    background-color: #fef2f2;
+    border-color: #fecaca;
+}
+
+.sale-card__layout {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+/* Thumbnail */
+.sale-card__thumb {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.sale-card__thumb-img { width: 100%; height: 100%; object-fit: cover; }
+.sale-card__thumb-placeholder { color: #cbd5e1; }
+
+/* Main */
+.sale-card__main { flex: 1; min-width: 0; }
+
+.sale-card__id-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.4rem;
+}
+.sale-card__id-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.2rem 0.45rem;
+    background-color: #f1f5f9;
+    color: #64748b;
+    border-radius: 0.375rem;
+    font-size: 11px;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+.sale-card__id-tag:hover { background-color: #e2e8f0; }
+.sale-card__id-label { opacity: 0.65; }
+.sale-card__id-value { font-weight: 600; }
+
+.sale-card__date-mobile {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-weight: 500;
+    display: none;
+}
+
+.sale-card__title-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.4rem;
+    flex-wrap: wrap;
+}
+.sale-card__product-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+    max-width: 520px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+.sale-card__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.sale-card__specs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.85rem;
+    font-size: 0.875rem;
+    color: #475569;
+    margin-bottom: 0.6rem;
+}
+.sale-card__spec { display: inline-flex; align-items: center; gap: 0.25rem; }
+.sale-card__spec-label { font-size: 0.78rem; color: #94a3b8; }
+.sale-card__spec-value {
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #1e293b;
+}
+.sale-card__spec-mono {
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    color: #475569;
+    font-size: 0.78rem;
+}
+.sale-card__divider { color: #cbd5e1; user-select: none; }
+
+.sale-card__footer {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.6rem;
+    font-size: 11px;
+    color: #64748b;
+    text-transform: uppercase;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+}
+.sale-card__footer-item { display: inline-flex; align-items: center; gap: 0.25rem; }
+.sale-card__footer-item svg { flex-shrink: 0; }
+.sale-card__footer-dot { opacity: 0.4; user-select: none; }
+
+/* Aside */
+.sale-card__aside {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-shrink: 0;
+    min-width: 190px;
+    gap: 0.75rem;
+}
+.sale-card__date-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.2rem;
+}
+.sale-card__date-value {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+.sale-card__exp-date {
+    font-size: 11px;
+    font-weight: 500;
+    color: #64748b;
+}
+.sale-card__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+    .sale-card__layout { flex-wrap: wrap; gap: 0.75rem; }
+    .sale-card__aside {
+        width: 100%;
+        align-items: flex-start;
+        border-top: 1px solid #f1f5f9;
+        padding-top: 0.75rem;
+        min-width: 0;
+    }
+    .sale-card__date-block { align-items: flex-start; display: none; }
+    .sale-card__date-mobile { display: inline; }
+    .sale-card__actions { justify-content: flex-start; }
+    .sale-card__product-title { max-width: 100%; }
 }
 </style>
