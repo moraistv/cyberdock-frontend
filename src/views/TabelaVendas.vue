@@ -188,7 +188,7 @@
                         <div class="sale-cards-list" ref="tableBodyRef">
                             <div v-for="sale in paginatedSales" :key="`${sale.id}-${sale.sku}`"
                                  class="sale-card"
-                                 :class="{ 'sale-card--cancelled': sale.unified_status === 'cancelled' }">
+                                 :class="{ 'sale-card--cancelled': (sale.unified_status === 'cancelled' || sale.raw_api_data?.status === 'cancelled') }">
 
                                 <div class="sale-card__layout">
                                     <!-- Thumbnail do Produto -->
@@ -205,7 +205,7 @@
 
                                     <!-- Centro: Informações Principais -->
                                     <div class="sale-card__main">
-                                        <!-- ID + Data Mobile -->
+                                        <!-- Topo: ID tag -->
                                         <div class="sale-card__id-row">
                                             <div class="sale-card__id-tag" @click="copySaleId(sale.id)" title="Copiar ID da Venda">
                                                 <span class="sale-card__id-label">ID:</span>
@@ -213,29 +213,34 @@
                                             </div>
                                             <span class="sale-card__date-mobile">{{ formatDateTime(sale.sale_date) }}</span>
                                         </div>
-
-                                        <!-- Título do Produto -->
+                                        <!-- Título do Produto (clicável) + Logo ML -->
                                         <div class="sale-card__title-row">
-                                            <h3 class="sale-card__product-title" :title="sale.product_title">
+                                            <a v-if="getProductLink(sale)" :href="getProductLink(sale)" target="_blank" rel="noopener" class="sale-card__product-link" :title="sale.product_title">
+                                                {{ sale.product_title || 'Produto sem título' }}
+                                            </a>
+                                            <h3 v-else class="sale-card__product-title" :title="sale.product_title">
                                                 {{ sale.product_title || 'Produto sem título' }}
                                             </h3>
                                             <div class="sale-card__badges">
-                                                <span class="channel-badge ml"
-                                                    :class="{ clickable: userRole === 'master' }"
-                                                    @click="userRole === 'master' ? showJsonModal(sale) : null"
-                                                    :title="userRole === 'master' ? 'Ver JSON da Venda' : 'Canal de Venda'">
-                                                    {{ sale.channel }}
-                                                </span>
+                                                <img v-if="sale.channel?.toLowerCase() === 'ml'" src="/img/ml-logo.svg" alt="Mercado Livre" class="sale-card__ml-logo" />
+                                                <span v-else class="sale-card__badge sale-card__badge--other">{{ sale.channel }}</span>
                                             </div>
                                         </div>
 
-                                        <!-- Specs: Status | SKU | Qtd | Processada -->
+                                        <!-- Specs: Venda | Expedição | SKU | Mapeado | QTD -->
                                         <div class="sale-card__specs">
                                             <span class="sale-card__spec">
-                                                <span class="sale-card__spec-label">Status:</span>
+                                                <span class="sale-card__spec-label">Venda:</span>
                                                 <span class="sale-card__spec-value">
-                                                    <span :class="['status-badge', getStatusColorClass(sale.unified_status)]"></span>
-                                                    {{ getStatusLabel(sale.unified_status) }}
+                                                    {{ getSaleStatusLabel(sale.raw_api_data?.status || sale.sale_status) }}
+                                                </span>
+                                            </span>
+                                            <span class="sale-card__divider">|</span>
+                                            <span class="sale-card__spec">
+                                                <span class="sale-card__spec-label">Expedição:</span>
+                                                <span class="sale-card__spec-value">
+                                                    <span :class="['status-badge', getStatusColorClass(sale.shipping_status || sale.unified_status)]"></span>
+                                                    {{ getStatusLabel(sale.shipping_status || sale.unified_status) }}
                                                 </span>
                                             </span>
                                             <span class="sale-card__divider">|</span>
@@ -244,52 +249,77 @@
                                                 <span class="sale-card__spec-mono">{{ sale.sku || 'N/A' }}</span>
                                             </span>
                                             <span class="sale-card__divider">|</span>
+                                            <span class="sale-card__spec" style="display: flex; align-items: center; gap: 0.25rem;">
+                                                <span class="sale-card__spec-label" title="Indica se o SKU está mapeado no armazenamento">Mapeado:</span>
+                                                <span v-if="sale.is_sku_mapped" class="sale-card__spec-value" style="color: #10b981; font-weight: 600; font-size: 0.8rem;">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:2px; vertical-align: text-top;"><polyline points="20 6 9 17 4 12"></polyline></svg>Sim
+                                                </span>
+                                                <span v-else class="sale-card__spec-value" style="color: #ef4444; font-weight: 600; font-size: 0.8rem;">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:2px; vertical-align: text-top;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>Não
+                                                </span>
+                                            </span>
+                                            <span class="sale-card__divider">|</span>
                                             <span class="sale-card__spec">
                                                 <span class="sale-card__spec-label">QTD:</span>
                                                 <span class="sale-card__spec-value">{{ sale.quantity }}</span>
                                             </span>
-                                            <span class="sale-card__divider">|</span>
-                                            <span class="sale-card__spec">
-                                                <span class="sale-card__spec-label">Processada:</span>
-                                                <span v-if="sale.processed_at" class="tag processed" :title="`Processado em: ${formatDateTime(sale.processed_at)}`">Sim</span>
-                                                <span v-else class="tag unprocessed">Não</span>
-                                            </span>
                                         </div>
 
-                                        <!-- Footer: Conta • Cliente • Envio • Pacotes -->
+                                        <!-- Footer: Conta • Cliente • Envio -->
                                         <div class="sale-card__footer">
                                             <span class="sale-card__footer-item" title="Conta">
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                                                 {{ sale.account_nickname || 'N/A' }}
                                             </span>
                                             <span class="sale-card__footer-dot">•</span>
-                                            <span class="sale-card__footer-item" title="Cliente">
-                                                <strong>Cliente:</strong> {{ getCustomerName(sale) }}
+                                            <span class="sale-card__footer-item" title="Comprador">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                                {{ getCustomerName(sale) }}
                                             </span>
                                             <span class="sale-card__footer-dot">•</span>
                                             <span class="sale-card__footer-item" title="Modo Envio">
-                                                <strong>Envio:</strong> {{ sale.shipping_mode || 'N/A' }}
-                                            </span>
-                                            <span v-if="sale.packages" class="sale-card__footer-dot">•</span>
-                                            <span v-if="sale.packages" class="sale-card__footer-item">
-                                                <strong>Pacotes:</strong> {{ sale.packages }}
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                                {{ sale.shipping_mode || 'N/A' }}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <!-- Aside: Datas + JSON -->
+                                    <!-- Direita: Data / Status / Ações -->
                                     <div class="sale-card__aside">
                                         <div class="sale-card__date-block">
-                                            <span class="sale-card__date-value" title="Data Limite de Envio">
-                                                LIMITE: {{ formatDateTime(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date) || '—' }}
-                                            </span>
-                                            <span class="sale-card__exp-date" title="Data da Venda">
+                                             <span v-if="String(sale.shipping_mode).toLowerCase().includes('full')" class="sale-card__date-value" style="color: #6366f1; font-weight: 700;" title="Envio FULL">
+                                                LIMITE ENVIO: FULL
+                                             </span>
+                                             <span v-else class="sale-card__date-value" :class="{'sale-card__date-value--late': isLate(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date)}" title="Prazo de Expedição">
+                                                LIMITE ENVIO: {{ formatDateTime(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date) || '—' }}
+                                             </span>
+                                             <span class="sale-card__exp-date" title="Data da Venda">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                                                 Venda: {{ formatDateTime(sale.sale_date) }}
-                                            </span>
+                                             </span>
                                         </div>
+
                                         <div class="sale-card__actions">
-                                            <button v-if="userRole === 'master'" @click="showJsonModal(sale)" class="btn-json" title="Ver JSON da API">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 16v-8l3 8v-8"/><path d="M15 8a2 2 0 0 1 2 2v4a2 2 0 1 1 -4 0v-4a2 2 0 0 1 2 -2z"/><path d="M1 10h3v4h-2a2 2 0 0 1 -2 -2v-2z"/><path d="M7 15a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-2a1 1 0 0 0 -1 -1h-1a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1h1a1 1 0 0 1 1 1"/></svg>
+                                            <span v-if="sale.processed_at" class="sale-card__status-tag sale-card__status-tag--proc" :title="'Processado em: ' + formatDateTime(sale.processed_at)">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                                Proc
+                                            </span>
+                                            <span v-else class="sale-card__status-tag sale-card__status-tag--pend">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                                Pend
+                                            </span>
+
+                                            <button v-if="getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                                PDF
+                                            </button>
+
+                                            <button v-if="getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
+                                                ZPL
+                                            </button>
+
+                                            <button v-if="userRole === 'master'" @click="showJsonModal(sale)" class="btn-label" title="Ver JSON da API" style="background: rgba(99,102,241,0.15); color: #818cf8;">
                                                 JSON
                                             </button>
                                         </div>
@@ -403,6 +433,8 @@ import { useAuth } from '@/composables/useAuth';
 import { useSales } from '@/composables/useSales';
 import { useStatusesForUser } from '@/composables/useStatusesForUser';
 import { useSyncManager } from '@/composables/useSyncManager';
+import { useSystemStatus } from '@/composables/useSystemStatus';
+import { useLabels } from '@/composables/useLabels';
 
 // ===== UTILITY FUNCTIONS FOR CUSTOMER DATA =====
 
@@ -540,6 +572,54 @@ const { sales, isLoading, error, fetchSales } = useSales();
 const userUid = computed(() => user.value?.uid);
 const { allStatuses: customStatuses } = useStatusesForUser(userUid);
 const { syncState, syncAccount } = useSyncManager();
+const { systemStatuses } = useSystemStatus();
+const { downloadLabel, getLabelInfo: composableLabelInfo } = useLabels();
+const labelError = ref(null);
+const isProcessing = ref(false);
+
+// === HELPERS DO MASTER ===
+function getProductLink(sale) {
+    if (sale.product_permalink) return sale.product_permalink;
+    if (sale.raw_api_data?.order_items) {
+        const item = sale.raw_api_data.order_items.find(it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku);
+        if (item?.item?.permalink) return item.item.permalink;
+    }
+    if (sale.ml_item_id && String(sale.ml_item_id).toUpperCase().startsWith('MLB')) {
+        const idStr = String(sale.ml_item_id);
+        const match = idStr.match(/^MLB(\d+)$/i);
+        const numId = match ? match[1] : idStr.replace('MLB', '');
+        return `https://produto.mercadolivre.com.br/MLB-${numId}`;
+    }
+    return null;
+}
+
+function getSaleStatusLabel(statusValue) {
+    if (!statusValue) return 'Pendente';
+    const map = { paid: 'Pago', ready_to_ship: 'Pronto para Envio', shipped: 'Enviado', delivered: 'Entregue', cancelled: 'Cancelado', canceled: 'Cancelado', pending: 'Pendente', handling: 'Em Manuseio' };
+    const key = String(statusValue).toLowerCase();
+    return map[key] || (key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '));
+}
+
+function isLate(dateString) {
+    if (!dateString) return false;
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return false;
+    return date < new Date();
+}
+
+function getLabelInfo(sale) {
+    return composableLabelInfo(sale);
+}
+
+async function handleDownloadLabel(shipmentId, sellerId, type) {
+    labelError.value = null;
+    try {
+        await downloadLabel(shipmentId, sellerId, type);
+    } catch (err) {
+        labelError.value = err?.message || 'Não foi possível baixar a etiqueta.';
+        setTimeout(() => { labelError.value = null; }, 8000);
+    }
+}
 
 const tableBodyRef = ref(null);
 const searchQuery = ref('');
