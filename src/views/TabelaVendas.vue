@@ -191,6 +191,15 @@
                                  :class="{ 'sale-card--cancelled': (sale.unified_status === 'cancelled' || sale.raw_api_data?.status === 'cancelled') }">
 
                                 <div class="sale-card__layout">
+                                    <!-- Checkbox para lote -->
+                                    <div v-if="!sale.processed_at && sale.is_sku_mapped" class="sale-card__checkbox-container" @click.stop>
+                                        <input type="checkbox"
+                                               :checked="selectedSaleIds.has(getSaleKey(sale))"
+                                               @change="toggleSaleSelection(sale)"
+                                               class="sale-card__checkbox"
+                                               :disabled="isProcessing">
+                                    </div>
+
                                     <!-- Thumbnail do Produto -->
                                     <div class="sale-card__thumb">
                                         <img v-if="getThumbUrl(sale)"
@@ -222,8 +231,7 @@
                                                 {{ sale.product_title || 'Produto sem título' }}
                                             </h3>
                                             <div class="sale-card__badges">
-                                                <img v-if="sale.channel?.toLowerCase() === 'ml'" src="/img/ml-logo.svg" alt="Mercado Livre" class="sale-card__ml-logo" />
-                                                <span v-else class="sale-card__badge sale-card__badge--other">{{ sale.channel }}</span>
+                                                <img src="/img/ml-logo.svg" alt="Mercado Livre" class="sale-card__ml-logo" />
                                             </div>
                                         </div>
 
@@ -269,7 +277,9 @@
                                         <div class="sale-card__footer">
                                             <span class="sale-card__footer-item" title="Conta">
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                                                {{ sale.account_nickname || 'N/A' }}
+                                                <span class="sale-card__account-tag" v-if="sale.account_nickname">
+                                                    ({{ sale.account_nickname }})
+                                                </span>
                                             </span>
                                             <span class="sale-card__footer-dot">•</span>
                                             <span class="sale-card__footer-item" title="Comprador">
@@ -300,6 +310,14 @@
                                         </div>
 
                                         <div class="sale-card__actions">
+                                            <button v-if="!sale.processed_at && sale.is_sku_mapped"
+                                                    @click="processSingleSale(sale)"
+                                                    class="btn-label btn-process-single"
+                                                    :disabled="isProcessing"
+                                                    title="Processar Abatimento de Estoque">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                                                Processar
+                                            </button>
                                             <span v-if="sale.processed_at" class="sale-card__status-tag sale-card__status-tag--proc" :title="'Processado em: ' + formatDateTime(sale.processed_at)">
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                                 Proc
@@ -435,6 +453,7 @@ import { useStatusesForUser } from '@/composables/useStatusesForUser';
 import { useSyncManager } from '@/composables/useSyncManager';
 import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
+import { useApi } from '@/composables/useApi';
 
 // ===== UTILITY FUNCTIONS FOR CUSTOMER DATA =====
 
@@ -576,6 +595,7 @@ const { systemStatuses } = useSystemStatus();
 const { downloadLabel, getLabelInfo: composableLabelInfo } = useLabels();
 const labelError = ref(null);
 const isProcessing = ref(false);
+const api = useApi();
 
 // === HELPERS DO MASTER ===
 function getProductLink(sale) {
@@ -618,6 +638,38 @@ async function handleDownloadLabel(shipmentId, sellerId, type) {
     } catch (err) {
         labelError.value = err?.message || 'Não foi possível baixar a etiqueta.';
         setTimeout(() => { labelError.value = null; }, 8000);
+    }
+}
+
+// === SELEÇÃO EM LOTE & PROCESSAR ===
+const selectedSaleIds = ref(new Set());
+
+function getSaleKey(sale) {
+    return `${sale.id}_${sale.sku}`;
+}
+
+function toggleSaleSelection(sale) {
+    const key = getSaleKey(sale);
+    const newSet = new Set(selectedSaleIds.value);
+    if (newSet.has(key)) {
+        newSet.delete(key);
+    } else {
+        newSet.add(key);
+    }
+    selectedSaleIds.value = newSet;
+}
+
+async function processSingleSale(sale) {
+    if (isProcessing.value) return;
+    isProcessing.value = true;
+    try {
+        await api.post('/sales/process', { sale_id: sale.id, sku: sale.sku });
+        sale.processed_at = new Date().toISOString();
+    } catch (err) {
+        console.error('Erro ao processar venda:', err);
+        alert(err?.response?.data?.message || err?.message || 'Erro ao processar venda');
+    } finally {
+        isProcessing.value = false;
     }
 }
 
@@ -2035,5 +2087,113 @@ function hideTooltip() {
     .sale-card__date-mobile { display: inline; }
     .sale-card__actions { justify-content: flex-start; }
     .sale-card__product-title { max-width: 100%; }
+}
+
+/* === ESTILOS EXTRAS DO MASTER === */
+.sale-card__ml-logo {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.sale-card__product-link {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #e0e0ff;
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 450px;
+    transition: color 0.2s;
+}
+.sale-card__product-link:hover {
+    color: #818cf8;
+    text-decoration: underline;
+}
+
+.sale-card__status-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.sale-card__status-tag--proc {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.sale-card__status-tag--pend {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.btn-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+.btn-label.pdf {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+.btn-label.pdf:hover { background: rgba(239, 68, 68, 0.3); }
+.btn-label.zpl {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border-color: rgba(34, 197, 94, 0.3);
+}
+.btn-label.zpl:hover { background: rgba(34, 197, 94, 0.3); }
+
+.btn-process-single {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    border-color: rgba(59, 130, 246, 0.3);
+}
+.btn-process-single:hover { background: rgba(59, 130, 246, 0.3); }
+.btn-process-single:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.sale-card__date-value--late {
+    color: #ef4444 !important;
+    font-weight: 700 !important;
+}
+
+.sale-card__checkbox-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    flex-shrink: 0;
+}
+.sale-card__checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #6366f1;
+}
+
+.sale-card__account-tag {
+    color: #f59e0b;
+    font-weight: 600;
+    font-size: 0.78rem;
 }
 </style>
