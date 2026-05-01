@@ -446,7 +446,8 @@ const {
     updateSku,
     removeSku,
     adjustStock,
-    deleteMovement
+    deleteMovement,
+    loadStorageData
 } = useUserStorage(userId);
 
 const {
@@ -463,7 +464,8 @@ watch(activeKitParents, (newValue) => {
 const {
     activeKits,
     availableChildSkus,
-    loadAvailableChildSkus
+    loadAvailableChildSkus,
+    loadActiveKits
 } = useKitManagement(userId);
 
 const { sales } = useSalesForUser(userId);
@@ -502,16 +504,22 @@ const closeKitManagementModal = () => {
 const handleKitCreated = async () => {
     // Recarregar kits ativos quando um novo kit for criado
     await loadActiveKitParents();
+    await loadActiveKits();
+    if (typeof loadStorageData === 'function') loadStorageData();
 };
 
 const handleKitUpdated = async () => {
     // Recarregar kits ativos quando um kit for atualizado
     await loadActiveKitParents();
+    await loadActiveKits();
+    if (typeof loadStorageData === 'function') loadStorageData();
 };
 
 const handleKitDeleted = async () => {
     // Recarregar kits ativos quando um kit for excluído
     await loadActiveKitParents();
+    await loadActiveKits();
+    if (typeof loadStorageData === 'function') loadStorageData();
 };
 
 // Storage Modal Methods
