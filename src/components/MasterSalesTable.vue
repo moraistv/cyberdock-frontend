@@ -905,8 +905,11 @@ async function processSingleSale(sale) {
             isSummaryModalOpen.value = true;
         } else {
             showToast('Venda processada com sucesso!', 'success');
-            // Optimistic update
-            sale.processed_at = new Date().toISOString();
+            // Atualiza o array reativo por índice para garantir reatividade do Vue
+            const idx = sales.value.findIndex(s => s.id === sale.id && s.sku === sale.sku);
+            if (idx !== -1) {
+                sales.value[idx] = { ...sales.value[idx], processed_at: new Date().toISOString() };
+            }
             selectedSaleIds.delete(getSaleKey(sale));
         }
     } catch (err) {

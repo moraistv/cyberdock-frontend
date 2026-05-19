@@ -82,7 +82,13 @@
                     </div>
 
                     <div class="table-container">
-                        <h2 class="table-title">Seus SKUs Armazenados</h2>
+                        <div class="table-header-row">
+                            <h2 class="table-title">Seus SKUs Armazenados</h2>
+                            <label class="filter-toggle">
+                                <input type="checkbox" v-model="hideZeroStock" />
+                                <span>Ocultar zerados</span>
+                            </label>
+                        </div>
                         <table class="sku-table">
                             <thead>
                                 <tr>
@@ -478,6 +484,7 @@ const currentSku = ref(null);
 const isKitManagementModalOpen = ref(false);
 const isAdjustStockModalOpen = ref(false);
 const skuToAdjust = ref(null);
+const hideZeroStock = ref(false);
 
 // Kit Management Modal Methods
 const openKitManagementModal = async () => {
@@ -757,14 +764,20 @@ const formatCurrency = (value) => {
 // Combinar SKUs individuais com kits ativos para exibição
 const allItemsForDisplay = computed(() => {
     // SKUs individuais (não kits)
-    const individualSkus = skus.value?.filter(sku => !sku.is_kit) || []
+    let individualSkus = skus.value?.filter(sku => !sku.is_kit) || []
     
     // Kits ativos com informação de estoque calculado
-    const activeKitsForDisplay = activeKits.value?.map(kit => ({
+    let activeKitsForDisplay = activeKits.value?.map(kit => ({
         ...kit,
         quantidade: kit.available_quantity || 0,
         is_kit: true
     })) || []
+    
+    // Filtrar zerados se toggle ativo
+    if (hideZeroStock.value) {
+        individualSkus = individualSkus.filter(sku => sku.quantidade > 0)
+        activeKitsForDisplay = activeKitsForDisplay.filter(kit => kit.quantidade > 0)
+    }
     
     // Combinar e ordenar por SKU
     return [...individualSkus, ...activeKitsForDisplay]
@@ -840,6 +853,11 @@ const allItemsForDisplay = computed(() => {
 .package-quantity { font-weight: 600; color: #111827; }
 
 .table-container { background-color: #ffffff; border-radius: 0.75rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); }
+.table-header-row { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
+.table-header-row .table-title { padding: 0; border-bottom: none; margin: 0; }
+.filter-toggle { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.813rem; color: #6b7280; user-select: none; }
+.filter-toggle input[type="checkbox"] { width: 16px; height: 16px; accent-color: #2563eb; cursor: pointer; }
+.filter-toggle span { white-space: nowrap; }
 .table-title { font-size: 1.25rem; font-weight: 600; padding: 1.5rem; border-bottom: 1px solid #e5e7eb; }
 .sku-table { width: 100%; border-collapse: collapse; }
 .sku-table th, .sku-table td { padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
