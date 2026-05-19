@@ -84,10 +84,32 @@
                     <div class="table-container">
                         <div class="table-header-row">
                             <h2 class="table-title">Seus SKUs Armazenados</h2>
-                            <label class="filter-toggle">
-                                <input type="checkbox" v-model="hideZeroStock" />
-                                <span>Ocultar zerados</span>
-                            </label>
+                            <div class="stock-filter-group">
+                                <button 
+                                    type="button" 
+                                    class="filter-btn" 
+                                    :class="{ active: stockFilter === 'all' }" 
+                                    @click="stockFilter = 'all'"
+                                >
+                                    Todos
+                                </button>
+                                <button 
+                                    type="button" 
+                                    class="filter-btn" 
+                                    :class="{ active: stockFilter === 'with' }" 
+                                    @click="stockFilter = 'with'"
+                                >
+                                    Com estoque
+                                </button>
+                                <button 
+                                    type="button" 
+                                    class="filter-btn" 
+                                    :class="{ active: stockFilter === 'without' }" 
+                                    @click="stockFilter = 'without'"
+                                >
+                                    Sem estoque
+                                </button>
+                            </div>
                         </div>
                         <table class="sku-table">
                             <thead>
@@ -167,10 +189,38 @@
                 
                 <!-- Hierarquia de Kits e SKUs -->
                 <div class="hierarchy-section">
-                    <h3 class="section-title">
-                        🏗️ Hierarquia de Kits e SKUs
-                        <span class="item-count">({{ hierarchyItems.length }} grupos)</span>
-                    </h3>
+                    <div class="hierarchy-header-row">
+                        <h3 class="section-title">
+                            🏗️ Hierarquia de Kits e SKUs
+                            <span class="item-count">({{ hierarchyItems.length }} grupos)</span>
+                        </h3>
+                        <div class="stock-filter-group">
+                            <button 
+                                type="button" 
+                                class="filter-btn" 
+                                :class="{ active: stockFilter === 'all' }" 
+                                @click="stockFilter = 'all'"
+                            >
+                                Todos
+                            </button>
+                            <button 
+                                type="button" 
+                                class="filter-btn" 
+                                :class="{ active: stockFilter === 'with' }" 
+                                @click="stockFilter = 'with'"
+                            >
+                                Com estoque
+                            </button>
+                            <button 
+                                type="button" 
+                                class="filter-btn" 
+                                :class="{ active: stockFilter === 'without' }" 
+                                @click="stockFilter = 'without'"
+                            >
+                                Sem estoque
+                            </button>
+                        </div>
+                    </div>
                     <div class="table-container">
                         <table class="hierarchy-table">
                             <thead>
@@ -484,7 +534,7 @@ const currentSku = ref(null);
 const isKitManagementModalOpen = ref(false);
 const isAdjustStockModalOpen = ref(false);
 const skuToAdjust = ref(null);
-const hideZeroStock = ref(false);
+const stockFilter = ref('all'); // 'all', 'with', 'without'
 
 // Kit Management Modal Methods
 const openKitManagementModal = async () => {
@@ -670,6 +720,13 @@ const hierarchyItems = computed(() => {
     const items = [];
     const kitParentMap = new Map();
     
+    // Helper function to check if item quantity matches the filter
+    const matchesFilter = (qty) => {
+        if (stockFilter.value === 'with') return qty > 0;
+        if (stockFilter.value === 'without') return qty === 0;
+        return true;
+    };
+    
     // Primeiro, criar mapa de kit parents ativos (organização hierárquica)
     const kitParents = activeKitParents.value || [];
     kitParents.forEach(kitParent => {
@@ -686,10 +743,13 @@ const hierarchyItems = computed(() => {
     // Adicionar kits compostos como itens separados (se existirem)
     const kitsCompostos = activeKits.value || [];
     kitsCompostos.forEach(kit => {
-        items.push({
-            ...kit,
-            type: 'kit-composto'
-        });
+        const qty = kit.available_kit_quantity || 0;
+        if (matchesFilter(qty)) {
+            items.push({
+                ...kit,
+                type: 'kit-composto'
+            });
+        }
     });
     
     // Organizar SKUs individuais por kit pai
@@ -698,19 +758,26 @@ const hierarchyItems = computed(() => {
     individualSkus.forEach(sku => {
         if (sku.kit_parent_id && kitParentMap.has(sku.kit_parent_id)) {
             // SKU tem kit pai - adicionar como filho
-            kitParentMap.get(sku.kit_parent_id).children.push(sku);
+            if (matchesFilter(sku.quantidade)) {
+                kitParentMap.get(sku.kit_parent_id).children.push(sku);
+            }
         } else {
             // SKU órfão - adicionar diretamente
-            items.push({
-                ...sku,
-                type: 'orphan'
-            });
+            if (matchesFilter(sku.quantidade)) {
+                items.push({
+                    ...sku,
+                    type: 'orphan'
+                });
+            }
         }
     });
     
     // Adicionar kit parents com filhos ao início da lista
     kitParentMap.forEach(kitParent => {
-        items.unshift(kitParent);
+        // Se estiver filtrando e não tiver filhos correspondentes, não mostrar o kit pai
+        if (stockFilter.value === 'all' || kitParent.children.length > 0) {
+            items.unshift(kitParent);
+        }
     });
     
     return items;
@@ -773,10 +840,13 @@ const allItemsForDisplay = computed(() => {
         is_kit: true
     })) || []
     
-    // Filtrar zerados se toggle ativo
-    if (hideZeroStock.value) {
+    // Filtrar com base no filtro selecionado
+    if (stockFilter.value === 'with') {
         individualSkus = individualSkus.filter(sku => sku.quantidade > 0)
         activeKitsForDisplay = activeKitsForDisplay.filter(kit => kit.quantidade > 0)
+    } else if (stockFilter.value === 'without') {
+        individualSkus = individualSkus.filter(sku => sku.quantidade === 0)
+        activeKitsForDisplay = activeKitsForDisplay.filter(kit => kit.quantidade === 0)
     }
     
     // Combinar e ordenar por SKU
@@ -855,9 +925,12 @@ const allItemsForDisplay = computed(() => {
 .table-container { background-color: #ffffff; border-radius: 0.75rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); }
 .table-header-row { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
 .table-header-row .table-title { padding: 0; border-bottom: none; margin: 0; }
-.filter-toggle { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.813rem; color: #6b7280; user-select: none; }
-.filter-toggle input[type="checkbox"] { width: 16px; height: 16px; accent-color: #2563eb; cursor: pointer; }
-.filter-toggle span { white-space: nowrap; }
+.stock-filter-group { display: flex; gap: 0.25rem; background-color: #f3f4f6; padding: 0.25rem; border-radius: 0.5rem; border: 1px solid #e5e7eb; }
+.filter-btn { border: none; background: none; padding: 0.375rem 0.75rem; font-size: 0.813rem; font-weight: 500; color: #4b5563; border-radius: 0.375rem; cursor: pointer; transition: all 0.2s ease; }
+.filter-btn:hover { color: #1f2937; }
+.filter-btn.active { background-color: #ffffff; color: #2563eb; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+.hierarchy-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; width: 100%; }
+.hierarchy-header-row .section-title { margin: 0; }
 .table-title { font-size: 1.25rem; font-weight: 600; padding: 1.5rem; border-bottom: 1px solid #e5e7eb; }
 .sku-table { width: 100%; border-collapse: collapse; }
 .sku-table th, .sku-table td { padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
