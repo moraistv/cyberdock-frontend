@@ -23,9 +23,32 @@
           <option value="(sem pacote)">(sem pacote)</option>
         </select>
 
-
-
-        <div class="actions">
+        <div class="stock-filter-group">
+            <button 
+                type="button" 
+                class="filter-btn" 
+                :class="{ active: stockFilter === 'all' }" 
+                @click="stockFilter = 'all'"
+            >
+                Todos
+            </button>
+            <button 
+                type="button" 
+                class="filter-btn" 
+                :class="{ active: stockFilter === 'with' }" 
+                @click="stockFilter = 'with'"
+            >
+                Com estoque
+            </button>
+            <button 
+                type="button" 
+                class="filter-btn" 
+                :class="{ active: stockFilter === 'without' }" 
+                @click="stockFilter = 'without'"
+            >
+                Sem estoque
+            </button>
+        </div>        <div class="actions">
           <button @click="$emit('open-package-manager')" class="btn ghost">Gerenciar pacotes</button>
           <button @click="$emit('open-kit-manager')" class="btn ghost kit-manager">
             <svg  xmlns="http://www.w3.org/2000/svg"  width="20"  height="20"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-package"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /><path d="M16 5.25l-8 4.5" /></svg>
@@ -252,6 +275,7 @@ export default defineComponent({
   setup(props) {
     const query = ref('')
     const pkgFilter = ref('')
+    const stockFilter = ref('all') // 'all', 'with', 'without'
     const tbodyEl = ref(null)
     
     // Estado para controlar a expansão dos kits
@@ -328,6 +352,13 @@ export default defineComponent({
 
       const hierarchy = [];
 
+      // Helper function to check if item quantity matches the filter
+      const matchesFilter = (qty) => {
+        if (stockFilter.value === 'with') return qty > 0;
+        if (stockFilter.value === 'without') return qty === 0;
+        return true;
+      };
+
       // 1. Adiciona os kits como itens "pai"
       kits.forEach(kit => {
         // Encontra os dados completos dos SKUs filhos (componentes)
@@ -336,21 +367,29 @@ export default defineComponent({
           // Adiciona a quantidade por kit para exibição
           return childSku ? { ...childSku, quantity_per_kit: comp.quantity_per_kit } : null;
         }).filter(Boolean); // Remove nulos se algum filho não for encontrado
+        
+        // Aplica o filtro de estoque nos componentes do kit
+        const filteredChildren = children.filter(child => matchesFilter(child.quantidade || 0));
 
-        hierarchy.push({
-          ...kit,
-          type: 'kit',
-          children: children,
-        });
+        // Adiciona o kit se não estiver filtrando, ou se tiver filhos que correspondem ao filtro
+        if (stockFilter.value === 'all' || filteredChildren.length > 0) {
+          hierarchy.push({
+            ...kit,
+            type: 'kit',
+            children: filteredChildren,
+          });
+        }
       });
 
       // 2. Adiciona SKUs "órfãos" (que não são kits e nem componentes de kits)
       allSkus.forEach(sku => {
         if (!sku.is_kit && !childSkuIds.has(sku.id)) {
-          hierarchy.push({
-            ...sku,
-            type: 'orphan',
-          });
+          if (matchesFilter(sku.quantidade || 0)) {
+            hierarchy.push({
+              ...sku,
+              type: 'orphan',
+            });
+          }
         }
       });
       
@@ -428,6 +467,7 @@ export default defineComponent({
         return { 
       query, 
       pkgFilter, 
+      stockFilter,
       filteredSkus, 
       tbodyEl, 
       expandedKits,
@@ -485,6 +525,11 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; color: #0f172a; }
 .search input:focus { border-color: #4f46e5; background: #ffffff; }
 
 .select { padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f8fafc; color: #0f172a; }
+
+.stock-filter-group { display: flex; gap: 0.25rem; background-color: #f8fafc; padding: 0.25rem; border-radius: 10px; border: 1px solid #e5e7eb; }
+.filter-btn { border: none; background: none; padding: 0.375rem 0.75rem; font-size: 0.813rem; font-weight: 500; color: #64748b; border-radius: 0.375rem; cursor: pointer; transition: all 0.2s ease; }
+.filter-btn:hover { color: #0f172a; }
+.filter-btn.active { background-color: #ffffff; color: #4f46e5; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
 
 .actions { margin-left: auto; display: flex; gap: 8px; }
 .btn { display: inline-flex; align-items: center; gap: 8px; border: none; cursor: pointer; border-radius: 10px; padding: 10px 14px; font-weight: 600; transition: transform .02s ease-in; }
