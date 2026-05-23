@@ -11,6 +11,13 @@
             <p class="subtitle">Visão global e unificada de todas as vendas de todos os clientes.</p>
           </div>
           <div class="header-actions">
+            <select v-model="syncTimeframe" class="sync-time-select" :disabled="syncState.isSyncing || isFetchingAccounts">
+                <option value="1">Último dia</option>
+                <option value="3">Últimos 3 dias</option>
+                <option value="7">Últimos 7 dias</option>
+                <option value="30">Últimos 30 dias</option>
+                <option value="180">Sincronizar Tudo (180 dias)</option>
+            </select>
             <button @click="handleGlobalSync" :disabled="syncState.isSyncing || isFetchingAccounts"
                 :class="['btn', 'sync-btn', 'btn-primary']" 
                 title="Sincronizar massivamente todas as contas do sistema">
@@ -114,6 +121,7 @@ const { syncState, syncAccount } = useSyncManager();
 const masterTableRef = ref(null);
 const isFetchingAccounts = ref(false);
 const isSyncResultsModalOpen = ref(false);
+const syncTimeframe = ref('3');
 
 const syncResults = ref({
     title: '',
@@ -152,7 +160,7 @@ const handleGlobalSync = async () => {
             try {
                 // Passamos o uid para garantir a sincronização do cliente correto (mesmo sendo master)
                 syncState.value.newSalesCount = 0; // zera pro Toast
-                await syncAccount(account.user_id, account.nickname, account.uid);
+                await syncAccount(account.user_id, account.nickname, account.uid, syncTimeframe.value);
                 successCount++;
                 
                 const foundForThisAccount = syncState.value.newSalesCount || 0;
@@ -301,6 +309,29 @@ const handleGlobalSync = async () => {
 .btn-primary { background-color: #3b82f6; color: white; }
 .btn-primary:hover { background-color: #2563eb; }
 .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.sync-time-select {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background-color: white;
+  font-size: 0.875rem;
+  color: #374151;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.sync-time-select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.sync-time-select:disabled {
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
 
 .sync-spinner { animation: spin 1.2s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }

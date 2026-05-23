@@ -107,7 +107,9 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', handleOutsideClick, { capture: true });
 });
 
-watch(route, (r) => setAdminMode(r.path.startsWith('/admin') || r.path.startsWith('/master')));
+watch(() => route.path, (path) => {
+  setAdminMode(path.startsWith('/admin') || path.startsWith('/master'));
+}, { immediate: true });
 
 // ===== Avatar (iniciais, cor e animação) =====
 const userInitials = computed(() => {
