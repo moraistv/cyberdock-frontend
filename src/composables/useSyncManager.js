@@ -49,8 +49,8 @@ export function useSyncManager() {
       }
     };
 
-  // Aceita mlAccountId, accountNickname e clientUid
-  const syncAccount = async (mlAccountId, accountNickname, clientUid = null) => {
+  // Aceita mlAccountId, accountNickname e clientUid e opcional daysToSync
+  const syncAccount = async (mlAccountId, accountNickname, clientUid = null, daysToSync = null) => {
     return new Promise((resolve, reject) => {
       if (state.value.isSyncing) {
         console.warn("A sincronização já está em andamento.");
@@ -72,7 +72,7 @@ export function useSyncManager() {
           };
 
           // Adiciona o clientUid no payload da requisição
-          api.post('/sales/sync-account', { userId: mlAccountId, clientId, accountNickname, force, backfill: force, clientUid })
+          api.post('/sales/sync-account', { userId: mlAccountId, clientId, accountNickname, force, backfill: force, clientUid, daysToSync })
             .then(() => {
               const sseUrl = `${API_BASE_URL}/sales/sync-status/${clientId}?token=${encodeURIComponent(token.value)}&mlAccountId=${encodeURIComponent(mlAccountId)}`;
               eventSource = new window.EventSource(sseUrl);

@@ -12,6 +12,13 @@
                         </p>
                     </div>
                                     <div class="header-buttons">
+                    <select v-model="syncTimeframe" class="sync-time-select" :disabled="syncState.isSyncing || isFetchingAccounts">
+                        <option value="1">Últimas 24 horas</option>
+                        <option value="3">Últimos 3 dias</option>
+                        <option value="7">Últimos 7 dias</option>
+                        <option value="30">Últimos 30 dias</option>
+                        <option value="180">Sincronizar Tudo (180 dias)</option>
+                    </select>
                     <button @click="handleUnifiedSync" :disabled="syncState.isSyncing || isFetchingAccounts"
                         :class="['btn', 'sync-btn', 'btn-primary']" 
                         title="Clique para sincronizar vendas">
@@ -591,6 +598,7 @@ const { sales, isLoading, error, fetchSales } = useSales();
 const userUid = computed(() => user.value?.uid);
 const { allStatuses: customStatuses } = useStatusesForUser(userUid);
 const { syncState, syncAccount } = useSyncManager();
+const syncTimeframe = ref('3');
 const { systemStatuses } = useSystemStatus();
 const { downloadLabel, getLabelInfo: composableLabelInfo } = useLabels();
 const labelError = ref(null);
@@ -854,7 +862,7 @@ const handleSync = async () => {
 
         for (const account of accounts) {
             try {
-                await syncAccount(account.user_id, account.nickname);
+                await syncAccount(account.user_id, account.nickname, null, syncTimeframe.value);
                 successCount++;
                 
                 // Aguarda um pouco para permitir que as vendas sejam atualizadas
@@ -1937,6 +1945,8 @@ function hideTooltip() {
     align-items: center;
     justify-content: center;
 }
+.sync-time-select { padding: 0.5rem 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background-color: #ffffff; color: #475569; font-size: 0.875rem; font-weight: 500; outline: none; transition: border-color 0.2s; }
+.sync-time-select:focus { border-color: #3b82f6; }
 .sale-card__thumb-img { width: 100%; height: 100%; object-fit: cover; }
 .sale-card__thumb-placeholder { color: #cbd5e1; }
 
