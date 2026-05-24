@@ -183,9 +183,7 @@
                         <p class="empty-state-text">Clique em "Sincronizar Vendas" para buscar os dados do Mercado
                             Livre.</p>
                     </div>
-                    <div v-else-if="sales.length === 0" class="empty-state">
-                        <p>Nenhuma venda encontrada para os filtros selecionados.</p>
-                    </div>
+
                     <div v-else>
                         <!-- Contador de resultados -->
                         <div class="sale-cards-counter">
