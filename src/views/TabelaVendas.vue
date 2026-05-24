@@ -183,17 +183,17 @@
                         <p class="empty-state-text">Clique em "Sincronizar Vendas" para buscar os dados do Mercado
                             Livre.</p>
                     </div>
-                    <div v-else-if="filteredSales.length === 0" class="empty-state">
+                    <div v-else-if="sales.length === 0" class="empty-state">
                         <p>Nenhuma venda encontrada para os filtros selecionados.</p>
                     </div>
                     <div v-else>
                         <!-- Contador de resultados -->
                         <div class="sale-cards-counter">
-                            <span>Mostrando <strong>{{ filteredSales.length }}</strong> de <strong>{{ sales.length }}</strong> vendas</span>
+                            <span>Mostrando <strong>{{ sales.length }}</strong> de <strong>{{ totalSales }}</strong> vendas</span>
                             <span v-if="isLoading" class="sale-cards-counter__loading">Atualizando...</span>
                         </div>
                         <div class="sale-cards-list" ref="tableBodyRef">
-                            <div v-for="sale in paginatedSales" :key="`${sale.id}-${sale.sku}`"
+                            <div v-for="sale in sales" :key="`${sale.id}-${sale.sku}`"
                                  class="sale-card"
                                  :class="{ 'sale-card--cancelled': (sale.unified_status === 'cancelled' || sale.raw_api_data?.status === 'cancelled') }">
 
