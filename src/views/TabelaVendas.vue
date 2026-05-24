@@ -594,7 +594,7 @@ function showToast(message, type = 'info') {
 // ===== END UTILITY FUNCTIONS =====
 
 const { user, userRole, isAuthReady, mlAccounts, fetchMercadoLivreAccounts } = useAuth();
-const { sales, isLoading, error, fetchSales } = useSales();
+const { sales, isLoading, error, totalSales, currentPage, totalPages, pageSize, fetchSales } = useSales();
 const userUid = computed(() => user.value?.uid);
 const { allStatuses: customStatuses } = useStatusesForUser(userUid);
 const { syncState, syncAccount } = useSyncManager();
@@ -687,8 +687,6 @@ const selectedStatusFilter = ref(null);
 const isFilterDropdownOpen = ref(false);
 const filterDropdownRef = ref(null);
 const filterContainerRef = ref(null);
-const currentPage = ref(1);
-const itemsPerPage = ref(10);
 const isJsonModalOpen = ref(false);
 const selectedSaleJson = ref('');
 const tooltipRef = ref(null);
@@ -718,15 +716,6 @@ const filters = reactive({
 // --- INÍCIO DAS ALTERAÇÕES ---
 
 // 1. Cria um status unificado para cada venda, priorizando 'cancelled' da API.
-const salesWithUnifiedStatus = computed(() => {
-    return (sales.value || []).map(sale => ({
-        ...sale,
-        unified_status: sale.raw_api_data?.status === 'cancelled'
-            ? 'cancelled'
-            : (sale.shipping_status || 'pendente'),
-    }));
-});
-
 // 2. Cria uma lista de opções de status para o filtro, garantindo que 'Cancelado' esteja sempre presente.
 const statusOptions = computed(() => {
     const options = new Map();
@@ -741,11 +730,12 @@ const statusOptions = computed(() => {
         options.set('cancelled', 'Cancelado');
     }
 
-    // Adiciona dinamicamente outros status encontrados nos dados, caso não existam
-    salesWithUnifiedStatus.value.forEach(sale => {
-        if (sale.unified_status && !options.has(sale.unified_status)) {
-            const label = sale.unified_status.charAt(0).toUpperCase() + sale.unified_status.slice(1).replace(/_/g, ' ');
-            options.set(sale.unified_status, label);
+    // Adiciona dinamicamente outros status encontrados nos dados atuais
+    (sales.value || []).forEach(sale => {
+        const unified = sale.raw_api_data?.status === 'cancelled' ? 'cancelled' : (sale.shipping_status || 'pendente');
+        if (unified && !options.has(unified)) {
+            const label = unified.charAt(0).toUpperCase() + unified.slice(1).replace(/_/g, ' ');
+            options.set(unified, label);
         }
     });
 
@@ -950,83 +940,42 @@ watch(() => syncState.value.isSyncing, (newValue, oldValue) => {
 watch(selectedAccountFilterId, (v) => { filters.accountId = v ?? null; currentPage.value = 1; });
 watch(() => filters.accountId, (v) => { selectedAccountFilterId.value = v ?? null; });
 
-const filteredSales = computed(() => {
-    // --- INÍCIO DA ALTERAÇÃO: Usar 'salesWithUnifiedStatus' para a filtragem ---
-    let tempSales = salesWithUnifiedStatus.value;
+const triggerServerFetch = (resetPage = false) => {
+    if (resetPage) currentPage.value = 1;
+    
+    const params = {
+        page: currentPage.value,
+        limit: pageSize.value,
+    };
 
-    if (selectedStatusFilter.value) {
-        tempSales = tempSales.filter(s => s.unified_status === selectedStatusFilter.value);
-    }
-    // --- FIM DA ALTERAÇÃO ---
+    if (searchQuery.value) params.search = searchQuery.value;
+    if (selectedStatusFilter.value) params.shippingStatus = selectedStatusFilter.value;
+    if (filters.accountId) params.account = filters.accountId;
+    if (selectedShippingModeFilter.value) params.shippingMode = selectedShippingModeFilter.value;
+    
+    if (filters.saleDateStart) params.saleDateStart = toLocalDateInputValue(filters.saleDateStart);
+    if (filters.saleDateEnd) params.saleDateEnd = toLocalDateInputValue(filters.saleDateEnd);
+    if (filters.shippingLimitStart) params.shippingLimitStart = toLocalDateInputValue(filters.shippingLimitStart);
+    if (filters.shippingLimitEnd) params.shippingLimitEnd = toLocalDateInputValue(filters.shippingLimitEnd);
+    
+    fetchSales(params);
+};
 
-    if (searchQuery.value) {
-        const query = searchQuery.value.toLowerCase();
-        tempSales = tempSales.filter(s =>
-            (s.product_title?.toLowerCase().includes(query)) ||
-            (s.sku?.toLowerCase().includes(query)) ||
-            (s.account_nickname?.toLowerCase().includes(query))
-        );
-    }
-
-    if (selectedAccountFilterId.value) {
-        const sel = normalizeId(selectedAccountFilterId.value);
-        tempSales = tempSales.filter(s => normalizeId(getSaleAccountId(s)) === sel);
-    }
-
-    if (selectedShippingModeFilter.value) {
-        tempSales = tempSales.filter(s => s.shipping_mode === selectedShippingModeFilter.value);
-    }
-
-    if (filters.saleDateStart) {
-        const start = parseFlexibleDate(filters.saleDateStart);
-        tempSales = tempSales.filter(s => {
-            const saleDate = parseFlexibleDate(s.sale_date);
-            return saleDate && start && saleDate >= start;
-        });
-    }
-    if (filters.saleDateEnd) {
-        const end = parseFlexibleDate(filters.saleDateEnd, { endOfDay: true });
-        tempSales = tempSales.filter(s => {
-            const saleDate = parseFlexibleDate(s.sale_date);
-            return saleDate && end && saleDate <= end;
-        });
-    }
-
-    if (filters.shippingLimitStart) {
-        const start = parseFlexibleDate(filters.shippingLimitStart);
-        tempSales = tempSales.filter(s => {
-            const raw = s.raw_api_data?.sla_data?.expected_date || s.shipping_limit_date;
-            const limitDate = parseFlexibleDate(raw);
-            return limitDate && start && limitDate >= start;
-        });
-    }
-    if (filters.shippingLimitEnd) {
-        const end = parseFlexibleDate(filters.shippingLimitEnd, { endOfDay: true });
-        tempSales = tempSales.filter(s => {
-            const raw = s.raw_api_data?.sla_data?.expected_date || s.shipping_limit_date;
-            const limitDate = parseFlexibleDate(raw);
-            return limitDate && end && limitDate <= end;
-        });
-    }
-
-    return tempSales;
+let searchTimeout;
+watch(searchQuery, () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        triggerServerFetch(true);
+    }, 400);
 });
 
-const totalPages = computed(() => Math.ceil(filteredSales.value.length / itemsPerPage.value) || 1);
-const paginatedSales = computed(() => {
-    const start = (currentPage.value - 1) * itemsPerPage.value;
-    const paginated = filteredSales.value.slice(start, start + itemsPerPage.value);
-    nextTick(() => {
-        if (tableBodyRef.value?.children.length) {
-            gsap.from(tableBodyRef.value.children, {
-                opacity: 0, y: 20, duration: 0.5, stagger: 0.08, ease: 'power3.out'
-            });
-        }
-    });
-    return paginated;
-});
+watch([selectedStatusFilter, selectedAccountFilterId, selectedShippingModeFilter, filters], () => {
+    triggerServerFetch(true);
+}, { deep: true });
 
-watch([selectedStatusFilter, searchQuery, filters, selectedAccountFilterId, selectedShippingModeFilter], () => { currentPage.value = 1; }, { deep: true });
+watch(currentPage, () => {
+    triggerServerFetch(false);
+});
 
 function closeDropdownOnClickOutside(event) {
     const target = event.target;
@@ -1044,11 +993,11 @@ function closeDropdownOnClickOutside(event) {
 onMounted(async () => {
     await fetchMercadoLivreAccounts();
     if (isAuthReady.value && user.value) {
-        await fetchSales();
+        triggerServerFetch(false);
     }
     watch(isAuthReady, async (ready) => {
         if (ready && user.value) {
-            await fetchSales();
+            triggerServerFetch(false);
         }
     });
     document.addEventListener('click', closeDropdownOnClickOutside);
