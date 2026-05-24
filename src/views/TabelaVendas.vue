@@ -2057,7 +2057,7 @@ function hideTooltip() {
 .sale-card__product-link {
     font-size: 0.9rem;
     font-weight: 600;
-    color: #e0e0ff;
+    color: #1e293b;
     text-decoration: none;
     overflow: hidden;
     text-overflow: ellipsis;
