@@ -778,9 +778,10 @@ const paginatedUserSales = computed(() => {
     const paginated = filteredUserSales.value.slice(startIndex, startIndex + salesItemsPerPage.value);
     nextTick(() => {
         if (salesTableBodyRef.value?.children.length) {
-            gsap.from(salesTableBodyRef.value.children, {
-                opacity: 0, y: 20, duration: 0.5, stagger: 0.08, ease: 'power3.out'
-            });
+            gsap.fromTo(salesTableBodyRef.value.children, 
+                { opacity: 0, y: 20 },
+                { opacity: 1, y: 0, duration: 0.5, stagger: 0.08, ease: 'power3.out', overwrite: 'auto' }
+            );
         }
     });
     return paginated;
