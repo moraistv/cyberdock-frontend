@@ -639,6 +639,7 @@ const filters = reactive({
 
 function getThumbUrl(sale) {
     let thumbUrl = sale.product_thumbnail;
+    if (thumbUrl === 'not_found') return null;
     if (!thumbUrl && sale.raw_api_data?.order_items) {
         const itemObj = sale.raw_api_data.order_items.find(it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku);
         if (itemObj?.item?.thumbnail) thumbUrl = itemObj.item.thumbnail;
@@ -1940,31 +1941,6 @@ const handleSync = async () => {
         return;
     }
 
-    const accountToSync = mlAccounts.value[0];
-    const { user_id: accountId, nickname } = accountToSync;
-
-    if (!accountId || !nickname) {
-        summaryModalTitle.value = 'Dados da Conta Incompletos';
-        summaryModalContent.value = '<p>A conta do usuário não possui informações suficientes (ID e Nickname) para sincronizar.</p>';
-        isSummaryModalOpen.value = true;
-        return;
-    }
-
-    try {
-        // Primeiro faz a sincronização normal
-        await syncAccount(accountId, nickname, props.userId, syncTimeframe.value);
-
-        // Aguarda um pouco para a sincronização terminar
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        // Depois enriquece os dados das vendas existentes
-        console.log(`[ENRICH] Chamando enrichExistingSales com accountId: ${accountId}, nickname: ${nickname}, clientUid: ${props.userId}`);
-        await enrichExistingSales(accountId, nickname, props.userId);
-
-        // Atualiza as vendas após o enriquecimento
-        await fetchSales();
-
-    } catch (error) {
         summaryModalTitle.value = 'Falha na Sincronização/Enriquecimento';
         summaryModalContent.value = `<p>Ocorreu um erro:</p><p class="error-text">${error.message}</p>`;
         isSummaryModalOpen.value = true;
