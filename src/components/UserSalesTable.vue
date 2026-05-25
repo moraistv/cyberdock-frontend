@@ -1981,7 +1981,6 @@ watch(() => syncState.value.isSyncing, (newVal, oldVal) => {
         fetchSales();
     }
 });
-};
 
 
 function handleClickOutside(event) {
