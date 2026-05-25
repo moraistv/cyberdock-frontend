@@ -1941,12 +1941,39 @@ const handleSync = async () => {
         return;
     }
 
-        summaryModalTitle.value = 'Falha na Sincronização/Enriquecimento';
-        summaryModalContent.value = `<p>Ocorreu um erro:</p><p class="error-text">${error.message}</p>`;
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const account of mlAccounts.value) {
+        const { user_id: accountId, nickname } = account;
+
+        if (!accountId || !nickname) {
+            console.warn(`Conta ignorada por falta de ID ou Nickname:`, account);
+            continue;
+        }
+
+        try {
+            await syncAccount(accountId, nickname, props.userId, syncTimeframe.value);
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            await enrichExistingSales(accountId, nickname, props.userId);
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            successCount++;
+        } catch (error) {
+            console.error(`Erro ao sincronizar ${nickname}:`, error);
+            errorCount++;
+        }
+    }
+    
+    await fetchSales();
+    
+    if (errorCount > 0) {
+        summaryModalTitle.value = 'Sincronização Finalizada com Alertas';
+        summaryModalContent.value = `<p>Sincronizadas: ${successCount}. Falhas: ${errorCount}. Verifique os logs para mais detalhes.</p>`;
         isSummaryModalOpen.value = true;
     }
 };
-
 
 
 function handleClickOutside(event) {

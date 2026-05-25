@@ -467,6 +467,7 @@ import { useApi } from '@/composables/useApi';
  */
 function getThumbUrl(sale) {
     let thumbUrl = sale.product_thumbnail;
+    if (thumbUrl === 'not_found') return null;
     if (!thumbUrl && sale.raw_api_data?.order_items) {
         const itemObj = sale.raw_api_data.order_items.find(
             it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku

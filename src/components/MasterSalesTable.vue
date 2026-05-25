@@ -967,8 +967,8 @@ function getProductLink(sale) {
 
 // Thumbnail - usa o proxy do backend para servir imagens do ML sem 403
 function getThumbUrl(sale) {
-    // Pega a URL original da thumbnail dos dados da venda
     let thumbUrl = sale.product_thumbnail;
+    if (thumbUrl === 'not_found') return null;
     
     // Fallback: tenta extrair do raw_api_data
     if (!thumbUrl && sale.raw_api_data?.order_items) {
