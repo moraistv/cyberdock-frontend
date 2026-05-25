@@ -7,7 +7,7 @@
                 <div class="filters-left-group">
                     <!-- Busca -->
                     <div class="search-wrapper">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none"
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                             class="search-icon">
                             <circle cx="11" cy="11" r="8"></circle>
@@ -22,7 +22,7 @@
                         <button @click="toggleSaleStatusDropdown" class="btn btn-outline">
                             <span class="truncate pr-2">{{ selectedSaleStatusFilter ? `Venda:
                                 ${getSaleStatusLabel(selectedSaleStatusFilter)}` : 'Status da Venda' }}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24" fill="none"
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                                 class="h-4 w-4 shrink-0 opacity-50">
                                 <path d="m6 9 6 6 6-6"></path>
@@ -47,7 +47,7 @@
                         <button @click="toggleStatusDropdown" class="btn btn-outline">
                             <span class="truncate pr-2">{{ selectedStatusFilter ? `Expedição:
                                 ${getStatusLabel(selectedStatusFilter)}` : 'Status de Expedição' }}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24" fill="none"
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                                 class="h-4 w-4 shrink-0 opacity-50">
                                 <path d="m6 9 6 6 6-6"></path>
@@ -72,7 +72,7 @@
                     <div class="filter-container" ref="accountFilterContainerRef">
                         <button @click="toggleAccountDropdown" class="btn btn-outline">
                             <span class="truncate pr-2">{{ selectedAccountNickname }}</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24" fill="none"
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                                 class="h-4 w-4 shrink-0 opacity-50">
                                 <path d="m6 9 6 6 6-6"></path>
@@ -97,7 +97,7 @@
                 <div class="filters-right-group">
                     <!-- Botão para Filtros Avançados -->
                     <button @click="toggleAdvancedFilters" class="btn btn-ghost">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24" fill="none"
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                             class="mr-2 h-4 w-4">
                             <path d="M3 6h18M7 12h10M10 18h4"></path>
@@ -416,7 +416,7 @@
                                             <span :class="['status-badge', getStatusColorClass(sale.shipping_status)]"></span>
                                             <span>{{ getStatusLabel(sale.shipping_status) }}</span>
                                         </div>
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24"
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                             stroke-linejoin="round" class="status-arrow">
                                             <polyline points="6 9 12 15 18 9"></polyline>
@@ -452,7 +452,7 @@
                             <span :class="['status-badge', getStatusColorClass(status.value)]"></span>
                             <span>{{ status.label }}</span>
                         </div>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24" fill="none"
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
                             class="status-selection-arrow">
                             <polyline points="9 18 15 12 9 6"></polyline>
@@ -482,7 +482,7 @@
                             <span :class="['status-badge', getStatusColorClass(status.value)]"></span>
                             <span>{{ status.label }}</span>
                         </div>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24" fill="none"
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
                             class="status-selection-arrow">
                             <polyline points="9 18 15 12 9 6"></polyline>
@@ -1954,10 +1954,11 @@ const handleSync = async () => {
 
         try {
             await syncAccount(accountId, nickname, props.userId, syncTimeframe.value);
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            // Reduzimos o delay artificial para melhorar a fluidez da UI.
+            await new Promise(resolve => setTimeout(resolve, 300));
             
             await enrichExistingSales(accountId, nickname, props.userId);
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            await new Promise(resolve => setTimeout(resolve, 300));
             
             successCount++;
         } catch (error) {
@@ -1966,13 +1967,20 @@ const handleSync = async () => {
         }
     }
     
-    await fetchSales();
-    
     if (errorCount > 0) {
         summaryModalTitle.value = 'Sincronização Finalizada com Alertas';
         summaryModalContent.value = `<p>Sincronizadas: ${successCount}. Falhas: ${errorCount}. Verifique os logs para mais detalhes.</p>`;
         isSummaryModalOpen.value = true;
     }
+};
+
+// Observador para recarregar as vendas quando o sync / enriquecimento finalizar no background
+watch(() => syncState.value.isSyncing, (newVal, oldVal) => {
+    if (oldVal === true && newVal === false) {
+        console.log('Sincronização concluída via background. Recarregando vendas...');
+        fetchSales();
+    }
+});
 };
 
 
