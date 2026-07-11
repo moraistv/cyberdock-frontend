@@ -225,6 +225,9 @@ function buildMultiInsertQuery_DoUpdate(rows) {
     values.push(`(${placeholders})`);
   }
 
+  // RETURNING (xmax = 0) permite distinguir INSERT de UPDATE no mesmo upsert:
+  // em linhas recém-inseridas xmax = 0; em linhas atualizadas xmax != 0.
+  // Assim conseguimos contar "vendas realmente novas" vs "reprocessadas".
   const query = `
     INSERT INTO public.sales (${cols.join(', ')})
     VALUES ${values.join(', ')}
@@ -234,7 +237,8 @@ function buildMultiInsertQuery_DoUpdate(rows) {
       packages = EXCLUDED.packages,
       raw_api_data = EXCLUDED.raw_api_data,
       updated_at = EXCLUDED.updated_at
-    WHERE public.sales.processed_at IS NULL;
+    WHERE public.sales.processed_at IS NULL
+    RETURNING (xmax = 0) AS inserted;
   `;
 
   return { query, params };
@@ -1164,11 +1168,17 @@ router.post('/sync-account', authenticateToken, async (req, res) => {
     const clientDb = await db.pool.connect();
     try {
       await clientDb.query('BEGIN');
+      let insertedCount = 0;
+      let updatedCount = 0;
       for (let i = 0; i < allRows.length; i += UPSERT_BATCH_SIZE) {
         const chunk = allRows.slice(i, i + UPSERT_BATCH_SIZE);
 
         const { query, params } = buildMultiInsertQuery_DoUpdate(chunk);
-        await clientDb.query(query, params);
+        const result = await clientDb.query(query, params);
+        for (const row of result.rows) {
+          if (row.inserted) insertedCount++;
+          else updatedCount++;
+        }
 
         const pct = 85 + Math.floor(((i + chunk.length) / allRows.length) * 15);
         if (i === 0 || i + UPSERT_BATCH_SIZE >= allRows.length || i % (UPSERT_BATCH_SIZE * 3) === 0) {
@@ -1176,11 +1186,16 @@ router.post('/sync-account', authenticateToken, async (req, res) => {
         }
       }
       await clientDb.query('COMMIT');
-      sendEvent(clientId, { 
-        progress: 100, 
-        message: `[${nickname}] Sincronização concluída. ${allRows.length} itens processados.`, 
+      const doneMsg = insertedCount > 0
+        ? `[${nickname}] Concluída. ${insertedCount} venda(s) nova(s), ${updatedCount} atualizada(s).`
+        : `[${nickname}] Concluída. Nenhuma venda nova (${updatedCount} atualizada(s)).`;
+      sendEvent(clientId, {
+        progress: 100,
+        message: doneMsg,
         type: 'success',
-        newSalesCount: allRows.length
+        newSalesCount: insertedCount,   // agora é a contagem REAL de novas
+        updatedCount: updatedCount,
+        processedCount: allRows.length
       });
     } catch (e) {
       await clientDb.query('ROLLBACK');
