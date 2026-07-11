@@ -7,7 +7,6 @@ import { useAuth } from '@/composables/useAuth';
 export function useSyncManager() {
   const api = useApi();
   const { token } = useAuth();
-  let eventSource = null;
 
   const state = ref({
     isSyncing: false,
