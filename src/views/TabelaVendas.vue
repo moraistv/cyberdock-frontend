@@ -596,7 +596,7 @@ const { user, userRole, isAuthReady, mlAccounts, fetchMercadoLivreAccounts } = u
 const { sales, isLoading, error, totalSales, currentPage, totalPages, pageSize, fetchSales } = useSales();
 const userUid = computed(() => user.value?.uid);
 const { allStatuses: customStatuses } = useStatusesForUser(userUid);
-const { syncState, syncAccount } = useSyncManager();
+const { syncState, syncAccountsBatch } = useSyncManager();
 const syncTimeframe = ref('3');
 const { systemStatuses } = useSystemStatus();
 const { downloadLabel, getLabelInfo: composableLabelInfo } = useLabels();
@@ -846,51 +846,33 @@ const handleSync = async () => {
 
         totalAccounts = accounts.length;
 
-        // Captura o número de vendas antes da sincronização
-        const salesBefore = sales.value?.length || 0;
+        // Sincroniza as contas em paralelo controlado (rate protegido no backend),
+        // sem esperas artificiais e sem recarregar a tabela a cada conta.
+        const batch = await syncAccountsBatch(
+            accounts.map(account => ({
+                mlAccountId: account.user_id,
+                accountNickname: account.nickname,
+                clientUid: null,
+                daysToSync: syncTimeframe.value
+            })),
+            { concurrency: 3 }
+        );
 
-        for (const account of accounts) {
-            try {
-                await syncAccount(account.user_id, account.nickname, null, syncTimeframe.value);
-                successCount++;
-                
-                // Aguarda um pouco para permitir que as vendas sejam atualizadas
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                // Atualiza as vendas para obter contagem atualizada
-                await fetchSales();
-                
-                // Calcula o número de vendas para esta conta
-                const accountSales = sales.value?.filter(sale => {
-                    const saleAccountId = getSaleAccountId(sale);
-                    return normalizeId(saleAccountId) === normalizeId(account.user_id);
-                })?.length || 0;
-                
-                accountResults.push({
-                    nickname: account.nickname,
-                    userId: account.user_id,
-                    status: 'success',
-                    salesCount: accountSales,
-                    message: `Sincronizada com sucesso`
-                });
-            } catch (err) {
-                errorCount++;
-                console.error(`Falha ao sincronizar a conta ${account.nickname} (${account.user_id}):`, err);
-                
-                accountResults.push({
-                    nickname: account.nickname,
-                    userId: account.user_id,
-                    status: 'error',
-                    salesCount: 0,
-                    message: err.message || 'Erro desconhecido'
-                });
-            }
+        successCount = batch.summary.successful;
+        errorCount = batch.summary.failed;
+        for (const r of batch.results) {
+            accountResults.push({
+                nickname: r.accountNickname,
+                userId: r.mlAccountId,
+                status: r.status,
+                salesCount: r.newSalesCount || 0,
+                message: r.status === 'success' ? 'Sincronizada com sucesso' : (r.message || 'Erro desconhecido')
+            });
         }
 
-        // Atualiza as vendas uma última vez após todas as sincronizações
+        // Recarrega a tabela uma única vez, ao final de tudo.
         await fetchSales();
-        const salesAfter = sales.value?.length || 0;
-        const totalNewSales = salesAfter - salesBefore;
+        const totalNewSales = batch.totalNewSales;
 
         // Mostra o modal de resultados para múltiplas contas ou quando há resultados importantes
         if (totalAccounts > 1 || errorCount > 0) {

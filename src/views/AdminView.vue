@@ -116,7 +116,7 @@ import { useApi } from '@/composables/useApi';
 import { useSyncManager } from '@/composables/useSyncManager';
 
 const api = useApi();
-const { syncState, syncAccount } = useSyncManager();
+const { syncState, syncAccountsBatch } = useSyncManager();
 
 const masterTableRef = ref(null);
 const isFetchingAccounts = ref(false);
@@ -154,39 +154,32 @@ const handleGlobalSync = async () => {
         }
 
         totalAccounts = accounts.length;
-        let totalNewSalesFound = 0;
 
-        for (const account of accounts) {
-            try {
-                // Passamos o uid para garantir a sincronização do cliente correto (mesmo sendo master)
-                syncState.value.newSalesCount = 0; // zera pro Toast
-                await syncAccount(account.user_id, account.nickname, account.uid, syncTimeframe.value);
-                successCount++;
-                
-                const foundForThisAccount = syncState.value.newSalesCount || 0;
-                totalNewSalesFound += foundForThisAccount;
+        // Sincroniza todas as contas em paralelo controlado (o backend limita
+        // globalmente o rate do ML). Sem esperas artificiais e sem recarregar
+        // a tabela a cada conta — só uma vez no final.
+        const batch = await syncAccountsBatch(
+            accounts.map(account => ({
+                mlAccountId: account.user_id,
+                accountNickname: account.nickname,
+                clientUid: account.uid,
+                daysToSync: syncTimeframe.value
+            })),
+            { concurrency: 3 }
+        );
 
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                accountResults.push({
-                    nickname: account.nickname,
-                    userId: account.user_id,
-                    uid: account.uid,
-                    status: 'success',
-                    message: `Sincronizada. Novas vendas nesta conta: ${foundForThisAccount}`
-                });
-            } catch (err) {
-                errorCount++;
-                console.error(`Falha ao sincronizar a conta ${account.nickname} globalmente:`, err);
-                
-                accountResults.push({
-                    nickname: account.nickname,
-                    userId: account.user_id,
-                    uid: account.uid,
-                    status: 'error',
-                    message: err.message || 'Erro desconhecido'
-                });
-            }
+        successCount = batch.summary.successful;
+        errorCount = batch.summary.failed;
+        for (const r of batch.results) {
+            accountResults.push({
+                nickname: r.accountNickname,
+                userId: r.mlAccountId,
+                uid: r.clientUid,
+                status: r.status,
+                message: r.status === 'success'
+                    ? `Sincronizada. Novas vendas nesta conta: ${r.newSalesCount || 0}`
+                    : (r.message || 'Erro desconhecido')
+            });
         }
 
         if (masterTableRef.value && masterTableRef.value.fetchSales) {
@@ -206,7 +199,7 @@ const handleGlobalSync = async () => {
                 successful: successCount,
                 failed: errorCount
             },
-            totalNewSales: totalNewSalesFound
+            totalNewSales: batch.totalNewSales
         };
         isSyncResultsModalOpen.value = true;
 

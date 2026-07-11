@@ -264,6 +264,22 @@ async function syncDatabaseSchema() {
                 }
             }
         }
+
+        // Índices de performance da tabela sales. IF NOT EXISTS => idempotente e
+        // seguro rodar em toda inicialização. O índice (uid, seller_id, updated_at)
+        // acelera o MAX(updated_at)/last-sync e as varreduras de enriquecimento.
+        // SET LOCAL remove o statement_timeout do pool só nesta transação, pois
+        // criar índice em tabela grande pode levar mais que o timeout padrão.
+        console.log('   -> Verificando índices de performance em public.sales...');
+        await client.query('SET LOCAL statement_timeout = 0;');
+        await client.query('CREATE INDEX IF NOT EXISTS idx_sales_seller_id ON public.sales(seller_id);');
+        await client.query('CREATE INDEX IF NOT EXISTS idx_sales_sale_date ON public.sales(sale_date DESC);');
+        await client.query('CREATE INDEX IF NOT EXISTS idx_sales_uid ON public.sales(uid);');
+        await client.query('CREATE INDEX IF NOT EXISTS idx_sales_uid_date ON public.sales(uid, sale_date DESC);');
+        await client.query('CREATE INDEX IF NOT EXISTS idx_sales_seller_date ON public.sales(seller_id, sale_date DESC);');
+        await client.query('CREATE INDEX IF NOT EXISTS idx_sales_uid_seller_updated ON public.sales(uid, seller_id, updated_at DESC);');
+        await client.query('CREATE INDEX IF NOT EXISTS idx_sales_uid_seller_saledate ON public.sales(uid, seller_id, sale_date DESC);');
+
         await client.query('COMMIT');
         console.log('✅ Esquema do banco de dados está atualizado.');
     } catch (error) {

@@ -7,6 +7,19 @@ const pool = new Pool({
   password: process.env.PGPASSWORD || 'KVT8w15r7n2EDQQ7w4TNxI8HvR09JZ0u',
   port: process.env.PGPORT ? parseInt(process.env.PGPORT) : 5432,
   ssl: { rejectUnauthorized: false }, // Necessário para conexão externa segura
+
+  // Pool dimensionado e com timeouts, para que jobs paralelos não esgotem as
+  // conexões nem deixem queries travadas segurando conexão indefinidamente.
+  max: process.env.PGPOOL_MAX ? parseInt(process.env.PGPOOL_MAX, 10) : 15,
+  connectionTimeoutMillis: 10000,          // espera no máx. 10s por uma conexão
+  idleTimeoutMillis: 30000,                // libera conexões ociosas após 30s
+  statement_timeout: 30000,                // aborta query travada após 30s
+  query_timeout: 30000,
+  application_name: 'cyberdock-backend',
+});
+
+pool.on('error', (err) => {
+  console.error('Erro inesperado em cliente ocioso do pool PostgreSQL:', err.message);
 });
 
 pool.query('SELECT NOW()', (err, res) => {
