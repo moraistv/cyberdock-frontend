@@ -1026,10 +1026,13 @@ router.post('/sync-account', authenticateToken, async (req, res) => {
 
     while (orderSummaries.length < MAX_ORDERS) {
       const limit = Math.min(PAGE_LIMIT, MAX_ORDERS - orderSummaries.length);
+      // Filtro por date_last_updated: além de pedidos novos, captura pedidos
+      // ANTIGOS que foram atualizados (pagamento, cancelamento, mudança de
+      // envio). Isso corrige o bug de descartar por date_created antigo.
       const ordersUrl =
         `https://api.mercadolibre.com/orders/search` +
         `?seller=${userId}&offset=${offset}&limit=${limit}&sort=date_desc` +
-        `&order.date_created.from=${encodeURIComponent(lastSyncDate.toISOString())}`;
+        `&order.date_last_updated.from=${encodeURIComponent(lastSyncDate.toISOString())}`;
 
       let ordersResponse = await mlFetch(ordersUrl, { headers: mlHeaders(access_token) });
 
@@ -1099,20 +1102,70 @@ router.post('/sync-account', authenticateToken, async (req, res) => {
       const items = pageData.results || [];
       if (items.length === 0) break;
 
-      const filteredItems = items.filter((o) => new Date(o.date_created) >= lastSyncDate);
-      orderSummaries.push(...filteredItems);
-
-      if (items.length > 0) {
-        const lastDateInPage = new Date(items[items.length - 1]?.date_created);
-        if (lastDateInPage < lastSyncDate) break;
-      }
+      // A API já filtrou por date_last_updated.from, então aproveitamos todos
+      // os resultados (sem refiltrar por date_created, que descartava updates
+      // de pedidos antigos).
+      orderSummaries.push(...items);
 
       if (items.length < limit) break;
       offset += limit;
     }
 
     if (orderSummaries.length === 0) {
-      sendEvent(clientId, { progress: 100, message: `[${nickname}] Nenhuma venda nova encontrada. Tudo atualizado!`, type: 'success' });
+      sendEvent(clientId, { progress: 100, message: `[${nickname}] Nenhuma venda nova encontrada. Tudo atualizado!`, type: 'success', newSalesCount: 0, updatedCount: 0, skippedCount: 0 });
+      return;
+    }
+
+    // ====== SKIP DE PEDIDOS INALTERADOS (o maior ganho) ======
+    // Consulta o estado já salvo destes pedidos e pula aqueles cujo
+    // date_last_updated não mudou e que já estão enriquecidos. Assim, um clique
+    // repetido não refaz detalhe/shipment/SLA para o que não mudou — cai de
+    // milhares de chamadas para praticamente zero.
+    sendEvent(clientId, { progress: 35, message: `[${nickname}] Verificando o que mudou desde a última sincronização...`, type: 'info' });
+
+    const orderIdList = [...new Set(orderSummaries.map(o => o.id).filter(Boolean).map(id => parseInt(id, 10)).filter(n => !isNaN(n)))];
+    const savedState = new Map(); // id(string) -> { updated: Date|null, enriched: bool }
+    if (orderIdList.length > 0) {
+      const stateRes = await db.query(
+        `SELECT id,
+                MAX(raw_api_data->>'date_last_updated') AS stored_updated,
+                bool_and(
+                  (raw_api_data->'shipping'->>'id') IS NULL
+                  OR (raw_api_data->'shipping'->>'status') IS NOT NULL
+                ) AS enriched
+           FROM public.sales
+          WHERE uid = $1 AND seller_id = $2 AND id = ANY($3::bigint[])
+          GROUP BY id`,
+        [targetUid, userId, orderIdList]
+      );
+      for (const r of stateRes.rows) {
+        savedState.set(String(r.id), {
+          updated: r.stored_updated ? new Date(r.stored_updated) : null,
+          enriched: r.enriched === true
+        });
+      }
+    }
+
+    const toProcess = [];
+    let skippedCount = 0;
+    for (const summary of orderSummaries) {
+      const st = savedState.get(String(summary.id));
+      const remoteUpdated = summary.date_last_updated ? new Date(summary.date_last_updated) : null;
+      // Pula somente se: já existe, está enriquecido e não mudou no ML.
+      const unchanged = st && st.enriched && st.updated && remoteUpdated && st.updated.getTime() >= remoteUpdated.getTime();
+      if (unchanged) { skippedCount++; continue; }
+      toProcess.push(summary);
+    }
+
+    if (toProcess.length === 0) {
+      sendEvent(clientId, {
+        progress: 100,
+        message: `[${nickname}] Tudo atualizado. ${skippedCount} pedido(s) sem mudança.`,
+        type: 'success',
+        newSalesCount: 0,
+        updatedCount: 0,
+        skippedCount
+      });
       return;
     }
 
@@ -1121,9 +1174,9 @@ router.post('/sync-account', authenticateToken, async (req, res) => {
     // depois shipment, depois SLA). Agora cada pedido busca o detalhe e, se
     // tiver envio, dispara shipment e SLA em paralelo (Promise.all). Isso
     // elimina uma passagem inteira e paraleliza as duas chamadas de logística.
-    sendEvent(clientId, { progress: 45, message: `[${nickname}] Detalhando e enriquecendo ${orderSummaries.length} vendas...`, type: 'info' });
+    sendEvent(clientId, { progress: 45, message: `[${nickname}] Processando ${toProcess.length} pedido(s) alterado(s) (${skippedCount} sem mudança)...`, type: 'info' });
     let processedCount = 0;
-    const enrichedOrders = await mapWithConcurrency(orderSummaries, SLA_CONCURRENCY, async (summary) => {
+    const enrichedOrders = await mapWithConcurrency(toProcess, SLA_CONCURRENCY, async (summary) => {
       let order = summary;
       try {
         const orderDetailsRes = await mlFetch(`https://api.mercadolibre.com/orders/${summary.id}`, { headers: mlHeaders(access_token) });
@@ -1156,8 +1209,8 @@ router.post('/sync-account', authenticateToken, async (req, res) => {
 
       processedCount++;
       if (processedCount % 25 === 0) {
-        const pct = 45 + Math.floor((processedCount / orderSummaries.length) * 40);
-        sendEvent(clientId, { progress: Math.min(85, pct), message: `[${nickname}] Enriquecendo... ${processedCount}/${orderSummaries.length}`, type: 'info' });
+        const pct = 45 + Math.floor((processedCount / toProcess.length) * 40);
+        sendEvent(clientId, { progress: Math.min(85, pct), message: `[${nickname}] Enriquecendo... ${processedCount}/${toProcess.length}`, type: 'info' });
       }
       return order;
     });
@@ -1187,14 +1240,15 @@ router.post('/sync-account', authenticateToken, async (req, res) => {
       }
       await clientDb.query('COMMIT');
       const doneMsg = insertedCount > 0
-        ? `[${nickname}] Concluída. ${insertedCount} venda(s) nova(s), ${updatedCount} atualizada(s).`
-        : `[${nickname}] Concluída. Nenhuma venda nova (${updatedCount} atualizada(s)).`;
+        ? `[${nickname}] Concluída. ${insertedCount} venda(s) nova(s), ${updatedCount} atualizada(s), ${skippedCount} sem mudança.`
+        : `[${nickname}] Concluída. Nenhuma venda nova (${updatedCount} atualizada(s), ${skippedCount} sem mudança).`;
       sendEvent(clientId, {
         progress: 100,
         message: doneMsg,
         type: 'success',
         newSalesCount: insertedCount,   // agora é a contagem REAL de novas
         updatedCount: updatedCount,
+        skippedCount: skippedCount,
         processedCount: allRows.length
       });
     } catch (e) {
