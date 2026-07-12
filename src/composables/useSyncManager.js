@@ -18,6 +18,10 @@ export function useSyncManager() {
     newSalesCount: 0
   });
 
+  // Estado ao vivo por conta, para o painel de progresso em tempo real.
+  // [{ mlAccountId, nickname, progress, status, message, newSalesCount, updatedCount, skippedCount }]
+  const liveAccounts = ref([]);
+
   const closeToast = (delay = 6000) => {
     if (state.value.progress === 100 || state.value.progress === -1) {
       setTimeout(() => {
@@ -164,6 +168,18 @@ export function useSyncManager() {
     let totalSkipped = 0;
     const results = new Array(total);
 
+    // Inicializa o estado ao vivo (uma linha por conta).
+    liveAccounts.value = accounts.map((a) => ({
+      mlAccountId: a.mlAccountId,
+      nickname: a.accountNickname,
+      progress: 0,
+      status: 'pending',
+      message: 'Na fila...',
+      newSalesCount: 0,
+      updatedCount: 0,
+      skippedCount: 0
+    }));
+
     state.value = {
       isSyncing: true,
       isVisible: true,
@@ -179,12 +195,26 @@ export function useSyncManager() {
       while (cursor < total) {
         const idx = cursor++;
         const acc = accounts[idx];
+        const live = liveAccounts.value[idx];
+        live.status = 'syncing';
+        live.message = 'Iniciando...';
         try {
-          const r = await runSingleSync(acc.mlAccountId, acc.accountNickname, acc.clientUid ?? null, acc.daysToSync ?? null);
+          const r = await runSingleSync(acc.mlAccountId, acc.accountNickname, acc.clientUid ?? null, acc.daysToSync ?? null, (data) => {
+            if (typeof data.progress === 'number' && data.progress >= 0) live.progress = data.progress;
+            if (data.message) live.message = data.message;
+            if (data.newSalesCount !== undefined) live.newSalesCount = data.newSalesCount;
+            if (data.updatedCount !== undefined) live.updatedCount = data.updatedCount;
+            if (data.skippedCount !== undefined) live.skippedCount = data.skippedCount;
+          });
           successful++;
           totalNewSales += r?.newSalesCount || 0;
           totalUpdated += r?.updatedCount || 0;
           totalSkipped += r?.skippedCount || 0;
+          live.status = 'done';
+          live.progress = 100;
+          live.newSalesCount = r?.newSalesCount || 0;
+          live.updatedCount = r?.updatedCount || 0;
+          live.skippedCount = r?.skippedCount || 0;
           results[idx] = {
             ...acc,
             status: 'success',
@@ -194,6 +224,9 @@ export function useSyncManager() {
           };
         } catch (err) {
           failed++;
+          live.status = 'error';
+          live.progress = 100;
+          live.message = err.message || 'Erro desconhecido';
           results[idx] = { ...acc, status: 'error', message: err.message || 'Erro desconhecido' };
         } finally {
           done++;
@@ -309,6 +342,7 @@ export function useSyncManager() {
 
   return {
     syncState: state,
+    liveAccounts,
     syncAccount,
     syncAccountsBatch,
     enrichExistingSales,

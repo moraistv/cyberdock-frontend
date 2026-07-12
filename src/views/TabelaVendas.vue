@@ -462,6 +462,9 @@
             </template>
         </UniversalModal>
 
+        <!-- Painel de progresso ao vivo (por conta, em tempo real) -->
+        <SyncLiveModal :open="isSyncLiveOpen" :accounts="liveAccounts" title="Sincronizando vendas..." />
+
         <ToastNotification :is-visible="syncState.isVisible" :title="syncState.title"
             :description="syncState.description" :progress="syncState.progress" :type="syncState.type" />
     </div>
@@ -474,6 +477,7 @@ import { API_BASE_URL } from '@/config';
 import SidebarComponent from '../components/SidebarComponent.vue';
 import TopbarComponent from '../components/TopbarComponent.vue';
 import UniversalModal from '../components/UniversalModal.vue';
+import SyncLiveModal from '../components/SyncLiveModal.vue';
 import ToastNotification from '../components/ToastNotification.vue';
 import gsap from 'gsap';
 import { useAuth } from '@/composables/useAuth';
@@ -620,7 +624,8 @@ const { user, userRole, isAuthReady, mlAccounts, fetchMercadoLivreAccounts } = u
 const { sales, isLoading, error, totalSales, currentPage, totalPages, pageSize, fetchSales } = useSales();
 const userUid = computed(() => user.value?.uid);
 const { allStatuses: customStatuses } = useStatusesForUser(userUid);
-const { syncState, syncAccountsBatch } = useSyncManager();
+const { syncState, liveAccounts, syncAccountsBatch } = useSyncManager();
+const isSyncLiveOpen = ref(false);
 const syncTimeframe = ref('3');
 const { systemStatuses } = useSystemStatus();
 const { downloadLabel, getLabelInfo: composableLabelInfo } = useLabels();
@@ -899,6 +904,9 @@ const handleSync = async () => {
 
         totalAccounts = accounts.length;
 
+        // Abre o painel de progresso ao vivo enquanto sincroniza.
+        isSyncLiveOpen.value = true;
+
         // Sincroniza as contas em paralelo controlado (rate protegido no backend),
         // sem esperas artificiais e sem recarregar a tabela a cada conta.
         const batch = await syncAccountsBatch(
@@ -924,6 +932,9 @@ const handleSync = async () => {
                 message: r.status === 'error' ? (r.message || 'Erro desconhecido') : ''
             });
         }
+
+        // Fecha o painel ao vivo antes de mostrar o resumo.
+        isSyncLiveOpen.value = false;
 
         // Recarrega a tabela uma única vez, ao final de tudo.
         await fetchSales();
@@ -962,6 +973,7 @@ const handleSync = async () => {
         };
         isSyncResultsModalOpen.value = true;
     } finally {
+        isSyncLiveOpen.value = false;
         isFetchingAccounts.value = false;
         syncState.value.isForced = false;
     }

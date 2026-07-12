@@ -137,6 +137,8 @@
 
     <ToastNotification :is-visible="syncState.isVisible" :title="syncState.title"
             :description="syncState.description" :progress="syncState.progress" :type="syncState.type" />
+
+    <SyncLiveModal :open="isSyncLiveOpen" :accounts="liveAccounts" title="Sincronização global em andamento..." />
   </div>
 </template>
 
@@ -147,16 +149,18 @@ import SidebarComponent from '../components/SidebarComponent.vue';
 import TopbarComponent from '../components/TopbarComponent.vue';
 import MasterSalesTable from '../components/MasterSalesTable.vue';
 import UniversalModal from '../components/UniversalModal.vue';
+import SyncLiveModal from '../components/SyncLiveModal.vue';
 import ToastNotification from '../components/ToastNotification.vue';
 import { useApi } from '@/composables/useApi';
 import { useSyncManager } from '@/composables/useSyncManager';
 
 const api = useApi();
-const { syncState, syncAccountsBatch } = useSyncManager();
+const { syncState, liveAccounts, syncAccountsBatch } = useSyncManager();
 
 const masterTableRef = ref(null);
 const isFetchingAccounts = ref(false);
 const isSyncResultsModalOpen = ref(false);
+const isSyncLiveOpen = ref(false);
 const syncTimeframe = ref('3');
 
 const syncResults = ref({
@@ -227,6 +231,9 @@ const handleGlobalSync = async () => {
 
         totalAccounts = accounts.length;
 
+        // Abre o painel de progresso ao vivo enquanto sincroniza.
+        isSyncLiveOpen.value = true;
+
         // Sincroniza todas as contas em paralelo controlado (o backend limita
         // globalmente o rate do ML). Sem esperas artificiais e sem recarregar
         // a tabela a cada conta — só uma vez no final.
@@ -254,6 +261,9 @@ const handleGlobalSync = async () => {
                 message: r.status === 'error' ? (r.message || 'Erro desconhecido') : ''
             });
         }
+
+        // Fecha o painel ao vivo antes de mostrar o resumo.
+        isSyncLiveOpen.value = false;
 
         if (masterTableRef.value && masterTableRef.value.fetchSales) {
            await masterTableRef.value.fetchSales();
@@ -286,6 +296,7 @@ const handleGlobalSync = async () => {
         };
         isSyncResultsModalOpen.value = true;
     } finally {
+        isSyncLiveOpen.value = false;
         isFetchingAccounts.value = false;
         syncState.value.isForced = false;
     }
