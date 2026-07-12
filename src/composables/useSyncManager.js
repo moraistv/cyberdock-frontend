@@ -168,6 +168,8 @@ export function useSyncManager() {
     let totalSkipped = 0;
     const results = new Array(total);
 
+    const batchStartedAt = Date.now();
+
     // Inicializa o estado ao vivo (uma linha por conta).
     liveAccounts.value = accounts.map((a) => ({
       mlAccountId: a.mlAccountId,
@@ -177,7 +179,8 @@ export function useSyncManager() {
       message: 'Na fila...',
       newSalesCount: 0,
       updatedCount: 0,
-      skippedCount: 0
+      skippedCount: 0,
+      durationMs: 0
     }));
 
     state.value = {
@@ -196,6 +199,7 @@ export function useSyncManager() {
         const idx = cursor++;
         const acc = accounts[idx];
         const live = liveAccounts.value[idx];
+        const accStartedAt = Date.now();
         live.status = 'syncing';
         live.message = 'Iniciando...';
         try {
@@ -210,24 +214,29 @@ export function useSyncManager() {
           totalNewSales += r?.newSalesCount || 0;
           totalUpdated += r?.updatedCount || 0;
           totalSkipped += r?.skippedCount || 0;
+          const durationMs = Date.now() - accStartedAt;
           live.status = 'done';
           live.progress = 100;
           live.newSalesCount = r?.newSalesCount || 0;
           live.updatedCount = r?.updatedCount || 0;
           live.skippedCount = r?.skippedCount || 0;
+          live.durationMs = durationMs;
           results[idx] = {
             ...acc,
             status: 'success',
             newSalesCount: r?.newSalesCount || 0,
             updatedCount: r?.updatedCount || 0,
-            skippedCount: r?.skippedCount || 0
+            skippedCount: r?.skippedCount || 0,
+            durationMs
           };
         } catch (err) {
+          const durationMs = Date.now() - accStartedAt;
           failed++;
           live.status = 'error';
           live.progress = 100;
           live.message = err.message || 'Erro desconhecido';
-          results[idx] = { ...acc, status: 'error', message: err.message || 'Erro desconhecido' };
+          live.durationMs = durationMs;
+          results[idx] = { ...acc, status: 'error', message: err.message || 'Erro desconhecido', durationMs };
         } finally {
           done++;
           state.value.progress = Math.floor((done / total) * 100);
@@ -252,7 +261,8 @@ export function useSyncManager() {
       summary: { total, successful, failed },
       totalNewSales,
       totalUpdated,
-      totalSkipped
+      totalSkipped,
+      totalDurationMs: Date.now() - batchStartedAt
     };
   };
 

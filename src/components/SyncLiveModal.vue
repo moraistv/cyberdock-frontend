@@ -1,5 +1,5 @@
 <template>
-    <UniversalModal :open="open" :title="title" :prevent-close="true" :show-close-button="false" :close-on-esc="false" :close-on-overlay="false" size="lg">
+    <UniversalModal :open="open" :title="title" :prevent-close="true" :show-close-button="false" :close-on-esc="false" :close-on-overlay="false" :lock-scroll="false" size="lg">
         <div class="live-content">
             <!-- Progresso geral -->
             <div class="live-overall">
@@ -31,7 +31,10 @@
                         </span>
                         <div class="live-account-info">
                             <span class="live-account-name">{{ acc.nickname }}</span>
-                            <span class="live-account-msg">{{ acc.message }}</span>
+                            <span class="live-account-msg">
+                                {{ acc.message }}
+                                <span v-if="(acc.status === 'done' || acc.status === 'error') && acc.durationMs" class="live-account-time"> · {{ fmtDuration(acc.durationMs) }}</span>
+                            </span>
                         </div>
                         <div class="live-account-badges" v-if="acc.status === 'done'">
                             <span class="live-badge is-new" v-if="acc.newSalesCount > 0">{{ acc.newSalesCount }} nova{{ acc.newSalesCount > 1 ? 's' : '' }}</span>
@@ -68,6 +71,15 @@ const overallProgress = computed(() => {
     const sum = props.accounts.reduce((acc, a) => acc + (a.progress || 0), 0);
     return Math.round(sum / props.accounts.length);
 });
+
+function fmtDuration(ms) {
+    if (!ms || ms < 0) return '';
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    const s = ms / 1000;
+    if (s < 60) return `${s.toFixed(1).replace('.', ',')}s`;
+    const m = Math.floor(s / 60);
+    return `${m}m ${String(Math.round(s % 60)).padStart(2, '0')}s`;
+}
 </script>
 
 <style scoped>
@@ -106,6 +118,7 @@ const overallProgress = computed(() => {
 .live-account-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .live-account-name { font-size: 14px; font-weight: 600; color: #0f172a; }
 .live-account-msg { font-size: 12px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live-account-time { color: #cbd5e1; font-weight: 600; }
 
 .live-account-badges { display: flex; gap: 6px; flex-shrink: 0; }
 .live-badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }

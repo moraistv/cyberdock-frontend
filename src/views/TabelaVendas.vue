@@ -419,6 +419,15 @@
                             <span class="sr-card-label">Sem alteração</span>
                         </div>
                     </div>
+                    <div class="sr-card is-time" v-if="syncResults.totalDurationMs">
+                        <span class="sr-card-icon is-time">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        </span>
+                        <div class="sr-card-body">
+                            <span class="sr-card-value sr-card-value-sm">{{ formatDuration(syncResults.totalDurationMs) }}</span>
+                            <span class="sr-card-label">Tempo total</span>
+                        </div>
+                    </div>
                     <div class="sr-card is-error" v-if="syncResults.summary.failed > 0">
                         <span class="sr-card-icon is-error">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
@@ -440,7 +449,7 @@
                         </span>
                         <div class="sr-account-info">
                             <span class="sr-account-name">{{ account.nickname }}</span>
-                            <span class="sr-account-id">ID {{ account.userId }}</span>
+                            <span class="sr-account-id">ID {{ account.userId }}<span v-if="account.durationMs" class="sr-account-time"> · {{ formatDuration(account.durationMs) }}</span></span>
                         </div>
                         <div class="sr-account-badges" v-if="account.status === 'success'">
                             <span class="sr-badge is-new" v-if="account.newSalesCount > 0">{{ account.newSalesCount }} nova{{ account.newSalesCount > 1 ? 's' : '' }}</span>
@@ -846,6 +855,17 @@ const syncResults = ref({
     }
 });
 
+// Formata duração em ms para algo legível (ex.: "820ms", "3,4s", "1m 05s").
+function formatDuration(ms) {
+    if (!ms || ms < 0) return '—';
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    const s = ms / 1000;
+    if (s < 60) return `${s.toFixed(1).replace('.', ',')}s`;
+    const m = Math.floor(s / 60);
+    const rem = Math.round(s % 60);
+    return `${m}m ${String(rem).padStart(2, '0')}s`;
+}
+
 // Contadores animados (count-up) do modal de resultados.
 const animatedStats = reactive({ contas: 0, novas: 0, atualizadas: 0, semAlteracao: 0, falhas: 0 });
 const displayStats = computed(() => ({
@@ -929,6 +949,7 @@ const handleSync = async () => {
                 newSalesCount: r.newSalesCount || 0,
                 updatedCount: r.updatedCount || 0,
                 skippedCount: r.skippedCount || 0,
+                durationMs: r.durationMs || 0,
                 message: r.status === 'error' ? (r.message || 'Erro desconhecido') : ''
             });
         }
@@ -953,7 +974,8 @@ const handleSync = async () => {
                 },
                 totalNewSales: totalNewSales,
                 totalUpdated: batch.totalUpdated,
-                totalSkipped: batch.totalSkipped
+                totalSkipped: batch.totalSkipped,
+                totalDurationMs: batch.totalDurationMs
             };
             isSyncResultsModalOpen.value = true;
         }
@@ -2340,4 +2362,10 @@ function hideTooltip() {
 .sr-badge.is-updated { background: #eff6ff; color: #2563eb; }
 .sr-badge.is-muted   { background: #f1f5f9; color: #64748b; }
 .sr-account-error { font-size: 13px; color: #b91c1c; text-align: right; }
+</style>
+
+<style scoped>
+.sr-card-icon.is-time { background: #fef3c7; color: #d97706; }
+.sr-card-value-sm { font-size: 19px; }
+.sr-account-time { color: #cbd5e1; font-weight: 500; }
 </style>

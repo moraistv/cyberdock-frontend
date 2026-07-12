@@ -88,6 +88,15 @@
                       <span class="sr-card-label">Sem alteração</span>
                   </div>
               </div>
+              <div class="sr-card is-time" v-if="syncResults.totalDurationMs">
+                  <span class="sr-card-icon is-time">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  </span>
+                  <div class="sr-card-body">
+                      <span class="sr-card-value sr-card-value-sm">{{ formatDuration(syncResults.totalDurationMs) }}</span>
+                      <span class="sr-card-label">Tempo total</span>
+                  </div>
+              </div>
               <div class="sr-card is-error" v-if="syncResults.summary.failed > 0">
                   <span class="sr-card-icon is-error">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
@@ -109,7 +118,7 @@
                   </span>
                   <div class="sr-account-info">
                       <span class="sr-account-name">{{ account.nickname }}</span>
-                      <span class="sr-account-id">ML {{ account.userId }}</span>
+                      <span class="sr-account-id">ML {{ account.userId }}<span v-if="account.durationMs" class="sr-account-time"> · {{ formatDuration(account.durationMs) }}</span></span>
                   </div>
                   <div class="sr-account-badges" v-if="account.status === 'success'">
                       <span class="sr-badge is-new" v-if="account.newSalesCount > 0">{{ account.newSalesCount }} nova{{ account.newSalesCount > 1 ? 's' : '' }}</span>
@@ -178,6 +187,16 @@ const relevantAccounts = computed(() =>
         a.status === 'error' || (a.newSalesCount || 0) > 0 || (a.updatedCount || 0) > 0
     )
 );
+
+function formatDuration(ms) {
+    if (!ms || ms < 0) return '—';
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    const s = ms / 1000;
+    if (s < 60) return `${s.toFixed(1).replace('.', ',')}s`;
+    const m = Math.floor(s / 60);
+    const rem = Math.round(s % 60);
+    return `${m}m ${String(rem).padStart(2, '0')}s`;
+}
 
 // Contadores animados (count-up) do modal global.
 const animatedStats = reactive({ contas: 0, novas: 0, atualizadas: 0, semAlteracao: 0, falhas: 0 });
@@ -258,6 +277,7 @@ const handleGlobalSync = async () => {
                 newSalesCount: r.newSalesCount || 0,
                 updatedCount: r.updatedCount || 0,
                 skippedCount: r.skippedCount || 0,
+                durationMs: r.durationMs || 0,
                 message: r.status === 'error' ? (r.message || 'Erro desconhecido') : ''
             });
         }
@@ -283,7 +303,8 @@ const handleGlobalSync = async () => {
             },
             totalNewSales: batch.totalNewSales,
             totalUpdated: batch.totalUpdated,
-            totalSkipped: batch.totalSkipped
+            totalSkipped: batch.totalSkipped,
+            totalDurationMs: batch.totalDurationMs
         };
         isSyncResultsModalOpen.value = true;
 
@@ -518,4 +539,10 @@ const handleGlobalSync = async () => {
     padding: 28px 16px; color: #64748b; text-align: center; font-size: 14px;
 }
 .sr-empty svg { width: 34px; height: 34px; color: #10b981; }
+</style>
+
+<style scoped>
+.sr-card-icon.is-time { background: #fef3c7; color: #d97706; }
+.sr-card-value-sm { font-size: 19px; }
+.sr-account-time { color: #cbd5e1; font-weight: 500; }
 </style>
