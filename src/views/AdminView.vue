@@ -255,7 +255,7 @@ const handleGlobalSync = async () => {
                 clientUid: account.uid,
                 daysToSync: null
             })),
-            { concurrency: 3 }
+            { concurrency: accounts.length }
         );
 
         successCount = batch.summary.successful;

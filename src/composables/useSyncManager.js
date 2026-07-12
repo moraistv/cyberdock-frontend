@@ -180,6 +180,8 @@ export function useSyncManager() {
       newSalesCount: 0,
       updatedCount: 0,
       skippedCount: 0,
+      workCompleted: 0,
+      workTotal: 0,
       durationMs: 0
     }));
 
@@ -209,6 +211,8 @@ export function useSyncManager() {
             if (data.newSalesCount !== undefined) live.newSalesCount = data.newSalesCount;
             if (data.updatedCount !== undefined) live.updatedCount = data.updatedCount;
             if (data.skippedCount !== undefined) live.skippedCount = data.skippedCount;
+            if (data.workCompleted !== undefined) live.workCompleted = data.workCompleted;
+            if (data.workTotal !== undefined) live.workTotal = data.workTotal;
           });
           successful++;
           totalNewSales += r?.newSalesCount || 0;

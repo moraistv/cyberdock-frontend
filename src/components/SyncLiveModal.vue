@@ -68,8 +68,16 @@ const doneCount = computed(() =>
 
 const overallProgress = computed(() => {
     if (!props.accounts.length) return 0;
-    const sum = props.accounts.reduce((acc, a) => acc + (a.progress || 0), 0);
-    return Math.round(sum / props.accounts.length);
+    if (doneCount.value === props.accounts.length) return 100;
+    const knownWork = props.accounts.filter(a => Number(a.workTotal) > 0);
+    const allDiscovered = knownWork.length === props.accounts.length;
+    const total = knownWork.reduce((sum, a) => sum + Number(a.workTotal || 0), 0);
+    const completed = knownWork.reduce((sum, a) => sum + Math.min(Number(a.workCompleted || 0), Number(a.workTotal || 0)), 0);
+    if (!total) return 0;
+    const calculated = Math.round((completed / total) * 100);
+    // Until every account reports its workload, never imply the global job is
+    // almost done. All accounts are started together, so discovery is brief.
+    return allDiscovered ? Math.min(doneCount.value < props.accounts.length ? 99 : 100, calculated) : Math.min(90, calculated);
 });
 
 function fmtDuration(ms) {
