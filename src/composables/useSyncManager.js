@@ -68,18 +68,20 @@ export function useSyncManager() {
             .then(() => {
               const sseUrl = `${API_BASE_URL}/sales/sync-status/${clientId}?token=${encodeURIComponent(token.value)}&mlAccountId=${encodeURIComponent(mlAccountId)}`;
               es = new window.EventSource(sseUrl);
-              let lastCount = 0;
+              const metrics = { newSalesCount: 0, updatedCount: 0, skippedCount: 0 };
 
               es.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                if (data.newSalesCount !== undefined) lastCount = data.newSalesCount;
+                if (data.newSalesCount !== undefined) metrics.newSalesCount = data.newSalesCount;
+                if (data.updatedCount !== undefined) metrics.updatedCount = data.updatedCount;
+                if (data.skippedCount !== undefined) metrics.skippedCount = data.skippedCount;
                 if (typeof onProgress === 'function') {
                   onProgress({ ...data, accountNickname, mlAccountId });
                 }
                 if (data.progress === 100) {
                   if (es) es.close();
                   if (data.type === 'error') reject(new Error(data.message));
-                  else resolve({ newSalesCount: lastCount });
+                  else resolve({ ...metrics });
                 }
               };
 
@@ -158,6 +160,8 @@ export function useSyncManager() {
     let successful = 0;
     let failed = 0;
     let totalNewSales = 0;
+    let totalUpdated = 0;
+    let totalSkipped = 0;
     const results = new Array(total);
 
     state.value = {
@@ -179,7 +183,15 @@ export function useSyncManager() {
           const r = await runSingleSync(acc.mlAccountId, acc.accountNickname, acc.clientUid ?? null, acc.daysToSync ?? null);
           successful++;
           totalNewSales += r?.newSalesCount || 0;
-          results[idx] = { ...acc, status: 'success', newSalesCount: r?.newSalesCount || 0 };
+          totalUpdated += r?.updatedCount || 0;
+          totalSkipped += r?.skippedCount || 0;
+          results[idx] = {
+            ...acc,
+            status: 'success',
+            newSalesCount: r?.newSalesCount || 0,
+            updatedCount: r?.updatedCount || 0,
+            skippedCount: r?.skippedCount || 0
+          };
         } catch (err) {
           failed++;
           results[idx] = { ...acc, status: 'error', message: err.message || 'Erro desconhecido' };
@@ -205,7 +217,9 @@ export function useSyncManager() {
     return {
       results,
       summary: { total, successful, failed },
-      totalNewSales
+      totalNewSales,
+      totalUpdated,
+      totalSkipped
     };
   };
 
