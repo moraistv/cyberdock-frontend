@@ -49,50 +49,85 @@
           <div v-if="syncResults.message" class="sync-message" :class="syncResults.type">
               {{ syncResults.message }}
           </div>
-          
-          <div v-if="syncResults.accounts.length > 0" class="sync-summary">
-              <div class="summary-stats">
-                  <div class="stat-item">
-                      <span class="stat-label">Total G./Contas</span>
-                      <span class="stat-value">{{ syncResults.summary.total }}</span>
+
+          <!-- Cartões de resumo -->
+          <div v-if="syncResults.accounts.length > 0" class="sr-stats">
+              <div class="sr-card">
+                  <span class="sr-card-icon is-accounts">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  </span>
+                  <div class="sr-card-body">
+                      <span class="sr-card-value">{{ displayStats.contas }}</span>
+                      <span class="sr-card-label">Contas</span>
                   </div>
-                  <div class="stat-item success" v-if="syncResults.summary.successful > 0">
-                      <span class="stat-label">Sucesso</span>
-                      <span class="stat-value">{{ syncResults.summary.successful }}</span>
+              </div>
+              <div class="sr-card is-new">
+                  <span class="sr-card-icon is-new">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  </span>
+                  <div class="sr-card-body">
+                      <span class="sr-card-value">{{ displayStats.novas }}</span>
+                      <span class="sr-card-label">Vendas novas</span>
                   </div>
-                  <div class="stat-item error" v-if="syncResults.summary.failed > 0">
-                      <span class="stat-label">Falhas</span>
-                      <span class="stat-value">{{ syncResults.summary.failed }}</span>
+              </div>
+              <div class="sr-card is-updated">
+                  <span class="sr-card-icon is-updated">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                  </span>
+                  <div class="sr-card-body">
+                      <span class="sr-card-value">{{ displayStats.atualizadas }}</span>
+                      <span class="sr-card-label">Atualizadas</span>
                   </div>
-                  <div class="stat-item" v-if="syncResults.totalNewSales !== undefined">
-                      <span class="stat-label">Novas Vendas (Total)</span>
-                      <span class="stat-value">{{ syncResults.totalNewSales }}</span>
+              </div>
+              <div class="sr-card is-muted">
+                  <span class="sr-card-icon is-muted">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </span>
+                  <div class="sr-card-body">
+                      <span class="sr-card-value">{{ displayStats.semAlteracao }}</span>
+                      <span class="sr-card-label">Sem alteração</span>
+                  </div>
+              </div>
+              <div class="sr-card is-error" v-if="syncResults.summary.failed > 0">
+                  <span class="sr-card-icon is-error">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                  </span>
+                  <div class="sr-card-body">
+                      <span class="sr-card-value">{{ displayStats.falhas }}</span>
+                      <span class="sr-card-label">Falharam</span>
                   </div>
               </div>
           </div>
-          
-          <div v-if="syncResults.accounts.length > 0" class="accounts-details">
-              <h4 class="modal-subtitle">📊 Detalhes do Processamento Massivo</h4>
-              <div class="accounts-list">
-                  <div v-for="account in syncResults.accounts" :key="account.userId" class="account-item" :class="account.status">
-                      <div class="account-header">
-                          <div class="account-info">
-                              <span class="account-icon" v-if="account.status === 'success'">✅</span>
-                              <span class="account-icon" v-else>❌</span>
-                              <div class="account-details">
-                                  <span class="account-nickname">{{ account.nickname }}</span>
-                                  <small class="account-id">(Client UID: {{ account.uid }} | ML: {{ account.userId }})</small>
-                              </div>
-                          </div>
-                      </div>
-                      <div class="account-message" v-if="account.message">
-                          {{ account.message }}
-                      </div>
+
+          <!-- Detalhes só das contas que tiveram novidade/erro -->
+          <div v-if="relevantAccounts.length > 0" class="sr-accounts">
+              <h4 class="sr-subtitle">Contas com novidade</h4>
+              <div class="sr-account" v-for="account in relevantAccounts" :key="account.userId" :class="account.status">
+                  <span class="sr-account-status" :class="account.status">
+                      <svg v-if="account.status === 'success'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                      <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                  </span>
+                  <div class="sr-account-info">
+                      <span class="sr-account-name">{{ account.nickname }}</span>
+                      <span class="sr-account-id">ML {{ account.userId }}</span>
+                  </div>
+                  <div class="sr-account-badges" v-if="account.status === 'success'">
+                      <span class="sr-badge is-new" v-if="account.newSalesCount > 0">{{ account.newSalesCount }} nova{{ account.newSalesCount > 1 ? 's' : '' }}</span>
+                      <span class="sr-badge is-updated" v-if="account.updatedCount > 0">{{ account.updatedCount }} atualizada{{ account.updatedCount > 1 ? 's' : '' }}</span>
+                  </div>
+                  <div class="sr-account-badges" v-else>
+                      <span class="sr-account-error">{{ account.message }}</span>
                   </div>
               </div>
+          </div>
+
+          <!-- Quando nada mudou em conta nenhuma -->
+          <div v-else-if="syncResults.accounts.length > 0" class="sr-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <span>Tudo em dia. Nenhuma conta teve venda nova ou alteração.</span>
           </div>
       </div>
-      
+
       <template #footer>
           <button @click="isSyncResultsModalOpen = false" class="btn btn-primary">
               Fechar
@@ -106,7 +141,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
+import gsap from 'gsap';
 import SidebarComponent from '../components/SidebarComponent.vue';
 import TopbarComponent from '../components/TopbarComponent.vue';
 import MasterSalesTable from '../components/MasterSalesTable.vue';
@@ -129,6 +165,42 @@ const syncResults = ref({
     accounts: [],
     summary: { total: 0, successful: 0, failed: 0 },
     totalNewSales: 0
+});
+
+// Só mostra no detalhamento as contas que realmente tiveram algo (venda nova,
+// atualização) ou que falharam. Contas sem novidade não poluem o modal.
+const relevantAccounts = computed(() =>
+    (syncResults.value.accounts || []).filter(a =>
+        a.status === 'error' || (a.newSalesCount || 0) > 0 || (a.updatedCount || 0) > 0
+    )
+);
+
+// Contadores animados (count-up) do modal global.
+const animatedStats = reactive({ contas: 0, novas: 0, atualizadas: 0, semAlteracao: 0, falhas: 0 });
+const displayStats = computed(() => ({
+    contas: Math.round(animatedStats.contas),
+    novas: Math.round(animatedStats.novas),
+    atualizadas: Math.round(animatedStats.atualizadas),
+    semAlteracao: Math.round(animatedStats.semAlteracao),
+    falhas: Math.round(animatedStats.falhas),
+}));
+
+watch(isSyncResultsModalOpen, (open) => {
+    if (!open) return;
+    animatedStats.contas = 0;
+    animatedStats.novas = 0;
+    animatedStats.atualizadas = 0;
+    animatedStats.semAlteracao = 0;
+    animatedStats.falhas = 0;
+    gsap.to(animatedStats, {
+        contas: syncResults.value.summary?.total || 0,
+        novas: syncResults.value.totalNewSales || 0,
+        atualizadas: syncResults.value.totalUpdated || 0,
+        semAlteracao: syncResults.value.totalSkipped || 0,
+        falhas: syncResults.value.summary?.failed || 0,
+        duration: 0.9,
+        ease: 'power2.out'
+    });
 });
 
 const handleGlobalSync = async () => {
@@ -176,9 +248,10 @@ const handleGlobalSync = async () => {
                 userId: r.mlAccountId,
                 uid: r.clientUid,
                 status: r.status,
-                message: r.status === 'success'
-                    ? `Sincronizada. Novas vendas nesta conta: ${r.newSalesCount || 0}`
-                    : (r.message || 'Erro desconhecido')
+                newSalesCount: r.newSalesCount || 0,
+                updatedCount: r.updatedCount || 0,
+                skippedCount: r.skippedCount || 0,
+                message: r.status === 'error' ? (r.message || 'Erro desconhecido') : ''
             });
         }
 
@@ -189,9 +262,8 @@ const handleGlobalSync = async () => {
            window.dispatchEvent(new Event('reload-master-sales'));
         }
 
-        // Exibe modal apenas se processou várias (ou com erro/sucesso)
         syncResults.value = {
-            title: errorCount > 0 ? 'Sincronização Global Finalizada com Problemas' : 'Sincronização Global Finalizada',
+            title: errorCount > 0 ? 'Sincronização global finalizada com problemas' : 'Sincronização global finalizada',
             type: errorCount > 0 ? 'warning' : 'success',
             accounts: accountResults,
             summary: {
@@ -199,7 +271,9 @@ const handleGlobalSync = async () => {
                 successful: successCount,
                 failed: errorCount
             },
-            totalNewSales: batch.totalNewSales
+            totalNewSales: batch.totalNewSales,
+            totalUpdated: batch.totalUpdated,
+            totalSkipped: batch.totalSkipped
         };
         isSyncResultsModalOpen.value = true;
 
@@ -362,4 +436,75 @@ const handleGlobalSync = async () => {
     padding: 0.1rem 0.4rem;
     border-radius: 9999px;
 }
+</style>
+
+<style scoped>
+/* ===== Modal de sincronização global (mesmo padrão profissional) ===== */
+.sync-results-content { display: flex; flex-direction: column; gap: 20px; font-family: 'Inter', system-ui, sans-serif; }
+
+.sync-message {
+    padding: 12px 16px; border-radius: 10px; font-size: 14px; line-height: 1.5;
+    background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0;
+}
+.sync-message.warning { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+.sync-message.error   { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+.sync-message.success { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+
+.sr-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+.sr-card {
+    display: flex; align-items: center; gap: 12px; padding: 16px 14px;
+    background: #fff; border: 1px solid #eef0f4; border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(16,24,40,0.04);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    animation: sr-pop .35s ease both;
+}
+.sr-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(16,24,40,0.08); border-color: #e2e8f0; }
+@keyframes sr-pop { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+
+.sr-card-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+    background: #eef2ff; color: #4f46e5;
+}
+.sr-card-icon svg { width: 20px; height: 20px; }
+.sr-card-icon.is-new     { background: #ecfdf5; color: #059669; }
+.sr-card-icon.is-updated { background: #eff6ff; color: #2563eb; }
+.sr-card-icon.is-muted   { background: #f1f5f9; color: #64748b; }
+.sr-card-icon.is-error   { background: #fef2f2; color: #dc2626; }
+
+.sr-card-body { display: flex; flex-direction: column; line-height: 1.1; }
+.sr-card-value { font-size: 24px; font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.sr-card-label { font-size: 12px; color: #64748b; margin-top: 3px; font-weight: 500; }
+
+.sr-subtitle { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #64748b; margin: 0 0 10px; }
+.sr-accounts { max-height: 320px; overflow-y: auto; padding-right: 4px; }
+.sr-account {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+    border: 1px solid #eef0f4; border-radius: 12px; margin-bottom: 8px; background: #fff;
+    transition: background .15s ease, box-shadow .15s ease;
+}
+.sr-account:hover { box-shadow: 0 4px 14px rgba(16,24,40,0.06); }
+.sr-account.success { border-left: 3px solid #10b981; }
+.sr-account.error   { border-left: 3px solid #ef4444; background: #fef2f2; }
+
+.sr-account-status { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.sr-account-status svg { width: 22px; height: 22px; }
+.sr-account-status.success { color: #10b981; }
+.sr-account-status.error   { color: #ef4444; }
+
+.sr-account-info { display: flex; flex-direction: column; min-width: 0; }
+.sr-account-name { font-size: 14px; font-weight: 600; color: #0f172a; }
+.sr-account-id { font-size: 12px; color: #94a3b8; }
+
+.sr-account-badges { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.sr-badge { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.sr-badge.is-new     { background: #ecfdf5; color: #059669; }
+.sr-badge.is-updated { background: #eff6ff; color: #2563eb; }
+.sr-account-error { font-size: 13px; color: #b91c1c; text-align: right; }
+
+.sr-empty {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 28px 16px; color: #64748b; text-align: center; font-size: 14px;
+}
+.sr-empty svg { width: 34px; height: 34px; color: #10b981; }
 </style>
