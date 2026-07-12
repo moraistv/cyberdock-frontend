@@ -388,7 +388,7 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                         </span>
                         <div class="sr-card-body">
-                            <span class="sr-card-value">{{ syncResults.summary.total }}</span>
+                            <span class="sr-card-value">{{ displayStats.contas }}</span>
                             <span class="sr-card-label">Contas</span>
                         </div>
                     </div>
@@ -397,7 +397,7 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         </span>
                         <div class="sr-card-body">
-                            <span class="sr-card-value">{{ syncResults.totalNewSales || 0 }}</span>
+                            <span class="sr-card-value">{{ displayStats.novas }}</span>
                             <span class="sr-card-label">Vendas novas</span>
                         </div>
                     </div>
@@ -406,7 +406,7 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                         </span>
                         <div class="sr-card-body">
-                            <span class="sr-card-value">{{ syncResults.totalUpdated || 0 }}</span>
+                            <span class="sr-card-value">{{ displayStats.atualizadas }}</span>
                             <span class="sr-card-label">Atualizadas</span>
                         </div>
                     </div>
@@ -415,7 +415,7 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                         </span>
                         <div class="sr-card-body">
-                            <span class="sr-card-value">{{ syncResults.totalSkipped || 0 }}</span>
+                            <span class="sr-card-value">{{ displayStats.semAlteracao }}</span>
                             <span class="sr-card-label">Sem alteração</span>
                         </div>
                     </div>
@@ -424,7 +424,7 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                         </span>
                         <div class="sr-card-body">
-                            <span class="sr-card-value">{{ syncResults.summary.failed }}</span>
+                            <span class="sr-card-value">{{ displayStats.falhas }}</span>
                             <span class="sr-card-label">Falharam</span>
                         </div>
                     </div>
@@ -839,6 +839,35 @@ const syncResults = ref({
         successful: 0,
         failed: 0
     }
+});
+
+// Contadores animados (count-up) do modal de resultados.
+const animatedStats = reactive({ contas: 0, novas: 0, atualizadas: 0, semAlteracao: 0, falhas: 0 });
+const displayStats = computed(() => ({
+    contas: Math.round(animatedStats.contas),
+    novas: Math.round(animatedStats.novas),
+    atualizadas: Math.round(animatedStats.atualizadas),
+    semAlteracao: Math.round(animatedStats.semAlteracao),
+    falhas: Math.round(animatedStats.falhas),
+}));
+
+watch(isSyncResultsModalOpen, (open) => {
+    if (!open) return;
+    // Zera e faz o count-up suave dos números ao abrir o modal.
+    animatedStats.contas = 0;
+    animatedStats.novas = 0;
+    animatedStats.atualizadas = 0;
+    animatedStats.semAlteracao = 0;
+    animatedStats.falhas = 0;
+    gsap.to(animatedStats, {
+        contas: syncResults.value.summary?.total || 0,
+        novas: syncResults.value.totalNewSales || 0,
+        atualizadas: syncResults.value.totalUpdated || 0,
+        semAlteracao: syncResults.value.totalSkipped || 0,
+        falhas: syncResults.value.summary?.failed || 0,
+        duration: 0.9,
+        ease: 'power2.out'
+    });
 });
 
 const handleSync = async () => {
@@ -2198,10 +2227,22 @@ function hideTooltip() {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 14px;
+    padding: 16px 14px;
     background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
+    border: 1px solid #eef0f4;
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    animation: sr-pop 0.35s ease both;
+}
+.sr-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(16, 24, 40, 0.08);
+    border-color: #e2e8f0;
+}
+@keyframes sr-pop {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 .sr-card-icon {
     display: inline-flex;
@@ -2221,8 +2262,15 @@ function hideTooltip() {
 .sr-card-icon.is-error   { background: #fef2f2; color: #dc2626; }
 
 .sr-card-body { display: flex; flex-direction: column; line-height: 1.1; }
-.sr-card-value { font-size: 22px; font-weight: 700; color: #0f172a; }
-.sr-card-label { font-size: 12px; color: #64748b; margin-top: 2px; }
+.sr-card-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    letter-spacing: -0.02em;
+}
+.sr-card-label { font-size: 12px; color: #64748b; margin-top: 3px; font-weight: 500; }
 
 /* Lista por conta */
 .sr-subtitle {
@@ -2238,11 +2286,13 @@ function hideTooltip() {
     align-items: center;
     gap: 12px;
     padding: 12px 14px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid #eef0f4;
     border-radius: 12px;
     margin-bottom: 8px;
     background: #fff;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
 }
+.sr-account:hover { box-shadow: 0 4px 14px rgba(16, 24, 40, 0.06); }
 .sr-account.success { border-left: 3px solid #10b981; }
 .sr-account.error   { border-left: 3px solid #ef4444; background: #fef2f2; }
 
