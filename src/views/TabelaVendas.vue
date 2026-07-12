@@ -12,13 +12,6 @@
                         </p>
                     </div>
                                     <div class="header-buttons">
-                    <select v-model="syncTimeframe" class="sync-time-select" :disabled="syncState.isSyncing || isFetchingAccounts">
-                        <option value="1">Últimas 24 horas</option>
-                        <option value="3">Últimos 3 dias</option>
-                        <option value="7">Últimos 7 dias</option>
-                        <option value="30">Últimos 30 dias</option>
-                        <option value="180">Sincronizar Tudo (180 dias)</option>
-                    </select>
                     <button @click="handleUnifiedSync" :disabled="syncState.isSyncing || isFetchingAccounts"
                         :class="['btn', 'sync-btn', 'btn-primary']" 
                         title="Clique para sincronizar vendas">
@@ -934,7 +927,7 @@ const handleSync = async () => {
                 mlAccountId: account.user_id,
                 accountNickname: account.nickname,
                 clientUid: null,
-                daysToSync: syncTimeframe.value
+                daysToSync: null
             })),
             { concurrency: 3 }
         );

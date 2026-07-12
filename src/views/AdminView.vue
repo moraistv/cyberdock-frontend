@@ -11,13 +11,6 @@
             <p class="subtitle">Visão global e unificada de todas as vendas de todos os clientes.</p>
           </div>
           <div class="header-actions">
-            <select v-model="syncTimeframe" class="sync-time-select" :disabled="syncState.isSyncing || isFetchingAccounts">
-                <option value="1">Último dia</option>
-                <option value="3">Últimos 3 dias</option>
-                <option value="7">Últimos 7 dias</option>
-                <option value="30">Últimos 30 dias</option>
-                <option value="180">Sincronizar Tudo (180 dias)</option>
-            </select>
             <button @click="handleGlobalSync" :disabled="syncState.isSyncing || isFetchingAccounts"
                 :class="['btn', 'sync-btn', 'btn-primary']" 
                 title="Sincronizar massivamente todas as contas do sistema">
@@ -170,7 +163,6 @@ const masterTableRef = ref(null);
 const isFetchingAccounts = ref(false);
 const isSyncResultsModalOpen = ref(false);
 const isSyncLiveOpen = ref(false);
-const syncTimeframe = ref('3');
 
 const syncResults = ref({
     title: '',
@@ -261,7 +253,7 @@ const handleGlobalSync = async () => {
                 mlAccountId: account.user_id,
                 accountNickname: account.nickname,
                 clientUid: account.uid,
-                daysToSync: syncTimeframe.value
+                daysToSync: null
             })),
             { concurrency: 3 }
         );
