@@ -616,7 +616,6 @@ const shippingModeOptions = [
     { value: 'Agência', label: 'Agência' },
     { value: 'Coleta', label: 'Coleta' },
     { value: 'Envio Padrão', label: 'Envio Padrão' },
-    { value: 'Outros', label: 'Outros' },
 ];
 
 function toggleShippingMode(mode) {
