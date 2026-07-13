@@ -43,6 +43,22 @@ export function useLabels() {
     const sellerId = sale?.seller_id ?? raw?.seller?.id ?? raw?.seller_id;
     const shipmentIdRaw = raw?.shipping?.id ?? raw?.shipment_id ?? sale?.shipment_id;
 
+    // FULL (fulfillment): o vendedor NÃO imprime etiqueta — o Mercado Livre
+    // expede. Então não oferecemos os botões de etiqueta para esses pedidos.
+    const logisticType = String(raw?.shipping?.logistic_type || '').toLowerCase();
+    const modeStr = String(sale?.shipping_mode || '').toLowerCase();
+    const tags = Array.isArray(raw?.tags) ? raw.tags : [];
+    const isFull = logisticType === 'fulfillment' || modeStr.includes('full') || tags.includes('fulfillment');
+    if (isFull) {
+      return {
+        canPrint: false,
+        shipmentId: null,
+        sellerId: null,
+        status: status || 'full',
+        reason: 'Envio FULL — etiqueta gerada pelo Mercado Livre',
+      };
+    }
+
     // normaliza shipment id (remove .0 se vier de XLS/planilha)
     const shipmentId = shipmentIdRaw ? String(shipmentIdRaw).split('.')[0] : null;
 
