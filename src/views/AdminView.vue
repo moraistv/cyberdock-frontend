@@ -28,7 +28,18 @@
                     {{ syncState.newSalesCount }}
                 </span>
             </button>
+
+            <button @click="handleFixShippingModes" :disabled="fixState.running || syncState.isSyncing || isFetchingAccounts"
+                class="btn btn-fix" title="Revisa e corrige a modalidade de envio (Outros e FULL classificado errado)">
+                <svg v-if="fixState.running" class="sync-spinner" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                <span v-if="fixState.running">Corrigindo... {{ fixState.fixed }}</span>
+                <span v-else>Corrigir modalidades</span>
+            </button>
           </div>
+        </div>
+
+        <div v-if="fixState.message" class="fix-banner" :class="{ done: !fixState.running }">
+            {{ fixState.message }}
         </div>
 
         <div class="table-card">
@@ -208,6 +219,43 @@ watch(isSyncResultsModalOpen, (open) => {
         ease: 'power2.out'
     });
 });
+
+// Correção de modalidades: revisa vendas "Outros"/nula E "FULL" classificado
+// errado (marcado FULL mas sem logistic_type=fulfillment de verdade, ex.: FLEX
+// com pack_order). Roda o endpoint em lotes, mostrando o progresso.
+const fixState = ref({ running: false, fixed: 0, remaining: null, message: '' });
+
+const handleFixShippingModes = async () => {
+    if (fixState.value.running) return;
+    fixState.value = { running: true, fixed: 0, remaining: null, message: 'Iniciando correção de modalidades...' };
+    try {
+        let totalFixed = 0;
+        let rounds = 0;
+        const maxRounds = 1000;
+        while (rounds < maxRounds) {
+            rounds++;
+            const r = await api.get('/sales/fix-shipping-modes?limit=500');
+            const fixed = r?.fixed || 0;
+            totalFixed += fixed;
+            fixState.value.fixed = totalFixed;
+            fixState.value.remaining = r?.totalRemaining ?? null;
+            fixState.value.message = `Corrigindo... ${totalFixed} corrigida(s). Restam ~${Math.max(0, (r?.totalRemaining || 0))}.`;
+            if (!r || r.processed === 0 || fixed === 0) break;
+        }
+        fixState.value.running = false;
+        fixState.value.message = totalFixed > 0
+            ? `Concluído. ${totalFixed} venda(s) tiveram a modalidade corrigida.`
+            : 'Nada para corrigir.';
+        if (masterTableRef.value && masterTableRef.value.fetchSales) {
+            await masterTableRef.value.fetchSales();
+        } else {
+            window.dispatchEvent(new Event('reload-master-sales'));
+        }
+    } catch (e) {
+        fixState.value.running = false;
+        fixState.value.message = `Erro ao corrigir modalidades: ${e?.message || 'desconhecido'}`;
+    }
+};
 
 const handleGlobalSync = async () => {
     isFetchingAccounts.value = true;
@@ -528,4 +576,18 @@ const handleGlobalSync = async () => {
 .sr-card-icon.is-time { background: #fef3c7; color: #d97706; }
 .sr-card-value-sm { font-size: 19px; }
 .sr-account-time { color: #cbd5e1; font-weight: 500; }
+
+.btn-fix {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #fff; color: #b45309; border: 1px solid #fcd34d;
+    border-radius: 10px; padding: 0 14px; height: 40px; font-weight: 600;
+    cursor: pointer; transition: background .15s ease, box-shadow .15s ease;
+}
+.btn-fix:hover:not(:disabled) { background: #fffbeb; box-shadow: 0 4px 12px rgba(180,131,9,0.15); }
+.btn-fix:disabled { opacity: .6; cursor: default; }
+.fix-banner {
+    margin: 10px 0 0; padding: 10px 14px; border-radius: 10px;
+    background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 14px;
+}
+.fix-banner.done { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
 </style>
