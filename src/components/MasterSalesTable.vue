@@ -188,19 +188,21 @@
                         <span v-else-if="selectedSaleIds.size > 0">Processar {{ selectedSaleIds.size }} Selecionadas</span>
                         <span v-else>Processar Vendas Filtradas</span>
                     </button>
-                    <div v-if="selectedSaleIds.size > 0" class="batch-action-bar">
-                        <span class="batch-action-text">{{ selectedSaleIds.size }} selecionadas</span>
+                    <div class="batch-action-bar">
                         <button @click="selectAll" class="btn-text" :disabled="isProcessing || isPrinting">Selecionar Todas</button>
-                        <button @click="deselectAll" class="btn-text" :disabled="isProcessing || isPrinting">Desmarcar</button>
-                        <span class="batch-action-sep">|</span>
-                        <button @click="printSelectedLabels('pdf')" class="btn btn-label pdf" :disabled="isProcessing || isPrinting" title="Imprimir etiquetas PDF das selecionadas">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                            {{ isPrinting ? 'Gerando...' : 'Imprimir PDF' }}
-                        </button>
-                        <button @click="printSelectedLabels('zpl')" class="btn btn-label zpl" :disabled="isProcessing || isPrinting" title="Imprimir etiquetas ZPL das selecionadas">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
-                            {{ isPrinting ? 'Gerando...' : 'Imprimir ZPL' }}
-                        </button>
+                        <button @click="deselectAll" class="btn-text" :disabled="(isProcessing || isPrinting) || selectedSaleIds.size === 0">Desmarcar</button>
+                        <template v-if="selectedSaleIds.size > 0">
+                            <span class="batch-action-sep">|</span>
+                            <span class="batch-action-text">{{ selectedSaleIds.size }} selecionada(s)</span>
+                            <button @click="printSelectedLabels('pdf')" class="btn btn-label pdf" :disabled="isProcessing || isPrinting" title="Imprimir etiquetas PDF das selecionadas">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                                {{ isPrinting ? 'Gerando...' : 'Imprimir PDF' }}
+                            </button>
+                            <button @click="printSelectedLabels('zpl')" class="btn btn-label zpl" :disabled="isProcessing || isPrinting" title="Imprimir etiquetas ZPL das selecionadas">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
+                                {{ isPrinting ? 'Gerando...' : 'Imprimir ZPL' }}
+                            </button>
+                        </template>
                     </div>
                 </div>
             </div>
