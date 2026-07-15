@@ -190,8 +190,17 @@
                     </button>
                     <div v-if="selectedSaleIds.size > 0" class="batch-action-bar">
                         <span class="batch-action-text">{{ selectedSaleIds.size }} selecionadas</span>
-                        <button @click="selectAll" class="btn-text" :disabled="isProcessing">Selecionar Todas</button>
-                        <button @click="deselectAll" class="btn-text" :disabled="isProcessing">Desmarcar</button>
+                        <button @click="selectAll" class="btn-text" :disabled="isProcessing || isPrinting">Selecionar Todas</button>
+                        <button @click="deselectAll" class="btn-text" :disabled="isProcessing || isPrinting">Desmarcar</button>
+                        <span class="batch-action-sep">|</span>
+                        <button @click="printSelectedLabels('pdf')" class="btn btn-label pdf" :disabled="isProcessing || isPrinting" title="Imprimir etiquetas PDF das selecionadas">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                            {{ isPrinting ? 'Gerando...' : 'Imprimir PDF' }}
+                        </button>
+                        <button @click="printSelectedLabels('zpl')" class="btn btn-label zpl" :disabled="isProcessing || isPrinting" title="Imprimir etiquetas ZPL das selecionadas">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
+                            {{ isPrinting ? 'Gerando...' : 'Imprimir ZPL' }}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -224,12 +233,12 @@
                         
                         <div class="sale-card__layout">
                             <!-- Chceckbox para lote -->
-                            <div v-if="!sale.processed_at && sale.is_sku_mapped" class="sale-card__checkbox-container" @click.stop>
+                            <div v-if="isSelectable(sale)" class="sale-card__checkbox-container" @click.stop>
                                 <input type="checkbox" 
                                        :checked="selectedSaleIds.has(getSaleKey(sale))" 
                                        @change="toggleSaleSelection(sale)" 
                                        class="sale-card__checkbox"
-                                       :disabled="isProcessing">
+                                       :disabled="isProcessing || isPrinting">
                             </div>
                             
                             <!-- Thumbnail do Produto -->
@@ -526,8 +535,9 @@ const {
 } = useMasterSales();
 
 const { systemStatuses } = useSystemStatus();
-const { downloadLabel, getLabelInfo: composableLabelInfo } = useLabels();
+const { downloadLabel, downloadLabelsForSales, getLabelInfo: composableLabelInfo } = useLabels();
 const labelError = ref(null);
+const isPrinting = ref(false);
 
 async function handleDownloadLabel(shipmentId, sellerId, type) {
     labelError.value = null;
@@ -536,6 +546,68 @@ async function handleDownloadLabel(shipmentId, sellerId, type) {
     } catch (err) {
         labelError.value = err?.message || 'Não foi possível baixar a etiqueta. Tente novamente.';
         setTimeout(() => { labelError.value = null; }, 8000);
+    }
+}
+
+/**
+ * Imprime etiquetas EM MASSA das vendas selecionadas.
+ * - Coleta as selecionadas, filtra somente as imprimíveis (exclui FULL e status finais).
+ * - Agrupa por seller e baixa 1 arquivo por conta (backend junta num PDF/ZPL só).
+ * - Mostra um resumo do que foi impresso e do que foi pulado.
+ */
+async function printSelectedLabels(type = 'pdf') {
+    if (isPrinting.value || isProcessing.value) return;
+
+    // 1) Coleta as vendas selecionadas a partir da lista atual.
+    const selected = sales.value.filter(sale => selectedSaleIds.has(getSaleKey(sale)));
+    if (selected.length === 0) {
+        summaryModalTitle.value = 'Nenhuma Venda Selecionada';
+        summaryModalContent.value = '<p>Selecione ao menos uma venda para imprimir etiquetas.</p>';
+        isSummaryModalOpen.value = true;
+        return;
+    }
+
+    // 2) Separa imprimíveis dos não-imprimíveis (FULL, enviadas, entregues, canceladas...).
+    const printable = [];
+    const skipped = [];
+    for (const sale of selected) {
+        const info = getLabelInfo(sale);
+        if (info.canPrint && info.shipmentId && info.sellerId) {
+            printable.push({ seller_id: info.sellerId, shipment_id: info.shipmentId, sku: sale.sku });
+        } else {
+            skipped.push({ sku: sale.sku || sale.id, reason: info.reason || 'Não imprimível' });
+        }
+    }
+
+    if (printable.length === 0) {
+        const list = skipped.slice(0, 20).map(s => `<li><strong>${s.sku}</strong>: ${s.reason}</li>`).join('');
+        summaryModalTitle.value = 'Nenhuma Etiqueta Imprimível';
+        summaryModalContent.value = `<p>Nenhuma das ${selected.length} vendas selecionadas pode ser impressa.</p><ul>${list}</ul>`;
+        isSummaryModalOpen.value = true;
+        return;
+    }
+
+    // 3) Baixa em lote (agrupado por seller pelo composable).
+    isPrinting.value = true;
+    labelError.value = null;
+    try {
+        await downloadLabelsForSales(printable, type);
+
+        const sellers = new Set(printable.map(p => p.seller_id));
+        let msg = `<div class="summary-section success"><h4>Etiquetas geradas</h4><p><strong>${printable.length}</strong> etiqueta(s) (${type.toUpperCase()}) em <strong>${sellers.size}</strong> arquivo(s), um por conta.</p></div>`;
+        if (skipped.length > 0) {
+            const list = skipped.slice(0, 20).map(s => `<li><strong>${s.sku}</strong>: ${s.reason}</li>`).join('');
+            msg += `<div class="summary-section failed"><h4>${skipped.length} venda(s) pulada(s)</h4><ul>${list}</ul></div>`;
+        }
+        summaryModalTitle.value = 'Impressão em Massa';
+        summaryModalContent.value = msg;
+        isSummaryModalOpen.value = true;
+    } catch (err) {
+        summaryModalTitle.value = 'Erro na Impressão em Massa';
+        summaryModalContent.value = `<p class="error-text">${err?.message || 'Falha ao gerar etiquetas em lote.'}</p>`;
+        isSummaryModalOpen.value = true;
+    } finally {
+        isPrinting.value = false;
     }
 }
 
@@ -560,6 +632,12 @@ const processableSales = computed(() => {
     return sales.value.filter(sale => !sale.processed_at && sale.is_sku_mapped);
 });
 
+// Uma venda é selecionável se for processável (estoque) OU imprimível (etiqueta).
+function isSelectable(sale) {
+    if (!sale.processed_at && sale.is_sku_mapped) return true;
+    try { return getLabelInfo(sale).canPrint; } catch { return false; }
+}
+
 // Selection methods
 function toggleSaleSelection(sale) {
     const key = getSaleKey(sale);
@@ -571,8 +649,8 @@ function toggleSaleSelection(sale) {
 }
 
 function selectAll() {
-    processableSales.value.forEach(sale => {
-        selectedSaleIds.add(getSaleKey(sale));
+    sales.value.forEach(sale => {
+        if (isSelectable(sale)) selectedSaleIds.add(getSaleKey(sale));
     });
 }
 
@@ -1738,6 +1816,21 @@ function getThumbUrl(sale) {
 .batch-action-text {
     font-weight: 600;
     color: #0f172a;
+}
+
+.batch-action-sep {
+    color: #cbd5e1;
+    font-weight: 400;
+}
+
+.batch-action-bar .btn-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
 .btn-text {
