@@ -197,16 +197,28 @@ export function useLabels() {
       throw new Error('Nenhuma venda informada.');
     }
 
-    // Agrupa por sellerId
+    // Sanitiza texto para usar em nome de arquivo (remove chars inválidos).
+    const sanitizeFilename = (s) => String(s || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // tira acentos
+      .replace(/[\\/:*?"<>|]+/g, '') // chars inválidos em nome de arquivo
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 60);
+
+    // Agrupa por sellerId, guardando também o apelido da conta.
     const groups = new Map();
     for (const sale of sales) {
       const raw = sale?.raw_api_data || {};
       const sellerId = sale?.seller_id ?? raw?.seller?.id ?? raw?.seller_id;
       const shipmentIdRaw = raw?.shipping?.id ?? raw?.shipment_id ?? sale?.shipment_id;
       const shipmentId = shipmentIdRaw ? String(shipmentIdRaw).split('.')[0] : null;
+      const nickname = sale?.account_nickname ?? sale?.nickname ?? raw?.seller?.nickname ?? null;
       if (!sellerId || !shipmentId) continue;
-      if (!groups.has(sellerId)) groups.set(sellerId, []);
-      groups.get(sellerId).push(shipmentId);
+      if (!groups.has(sellerId)) groups.set(sellerId, { ids: [], nickname });
+      const g = groups.get(sellerId);
+      g.ids.push(shipmentId);
+      if (!g.nickname && nickname) g.nickname = nickname;
     }
 
     if (groups.size === 0) {
@@ -214,9 +226,14 @@ export function useLabels() {
     }
 
     // Para cada seller, dispara um download (CSV de IDs)
-    for (const [sellerId, ids] of groups.entries()) {
+    for (const [sellerId, group] of groups.entries()) {
+      const ids = group.ids;
       if (!ids.length) continue;
       const url = `/ml/download-label?shipment_ids=${encodeURIComponent(ids.join(','))}&response_type=${type}&seller_id=${sellerId}`;
+
+      // Nome do arquivo: prioriza o apelido da conta; cai pro seller_id se faltar.
+      const accountPart = sanitizeFilename(group.nickname) || String(sellerId);
+      const filename = `etiquetas-${accountPart}-${ids.length}.${type}`;
 
       try {
         const blob = await api.get(url, { responseType: 'blob' });
@@ -234,7 +251,7 @@ export function useLabels() {
         const fileURL = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = fileURL;
-        a.setAttribute('download', `etiquetas-${sellerId}-${ids.length}.${type}`);
+        a.setAttribute('download', filename);
         document.body.appendChild(a);
         a.click();
         a.remove();

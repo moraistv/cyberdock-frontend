@@ -575,16 +575,15 @@ async function printSelectedLabels(type = 'pdf') {
     for (const sale of selected) {
         const info = getLabelInfo(sale);
         if (info.canPrint && info.shipmentId && info.sellerId) {
-            printable.push({ seller_id: info.sellerId, shipment_id: info.shipmentId, sku: sale.sku });
+            printable.push({ seller_id: info.sellerId, shipment_id: info.shipmentId, sku: sale.sku, account_nickname: sale.account_nickname });
         } else {
             skipped.push({ sku: sale.sku || sale.id, reason: info.reason || 'Não imprimível' });
         }
     }
 
     if (printable.length === 0) {
-        const list = skipped.slice(0, 20).map(s => `<li><strong>${s.sku}</strong>: ${s.reason}</li>`).join('');
         summaryModalTitle.value = 'Nenhuma Etiqueta Imprimível';
-        summaryModalContent.value = `<p>Nenhuma das ${selected.length} vendas selecionadas pode ser impressa.</p><ul>${list}</ul>`;
+        summaryModalContent.value = buildPrintResultHtml({ type, printableCount: 0, fileCount: 0, skipped, selectedCount: selected.length });
         isSummaryModalOpen.value = true;
         return;
     }
@@ -596,21 +595,56 @@ async function printSelectedLabels(type = 'pdf') {
         await downloadLabelsForSales(printable, type);
 
         const sellers = new Set(printable.map(p => p.seller_id));
-        let msg = `<div class="summary-section success"><h4>Etiquetas geradas</h4><p><strong>${printable.length}</strong> etiqueta(s) (${type.toUpperCase()}) em <strong>${sellers.size}</strong> arquivo(s), um por conta.</p></div>`;
-        if (skipped.length > 0) {
-            const list = skipped.slice(0, 20).map(s => `<li><strong>${s.sku}</strong>: ${s.reason}</li>`).join('');
-            msg += `<div class="summary-section failed"><h4>${skipped.length} venda(s) pulada(s)</h4><ul>${list}</ul></div>`;
-        }
         summaryModalTitle.value = 'Impressão em Massa';
-        summaryModalContent.value = msg;
+        summaryModalContent.value = buildPrintResultHtml({ type, printableCount: printable.length, fileCount: sellers.size, skipped, selectedCount: selected.length });
         isSummaryModalOpen.value = true;
     } catch (err) {
         summaryModalTitle.value = 'Erro na Impressão em Massa';
-        summaryModalContent.value = `<p class="error-text">${err?.message || 'Falha ao gerar etiquetas em lote.'}</p>`;
+        summaryModalContent.value = `<p style="color:#dc2626;font-weight:600;">${err?.message || 'Falha ao gerar etiquetas em lote.'}</p>`;
         isSummaryModalOpen.value = true;
     } finally {
         isPrinting.value = false;
     }
+}
+
+// Monta o HTML do resumo da impressão em massa (layout limpo, puladas agrupadas por motivo).
+function buildPrintResultHtml({ type, printableCount, fileCount, skipped, selectedCount }) {
+    const stat = (num, label, color, bg) => `
+        <div style="flex:1;min-width:120px;text-align:center;padding:14px 10px;border-radius:12px;background:${bg};">
+            <div style="font-size:1.8rem;font-weight:800;line-height:1;color:${color};">${num}</div>
+            <div style="font-size:0.78rem;color:#475569;margin-top:4px;">${label}</div>
+        </div>`;
+
+    let html = '<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">';
+    html += stat(printableCount, `etiqueta(s) ${type.toUpperCase()}`, '#059669', '#ecfdf5');
+    if (fileCount > 0) html += stat(fileCount, 'arquivo(s), 1 por conta', '#2563eb', '#eff6ff');
+    if (skipped.length > 0) html += stat(skipped.length, 'venda(s) pulada(s)', '#d97706', '#fffbeb');
+    html += '</div>';
+
+    if (printableCount === 0) {
+        html += `<p style="color:#475569;margin:0 0 12px;">Nenhuma das <strong>${selectedCount}</strong> vendas selecionadas pode ser impressa.</p>`;
+    }
+
+    if (skipped.length > 0) {
+        // Agrupa por motivo (ex.: 25× "Envio FULL — etiqueta gerada pelo ML").
+        const byReason = new Map();
+        for (const s of skipped) {
+            const r = s.reason || 'Não imprimível';
+            if (!byReason.has(r)) byReason.set(r, []);
+            byReason.get(r).push(s.sku);
+        }
+        html += '<div style="border-top:1px solid #e2e8f0;padding-top:10px;"><div style="font-weight:700;color:#334155;margin-bottom:8px;font-size:0.9rem;">Puladas por motivo</div>';
+        for (const [reason, skus] of byReason.entries()) {
+            const sample = skus.slice(0, 8).join(', ');
+            const extra = skus.length > 8 ? ` <span style="color:#94a3b8;">(+${skus.length - 8})</span>` : '';
+            html += `<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;">
+                <span style="flex:0 0 auto;background:#fef3c7;color:#92400e;font-weight:700;border-radius:999px;padding:1px 9px;font-size:0.8rem;">${skus.length}×</span>
+                <div style="flex:1;font-size:0.85rem;color:#475569;"><strong style="color:#334155;">${reason}</strong><br><span style="color:#94a3b8;font-size:0.78rem;">${sample}${extra}</span></div>
+            </div>`;
+        }
+        html += '</div>';
+    }
+    return html;
 }
 
 onMounted(async () => {
