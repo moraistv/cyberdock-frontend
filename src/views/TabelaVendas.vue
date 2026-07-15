@@ -183,6 +183,24 @@
                             <span>Mostrando <strong>{{ sales.length }}</strong> de <strong>{{ totalSales }}</strong> vendas</span>
                             <span v-if="isLoading" class="sale-cards-counter__loading">Atualizando...</span>
                         </div>
+
+                        <!-- Barra de ações em massa (selecionar + imprimir etiquetas) -->
+                        <div class="batch-bar">
+                            <button @click="selectAll" class="btn-text" :disabled="isProcessing || isPrinting">Selecionar Todas</button>
+                            <button @click="deselectAll" class="btn-text" :disabled="(isProcessing || isPrinting) || selectedSaleIds.size === 0">Desmarcar</button>
+                            <template v-if="selectedSaleIds.size > 0">
+                                <span class="batch-bar__sep">|</span>
+                                <span class="batch-bar__count">{{ selectedSaleIds.size }} selecionada(s)</span>
+                                <button @click="printSelectedLabels('pdf')" class="btn-label pdf" :disabled="isProcessing || isPrinting" title="Imprimir etiquetas PDF das selecionadas">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                                    {{ isPrinting ? 'Gerando...' : 'Imprimir PDF' }}
+                                </button>
+                                <button @click="printSelectedLabels('zpl')" class="btn-label zpl" :disabled="isProcessing || isPrinting" title="Imprimir etiquetas ZPL das selecionadas">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
+                                    {{ isPrinting ? 'Gerando...' : 'Imprimir ZPL' }}
+                                </button>
+                            </template>
+                        </div>
                         <div class="sale-cards-list" ref="tableBodyRef">
                             <div v-for="sale in sales" :key="`${sale.id}-${sale.sku}`"
                                  class="sale-card"
@@ -190,12 +208,12 @@
 
                                 <div class="sale-card__layout">
                                     <!-- Checkbox para lote -->
-                                    <div v-if="!sale.processed_at && sale.is_sku_mapped" class="sale-card__checkbox-container" @click.stop>
+                                    <div v-if="isSelectable(sale)" class="sale-card__checkbox-container" @click.stop>
                                         <input type="checkbox"
                                                :checked="selectedSaleIds.has(getSaleKey(sale))"
                                                @change="toggleSaleSelection(sale)"
                                                class="sale-card__checkbox"
-                                               :disabled="isProcessing">
+                                               :disabled="isProcessing || isPrinting">
                                     </div>
 
                                     <!-- Thumbnail do Produto -->
@@ -352,6 +370,13 @@
                 </div>
             </div>
         </div>
+
+        <UniversalModal :title="printModalTitle" v-model:open="isPrintModalOpen">
+            <div class="summary-modal-content" v-html="printModalContent"></div>
+            <div class="modal-actions">
+                <button @click="isPrintModalOpen = false" class="btn btn-primary">Fechar</button>
+            </div>
+        </UniversalModal>
 
         <UniversalModal v-if="userRole === 'master'" title="JSON Completo da Venda" v-model:open="isJsonModalOpen">
             <div class="json-viewer">
@@ -620,10 +645,16 @@ const { syncState, liveAccounts, syncAccountsBatch } = useSyncManager();
 const isSyncLiveOpen = ref(false);
 const syncTimeframe = ref('3');
 const { systemStatuses } = useSystemStatus();
-const { downloadLabel, getLabelInfo: composableLabelInfo } = useLabels();
+const { downloadLabel, downloadLabelsForSales, getLabelInfo: composableLabelInfo } = useLabels();
 const labelError = ref(null);
 const isProcessing = ref(false);
+const isPrinting = ref(false);
 const api = useApi();
+
+// Modal de resultado da impressão em massa
+const isPrintModalOpen = ref(false);
+const printModalTitle = ref('');
+const printModalContent = ref('');
 
 // === HELPERS DO MASTER ===
 function getProductLink(sale) {
@@ -685,6 +716,83 @@ function toggleSaleSelection(sale) {
         newSet.add(key);
     }
     selectedSaleIds.value = newSet;
+}
+
+// Uma venda é selecionável se for processável (estoque) OU imprimível (etiqueta).
+function isSelectable(sale) {
+    if (!sale.processed_at && sale.is_sku_mapped) return true;
+    try { return getLabelInfo(sale).canPrint; } catch { return false; }
+}
+
+function selectAll() {
+    const newSet = new Set(selectedSaleIds.value);
+    sales.value.forEach(sale => {
+        if (isSelectable(sale)) newSet.add(getSaleKey(sale));
+    });
+    selectedSaleIds.value = newSet;
+}
+
+function deselectAll() {
+    selectedSaleIds.value = new Set();
+}
+
+/**
+ * Imprime etiquetas EM MASSA das vendas selecionadas.
+ * - Filtra somente as imprimíveis (exclui FULL e status finais).
+ * - Agrupa por seller e baixa 1 arquivo por conta.
+ * - Mostra um resumo do que foi impresso e do que foi pulado.
+ */
+async function printSelectedLabels(type = 'pdf') {
+    if (isPrinting.value || isProcessing.value) return;
+
+    const selected = sales.value.filter(sale => selectedSaleIds.value.has(getSaleKey(sale)));
+    if (selected.length === 0) {
+        printModalTitle.value = 'Nenhuma Venda Selecionada';
+        printModalContent.value = '<p>Selecione ao menos uma venda para imprimir etiquetas.</p>';
+        isPrintModalOpen.value = true;
+        return;
+    }
+
+    const printable = [];
+    const skipped = [];
+    for (const sale of selected) {
+        const info = getLabelInfo(sale);
+        if (info.canPrint && info.shipmentId && info.sellerId) {
+            printable.push({ seller_id: info.sellerId, shipment_id: info.shipmentId, sku: sale.sku });
+        } else {
+            skipped.push({ sku: sale.sku || sale.id, reason: info.reason || 'Não imprimível' });
+        }
+    }
+
+    if (printable.length === 0) {
+        const list = skipped.slice(0, 20).map(s => `<li><strong>${s.sku}</strong>: ${s.reason}</li>`).join('');
+        printModalTitle.value = 'Nenhuma Etiqueta Imprimível';
+        printModalContent.value = `<p>Nenhuma das ${selected.length} vendas selecionadas pode ser impressa.</p><ul>${list}</ul>`;
+        isPrintModalOpen.value = true;
+        return;
+    }
+
+    isPrinting.value = true;
+    labelError.value = null;
+    try {
+        await downloadLabelsForSales(printable, type);
+
+        const sellers = new Set(printable.map(p => p.seller_id));
+        let msg = `<div class="summary-section success"><h4>Etiquetas geradas</h4><p><strong>${printable.length}</strong> etiqueta(s) (${type.toUpperCase()}) em <strong>${sellers.size}</strong> arquivo(s), um por conta.</p></div>`;
+        if (skipped.length > 0) {
+            const list = skipped.slice(0, 20).map(s => `<li><strong>${s.sku}</strong>: ${s.reason}</li>`).join('');
+            msg += `<div class="summary-section failed"><h4>${skipped.length} venda(s) pulada(s)</h4><ul>${list}</ul></div>`;
+        }
+        printModalTitle.value = 'Impressão em Massa';
+        printModalContent.value = msg;
+        isPrintModalOpen.value = true;
+    } catch (err) {
+        printModalTitle.value = 'Erro na Impressão em Massa';
+        printModalContent.value = `<p class="error-text">${err?.message || 'Falha ao gerar etiquetas em lote.'}</p>`;
+        isPrintModalOpen.value = true;
+    } finally {
+        isPrinting.value = false;
+    }
 }
 
 async function processSingleSale(sale) {
@@ -1901,6 +2009,37 @@ function hideTooltip() {
     color: #3b82f6;
     font-weight: 500;
     animation: pulse-fade 1.2s ease-in-out infinite;
+}
+
+.batch-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-bottom: 0.9rem;
+    padding: 0.45rem 0.9rem;
+    background-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+}
+.batch-bar .btn-text {
+    background: none;
+    border: none;
+    color: #3b82f6;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    font-size: 0.85rem;
+}
+.batch-bar .btn-text:hover:not(:disabled) { color: #2563eb; text-decoration: underline; }
+.batch-bar .btn-text:disabled { color: #94a3b8; cursor: not-allowed; }
+.batch-bar__sep { color: #cbd5e1; }
+.batch-bar__count { font-weight: 600; color: #0f172a; font-size: 0.85rem; }
+.batch-bar .btn-label {
+    padding: 0.3rem 0.7rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 @keyframes pulse-fade {
     0%, 100% { opacity: 0.5; }
