@@ -66,6 +66,23 @@
                         </div>
                     </div>
 
+                    <!-- Filtro rápido: Processamento (abatimento de estoque) -->
+                    <div class="filter-container" ref="processedFilterContainerRef">
+                        <button @click="isProcessedDropdownOpen = !isProcessedDropdownOpen" :class="['btn', 'btn-outline', { 'btn-outline--active': selectedProcessedFilter }]">
+                            <span class="truncate pr-2">{{ selectedProcessedFilter ? (selectedProcessedFilter === 'yes' ? 'Processados' : 'Não processados') : 'Processamento' }}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
+                                <path d="m6 9 6 6 6-6"></path>
+                            </svg>
+                        </button>
+                        <div v-if="isProcessedDropdownOpen" class="filter-popover">
+                            <ul class="filter-popover-list">
+                                <li @click="applyProcessedFilter(null)"><span :class="{'font-bold': !selectedProcessedFilter}">Todos</span></li>
+                                <li @click="applyProcessedFilter('yes')"><span :class="{'font-bold': selectedProcessedFilter === 'yes'}">Processados</span></li>
+                                <li @click="applyProcessedFilter('no')"><span :class="{'font-bold': selectedProcessedFilter === 'no'}">Não processados</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
                     <!-- Filtro de Conta -->
                     <div class="filter-container" ref="accountFilterContainerRef">
                         <button @click="isAccountDropdownOpen = !isAccountDropdownOpen" :class="['btn', 'btn-outline', { 'btn-outline--active': selectedAccountFilter }]">
@@ -768,6 +785,11 @@ const isStatusDropdownOpen = ref(false);
 const statusFilterContainerRef = ref(null);
 const statusFilterDropdownRef = ref(null);
 
+const selectedProcessedFilter = ref(null); // null | 'yes' | 'no'
+const isProcessedDropdownOpen = ref(false);
+const processedFilterContainerRef = ref(null);
+function applyProcessedFilter(v) { selectedProcessedFilter.value = v; isProcessedDropdownOpen.value = false; }
+
 const selectedAccountFilter = ref(null);
 const isAccountDropdownOpen = ref(false);
 const accountFilterContainerRef = ref(null);
@@ -908,6 +930,7 @@ function triggerServerFetch(resetPage = true) {
         shippingLimitEnd: filters.shippingLimitEnd || undefined,
         shippingMode: selectedShippingModes.value.length > 0 ? selectedShippingModes.value.join(',') : undefined,
         userNickname: selectedUserFilter.value || undefined,
+        processed: selectedProcessedFilter.value || undefined,
     });
 }
 
@@ -916,7 +939,7 @@ watch(searchQuery, () => {
     searchDebounce = setTimeout(() => triggerServerFetch(true), 400);
 });
 
-watch([selectedSaleStatusFilter, selectedStatusFilter], () => triggerServerFetch(true));
+watch([selectedSaleStatusFilter, selectedStatusFilter, selectedProcessedFilter], () => triggerServerFetch(true));
 watch([() => filters.saleDateStart, () => filters.saleDateEnd, () => filters.shippingLimitStart, () => filters.shippingLimitEnd], () => {
     triggerServerFetch(true);
 });
@@ -1011,6 +1034,7 @@ function clearFilters() {
     searchQuery.value = '';
     selectedStatusFilter.value = null;
     selectedSaleStatusFilter.value = null;
+    selectedProcessedFilter.value = null;
     selectedAccountFilter.value = null;
     selectedUserFilter.value = null;
     activeSaleDatePreset.value = null;
@@ -1073,6 +1097,7 @@ function handleClickOutside(event) {
     if (statusFilterContainerRef.value && !statusFilterContainerRef.value.contains(target)) { isStatusDropdownOpen.value = false; }
     if (accountFilterContainerRef.value && !accountFilterContainerRef.value.contains(target)) { isAccountDropdownOpen.value = false; }
     if (userFilterContainerRef.value && !userFilterContainerRef.value.contains(target)) { isUserDropdownOpen.value = false; }
+    if (processedFilterContainerRef.value && !processedFilterContainerRef.value.contains(target)) { isProcessedDropdownOpen.value = false; }
 }
 
 function getLabelInfo(sale) {

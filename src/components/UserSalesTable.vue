@@ -68,6 +68,25 @@
                         </div>
                     </div>
 
+                    <!-- Filtro rápido: Processamento (abatimento de estoque) -->
+                    <div class="filter-container" ref="processedFilterContainerRef">
+                        <button @click="isProcessedDropdownOpen = !isProcessedDropdownOpen" class="btn btn-outline">
+                            <span class="truncate pr-2">{{ selectedProcessedFilter ? (selectedProcessedFilter === 'yes' ? 'Processados' : 'Não processados') : 'Processamento' }}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                class="h-4 w-4 shrink-0 opacity-50">
+                                <path d="m6 9 6 6 6-6"></path>
+                            </svg>
+                        </button>
+                        <div v-if="isProcessedDropdownOpen" class="filter-popover">
+                            <ul class="filter-popover-list">
+                                <li @click="applyProcessedFilter(null)"><span :class="{ 'font-bold': !selectedProcessedFilter }">Todos</span></li>
+                                <li @click="applyProcessedFilter('yes')"><span :class="{ 'font-bold': selectedProcessedFilter === 'yes' }">Processados</span></li>
+                                <li @click="applyProcessedFilter('no')"><span :class="{ 'font-bold': selectedProcessedFilter === 'no' }">Não processados</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
                     <!-- Filtro rápido: Conta -->
                     <div class="filter-container" ref="accountFilterContainerRef">
                         <button @click="toggleAccountDropdown" class="btn btn-outline">
@@ -621,6 +640,11 @@ const isStatusDropdownOpen = ref(false);
 const statusFilterContainerRef = ref(null);
 const statusFilterDropdownRef = ref(null);
 
+const selectedProcessedFilter = ref(null); // null | 'yes' | 'no'
+const isProcessedDropdownOpen = ref(false);
+const processedFilterContainerRef = ref(null);
+function applyProcessedFilter(v) { selectedProcessedFilter.value = v; isProcessedDropdownOpen.value = false; }
+
 const selectedAccountFilterId = ref(null);
 const isAccountDropdownOpen = ref(false);
 const accountFilterContainerRef = ref(null);
@@ -707,6 +731,13 @@ const filteredUserSales = computed(() => {
         });
     }
 
+    // Filtro de PROCESSADO / NÃO PROCESSADO (abatimento de estoque).
+    if (selectedProcessedFilter.value === 'yes') {
+        tempSales = tempSales.filter(s => !!s.processed_at);
+    } else if (selectedProcessedFilter.value === 'no') {
+        tempSales = tempSales.filter(s => !s.processed_at);
+    }
+
     if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase();
         tempSales = tempSales.filter(s =>
@@ -787,7 +818,7 @@ const paginatedUserSales = computed(() => {
     return paginated;
 });
 
-watch([searchQuery, selectedSaleStatusFilter, selectedStatusFilter, filters, selectedAccountFilterId], () => { salesCurrentPage.value = 1; }, { deep: true });
+watch([searchQuery, selectedSaleStatusFilter, selectedStatusFilter, selectedProcessedFilter, filters, selectedAccountFilterId], () => { salesCurrentPage.value = 1; }, { deep: true });
 watch(selectedAccountFilterId, (v) => { filters.accountId = v ?? null; });
 watch(() => filters.accountId, (v) => { selectedAccountFilterId.value = v ?? null; });
 
@@ -1503,6 +1534,8 @@ function clearFilters() {
     filters.shippingStatus = null;
     searchQuery.value = '';
     selectedStatusFilter.value = null;
+    selectedSaleStatusFilter.value = null;
+    selectedProcessedFilter.value = null;
     selectedAccountFilterId.value = null;
     salesCurrentPage.value = 1;
 }
@@ -1994,6 +2027,9 @@ function handleClickOutside(event) {
     }
     if (accountFilterContainerRef.value && !accountFilterContainerRef.value.contains(target)) {
         isAccountDropdownOpen.value = false;
+    }
+    if (processedFilterContainerRef.value && !processedFilterContainerRef.value.contains(target)) {
+        isProcessedDropdownOpen.value = false;
     }
 }
 
