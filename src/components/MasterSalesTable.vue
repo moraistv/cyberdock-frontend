@@ -229,16 +229,16 @@
                     <span v-if="isLoading" class="sale-cards-counter__loading">Atualizando...</span>
                 </div>
                 <div class="sale-cards-list" ref="salesTableBodyRef">
-                    <div v-for="sale in sales" :key="`${sale.id}-${sale.sku}`" 
+                    <div v-for="sale in groupedSales" :key="sale._groupKey" 
                          class="sale-card"
                          :class="{ 'sale-card--cancelled': sale.sale_status === 'cancelled' }">
                         
                         <div class="sale-card__layout">
-                            <!-- Chceckbox para lote -->
+                            <!-- Chceckbox para lote (marca/desmarca todos os itens do pacote) -->
                             <div v-if="isSelectable(sale)" class="sale-card__checkbox-container" @click.stop>
                                 <input type="checkbox" 
-                                       :checked="selectedSaleIds.has(getSaleKey(sale))" 
-                                       @change="toggleSaleSelection(sale)" 
+                                       :checked="isGroupSelected(sale)" 
+                                       @change="toggleGroupSelection(sale)" 
                                        class="sale-card__checkbox"
                                        :disabled="isProcessing || isPrinting">
                             </div>
@@ -296,24 +296,22 @@
                                         </span>
                                     </span>
                                     <span class="sale-card__divider">|</span>
-                                    <span class="sale-card__spec">
-                                        <span class="sale-card__spec-label">SKU:</span>
-                                        <span class="sale-card__spec-mono">{{ sale.sku || 'N/A' }}</span>
-                                    </span>
-                                    <span class="sale-card__divider">|</span>
-                                    <span class="sale-card__spec" style="display: flex; align-items: center; gap: 0.25rem;">
-                                        <span class="sale-card__spec-label" title="Indica se o SKU está mapeado no armazenamento">Mapeado:</span>
-                                        <span v-if="sale.is_sku_mapped" class="sale-card__spec-value" style="color: #10b981; font-weight: 600; font-size: 0.8rem;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:2px; vertical-align: text-top;"><polyline points="20 6 9 17 4 12"></polyline></svg>Sim
-                                        </span>
-                                        <span v-else class="sale-card__spec-value" style="color: #ef4444; font-weight: 600; font-size: 0.8rem;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:2px; vertical-align: text-top;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>Não
+                                    <!-- SKU(s) do pacote: quando o pedido tem 2+ itens diferentes, lista todos, um embaixo do outro -->
+                                    <span class="sale-card__spec sale-card__spec--skus">
+                                        <span class="sale-card__spec-label">{{ sale._items.length > 1 ? 'SKUs' : 'SKU' }}:</span>
+                                        <span class="sale-card__sku-list">
+                                            <span v-for="(it, i) in sale._items" :key="i" class="sale-card__sku-item">
+                                                <span class="sale-card__spec-mono">{{ it.sku || 'N/A' }}</span>
+                                                <span class="sale-card__sku-qty" title="Quantidade">x{{ it.quantity }}</span>
+                                                <svg v-if="it.is_sku_mapped" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" title="SKU mapeado"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                                <svg v-else xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" title="SKU não mapeado"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                            </span>
                                         </span>
                                     </span>
                                     <span class="sale-card__divider">|</span>
                                     <span class="sale-card__spec">
                                         <span class="sale-card__spec-label">QTD:</span>
-                                        <span class="sale-card__spec-value">{{ sale.quantity }}</span>
+                                        <span class="sale-card__spec-value">{{ sale._totalQty }}</span>
                                     </span>
                                 </div>
 
@@ -355,15 +353,15 @@
                                 </div>
                                 
                                 <div class="sale-card__actions">
-                                    <button v-if="!sale.processed_at && sale.is_sku_mapped" 
-                                            @click="processSingleSale(sale)" 
+                                    <button v-if="sale._processableItems && sale._processableItems.length > 0" 
+                                            @click="processGroup(sale)" 
                                             class="btn-label btn-process-single" 
                                             :disabled="isProcessing"
                                             title="Processar Abatimento de Estoque">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
                                         Processar
                                     </button>
-                                    <span v-if="sale.processed_at" class="sale-card__status-tag sale-card__status-tag--proc" :title="'Processado em: ' + formatDateTime(sale.processed_at)">
+                                    <span v-if="sale._allProcessed" class="sale-card__status-tag sale-card__status-tag--proc" :title="'Processado em: ' + formatDateTime(sale.processed_at)">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                         Proc
                                     </span>
@@ -668,22 +666,85 @@ const processableSales = computed(() => {
     return sales.value.filter(sale => !sale.processed_at && sale.is_sku_mapped);
 });
 
-// Uma venda é selecionável se for processável (estoque) OU imprimível (etiqueta).
+// Agrupa itens do MESMO pacote/envio num único card. Quando o comprador leva
+// 2+ itens diferentes, eles vêm como várias linhas de venda com o mesmo
+// shipment (ou mesmo pedido) — aqui viram 1 card com todos os SKUs listados.
+// A chave prioriza o shipment (é o que define a etiqueta); sem ele, o pedido.
+// A seleção/processamento continuam por ITEM por baixo (cada linha é um
+// abatimento de estoque), então processAllSales/etiquetas não mudam.
+const groupedSales = computed(() => {
+    const map = new Map();
+    const order = [];
+    for (const s of sales.value) {
+        const key = s.shipping_id ? `ship:${s.shipping_id}` : `order:${s.id}::${s.uid}`;
+        if (!map.has(key)) {
+            map.set(key, { ...s, _groupKey: key, _items: [] });
+            order.push(key);
+        }
+        map.get(key)._items.push(s);
+    }
+    return order.map((k) => {
+        const g = map.get(k);
+        g._allProcessed = g._items.every((it) => it.processed_at);
+        g._processableItems = g._items.filter((it) => !it.processed_at && it.is_sku_mapped);
+        g._totalQty = g._items.reduce((a, it) => a + (Number(it.quantity) || 0), 0);
+        return g;
+    });
+});
+
+// Seleção por PACOTE (marca/desmarca todos os itens do grupo por baixo).
+const isGroupSelected = (group) => (group._items || []).length > 0 && group._items.every((it) => selectedSaleIds.has(getSaleKey(it)));
+function toggleGroupSelection(group) {
+    const keys = (group._items || []).map((it) => getSaleKey(it));
+    if (isGroupSelected(group)) keys.forEach((k) => selectedSaleIds.delete(k));
+    else keys.forEach((k) => selectedSaleIds.add(k));
+}
+
+// Selecionável se QUALQUER item do grupo é processável, ou a etiqueta é imprimível.
+// (Aceita tanto um grupo — com _items — quanto uma venda avulsa, p/ retrocompat.)
 function isSelectable(sale) {
-    if (!sale.processed_at && sale.is_sku_mapped) return true;
+    const items = sale._items || [sale];
+    if (items.some((it) => !it.processed_at && it.is_sku_mapped)) return true;
     try { return getLabelInfo(sale).canPrint; } catch { return false; }
 }
 
-// Selection methods
-function toggleSaleSelection(sale) {
-    const key = getSaleKey(sale);
-    if (selectedSaleIds.has(key)) {
-        selectedSaleIds.delete(key);
-    } else {
-        selectedSaleIds.add(key);
+// Processa (abate estoque) todos os itens pendentes+mapeados de um pacote.
+async function processGroup(group) {
+    if (isProcessing.value) return;
+    const items = (group._items || []).filter((it) => !it.processed_at && it.is_sku_mapped);
+    if (items.length === 0) return;
+    isProcessing.value = true;
+    try {
+        const results = await processSalesApi(items);
+        const failed = results.failed || [];
+        if (failed.length > 0) {
+            summaryModalTitle.value = 'Erro ao Processar Pacote';
+            let html = `<div class="summary-section failed"><h4>Falhas: ${failed.length}</h4><ul>`;
+            failed.forEach((f) => { html += `<li>Venda #${f.saleId} (SKU: ${f.sku}): <strong>${f.reason}</strong></li>`; });
+            html += `</ul></div>`;
+            if (results.success?.length) html += `<div class="summary-section success"><h4>Processadas: ${results.success.length}</h4></div>`;
+            summaryModalContent.value = html;
+            isSummaryModalOpen.value = true;
+        } else {
+            showToast('Pacote processado com sucesso!', 'success');
+        }
+        // Marca como processado (reativo) os itens que NÃO falharam.
+        const okItems = items.filter((it) => !failed.some((f) => String(f.saleId) === String(it.id) && String(f.sku) === String(it.sku)));
+        for (const it of okItems) {
+            const idx = sales.value.findIndex((s) => s.id === it.id && s.sku === it.sku && s.uid === it.uid);
+            if (idx !== -1) sales.value[idx] = { ...sales.value[idx], processed_at: new Date().toISOString() };
+            selectedSaleIds.delete(getSaleKey(it));
+        }
+    } catch (err) {
+        summaryModalTitle.value = 'Erro ao Processar Pacote';
+        summaryModalContent.value = `<p>Ocorreu um erro inesperado:</p><p class="error-text">${err.message}</p>`;
+        isSummaryModalOpen.value = true;
+    } finally {
+        isProcessing.value = false;
     }
 }
 
+// Selection methods
 function selectAll() {
     sales.value.forEach(sale => {
         if (isSelectable(sale)) selectedSaleIds.add(getSaleKey(sale));
@@ -1002,34 +1063,6 @@ async function processAllSales() {
         isSummaryModalOpen.value = true;
     } finally {
         triggerServerFetch(false);
-        isProcessing.value = false;
-    }
-}
-
-async function processSingleSale(sale) {
-    if (isProcessing.value) return;
-    isProcessing.value = true;
-    try {
-        const results = await processSalesApi([sale]);
-        
-        if (results.failed?.length > 0) {
-            summaryModalTitle.value = 'Erro ao Processar Venda';
-            summaryModalContent.value = `<div class="summary-section failed"><h4>Falha no Processamento</h4><p>Venda #${sale.id} (SKU: ${sale.sku}): <strong>${results.failed[0].reason}</strong></p></div>`;
-            isSummaryModalOpen.value = true;
-        } else {
-            showToast('Venda processada com sucesso!', 'success');
-            // Atualiza o array reativo por índice para garantir reatividade do Vue
-            const idx = sales.value.findIndex(s => s.id === sale.id && s.sku === sale.sku);
-            if (idx !== -1) {
-                sales.value[idx] = { ...sales.value[idx], processed_at: new Date().toISOString() };
-            }
-            selectedSaleIds.delete(getSaleKey(sale));
-        }
-    } catch (err) {
-        summaryModalTitle.value = 'Erro ao Processar Venda';
-        summaryModalContent.value = `<p>Ocorreu um erro inesperado:</p><p class="error-text">${err.message}</p>`;
-        isSummaryModalOpen.value = true;
-    } finally {
         isProcessing.value = false;
     }
 }
@@ -1720,6 +1753,27 @@ function getThumbUrl(sale) {
     font-family: 'SFMono-Regular', Consolas, monospace;
     color: #475569;
     font-size: 0.8rem;
+}
+/* Lista de SKUs do pacote (2+ itens no mesmo envio) — empilhados um embaixo do outro */
+.sale-card__spec--skus {
+    align-items: flex-start;
+}
+.sale-card__sku-list {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+.sale-card__sku-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.sale-card__sku-qty {
+    font-size: 0.72rem;
+    color: #64748b;
+    background: #f1f5f9;
+    border-radius: 4px;
+    padding: 0 4px;
 }
 .sale-card__divider {
     color: #cbd5e1;
