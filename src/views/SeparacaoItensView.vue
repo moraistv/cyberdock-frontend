@@ -87,29 +87,29 @@
             <div class="s-card__body">
               <span class="s-card__label">Total de Itens</span>
               <span class="s-card__value">{{ summary.totalItens }}</span>
-              <span class="s-card__hint">itens no período</span>
+              <span class="s-card__hint">a separar</span>
+            </div>
+          </div>
+
+          <div class="s-card">
+            <div class="s-card__icon s-card__icon--red">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+            </div>
+            <div class="s-card__body">
+              <span class="s-card__label">Atrasados</span>
+              <span class="s-card__value" :class="{ 'value-danger': summary.atrasados > 0 }">{{ summary.atrasados }}</span>
+              <span class="s-card__hint">prazo já vencido</span>
             </div>
           </div>
 
           <div class="s-card">
             <div class="s-card__icon s-card__icon--orange">
-              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><path d="M12 14v3" /><path d="M10.5 15.5h3" /></svg>
             </div>
             <div class="s-card__body">
-              <span class="s-card__label">A Despachar</span>
-              <span class="s-card__value">{{ summary.aDespachar }}</span>
-              <span class="s-card__hint">{{ pct(summary.aDespachar) }}% do total</span>
-            </div>
-          </div>
-
-          <div class="s-card">
-            <div class="s-card__icon s-card__icon--green">
-              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15" /><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><polyline points="3.29 7 12 12 20.71 7" /><line x1="12" y1="22" x2="12" y2="12" /><path d="m16.5 15.5 2 2 4-4" /></svg>
-            </div>
-            <div class="s-card__body">
-              <span class="s-card__label">Despachados</span>
-              <span class="s-card__value">{{ summary.despachados }}</span>
-              <span class="s-card__hint">{{ pct(summary.despachados) }}% do total</span>
+              <span class="s-card__label">Despachar Hoje</span>
+              <span class="s-card__value">{{ summary.despacharHoje }}</span>
+              <span class="s-card__hint">com prazo para hoje</span>
             </div>
           </div>
 
@@ -282,8 +282,8 @@ const totalPages = ref(1);
 const summary = reactive({
   totalItens: 0,
   totalUnidades: 0,
-  despachados: 0,
-  aDespachar: 0,
+  atrasados: 0,
+  despacharHoje: 0,
   usuariosAtivos: 0,
   porModalidade: {},
 });
@@ -304,12 +304,6 @@ const emittedBy = computed(() => {
 const appliedFiltersLabel = ref({});
 
 const hasModes = computed(() => Object.keys(summary.porModalidade || {}).length > 0);
-
-function pct(value) {
-  const t = summary.totalItens || 0;
-  if (!t) return '0';
-  return ((value / t) * 100).toFixed(1);
-}
 
 function buildQuery(extra = {}) {
   const q = new URLSearchParams();
@@ -599,7 +593,9 @@ onMounted(() => {
 .s-card__icon--indigo { background: #eef2ff; color: #4f46e5; }
 .s-card__icon--orange { background: #fff7ed; color: #ea580c; }
 .s-card__icon--green { background: #f0fdf4; color: #16a34a; }
+.s-card__icon--red { background: #fef2f2; color: #dc2626; }
 .s-card__icon--slate { background: #f1f5f9; color: #475569; }
+.value-danger { color: #dc2626; }
 .s-card__body { display: flex; flex-direction: column; }
 .s-card__label { font-size: 0.72rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
 .s-card__value { font-size: 1.6rem; font-weight: 800; color: var(--color-text); line-height: 1.1; }

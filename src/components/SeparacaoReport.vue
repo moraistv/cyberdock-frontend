@@ -47,17 +47,17 @@
           <div class="rep-card">
             <span class="rep-card__label">Total de Itens</span>
             <span class="rep-card__value">{{ summary.totalItens }}</span>
-            <span class="rep-card__hint">itens no período</span>
+            <span class="rep-card__hint">a separar</span>
           </div>
           <div class="rep-card">
-            <span class="rep-card__label">A Despachar</span>
-            <span class="rep-card__value">{{ summary.aDespachar }}</span>
-            <span class="rep-card__hint">{{ pct(summary.aDespachar) }}% do total</span>
+            <span class="rep-card__label">Atrasados</span>
+            <span class="rep-card__value">{{ summary.atrasados }}</span>
+            <span class="rep-card__hint">prazo já vencido</span>
           </div>
           <div class="rep-card">
-            <span class="rep-card__label">Despachados</span>
-            <span class="rep-card__value">{{ summary.despachados }}</span>
-            <span class="rep-card__hint">{{ pct(summary.despachados) }}% do total</span>
+            <span class="rep-card__label">Despachar Hoje</span>
+            <span class="rep-card__value">{{ summary.despacharHoje }}</span>
+            <span class="rep-card__hint">prazo para hoje</span>
           </div>
           <div class="rep-card rep-card--modes">
             <span class="rep-card__label">Por Modalidades de Envio</span>
@@ -172,12 +172,6 @@ const pages = computed(() => {
   }
   return result;
 });
-
-function pct(value) {
-  const t = props.summary.totalItens || 0;
-  if (!t) return '0';
-  return ((value / t) * 100).toFixed(1);
-}
 
 function prazoDate(item) {
   return item.sla_expected_date || item.shipping_limit_date || null;
