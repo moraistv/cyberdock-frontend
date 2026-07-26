@@ -65,6 +65,14 @@
                 <option v-for="usr in userOptions" :key="usr" :value="usr">{{ usr }}</option>
               </select>
             </div>
+            <div class="filter-group">
+              <label>Situação de Despacho</label>
+              <select v-model="filters.despacho" @change="aplicarFiltros">
+                <option value="nao">A despachar</option>
+                <option value="sim">Já despachados</option>
+                <option value="todos">Todos</option>
+              </select>
+            </div>
           </div>
           <div class="filters-actions">
             <button class="btn-link" @click="limparFiltros">
@@ -271,6 +279,7 @@ const filters = reactive({
   shippingMode: '',
   account: '',
   userNickname: '',
+  despacho: 'nao',
   sort: 'prazo_asc',
 });
 
@@ -314,6 +323,7 @@ function buildQuery(extra = {}) {
   if (filters.shippingMode) q.set('shippingMode', filters.shippingMode);
   if (filters.account) q.set('account', filters.account);
   if (filters.userNickname) q.set('userNickname', filters.userNickname);
+  if (filters.despacho) q.set('despacho', filters.despacho);
   if (filters.sort) q.set('sort', filters.sort);
   for (const [k, v] of Object.entries(extra)) q.set(k, v);
   return q.toString();
@@ -360,6 +370,7 @@ function limparFiltros() {
   filters.shippingMode = '';
   filters.account = '';
   filters.userNickname = '';
+  filters.despacho = 'nao';
   filters.sort = 'prazo_asc';
   aplicarFiltros();
 }
