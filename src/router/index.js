@@ -65,7 +65,7 @@ const routes = [
     path: '/separacao-itens',
     name: 'SeparacaoItensView',
     component: SeparacaoItensView,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, requiresMaster: true }
   },
   {
     path: '/armazenamento',
