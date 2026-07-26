@@ -4,6 +4,7 @@ import AuthComponent from '../views/AuthComponent.vue';
 import DashboardView from '../views/DashboardView.vue';
 import ContasView from '../views/ContasView.vue';
 import TabelaVendas from '../views/TabelaVendas.vue';
+import SeparacaoItensView from '../views/SeparacaoItensView.vue';
 import ArmazenamentoView from '../views/ArmazenamentoView.vue';
 import KitParentView from '../views/KitParentView.vue';
 import ResumoCobranca from '../views/ResumoCobranca.vue';
@@ -58,6 +59,12 @@ const routes = [
     path: '/tabela-vendas',
     name: 'TabelaVendas',
     component: TabelaVendas,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/separacao-itens',
+    name: 'SeparacaoItensView',
+    component: SeparacaoItensView,
     meta: { requiresAuth: true }
   },
   {
