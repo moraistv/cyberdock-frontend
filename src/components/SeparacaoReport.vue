@@ -84,11 +84,11 @@
           <col style="width: 13%" />
           <col style="width: 4%" />
           <col style="width: 12%" />
-          <col style="width: 27%" />
-          <col style="width: 16%" />
+          <col style="width: 26%" />
+          <col style="width: 15%" />
           <col style="width: 11%" />
           <col style="width: 8%" />
-          <col style="width: 6%" />
+          <col style="width: 8%" />
         </colgroup>
         <thead>
           <tr>
@@ -208,14 +208,14 @@ function prazoDate(item) {
 .rep-meta { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; font-size: 10.5px; color: #374151; display: flex; flex-direction: column; gap: 4px; }
 .rep-meta-row { display: flex; align-items: center; gap: 6px; }
 
-.rep-filters { display: flex; flex-wrap: wrap; gap: 4px 24px; padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-size: 10.5px; color: #374151; }
-.rep-filter__label { color: #6b7280; font-weight: 600; }
+.rep-filters { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 8px 12px; background: #f1f5f9; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 10px; color: #334155; margin-top: 10px; }
+.rep-filter__label { color: #64748b; font-weight: 600; }
 
-.rep-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 12px 0; }
-.rep-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; }
-.rep-card__label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #6b7280; letter-spacing: 0.03em; }
-.rep-card__value { font-size: 22px; font-weight: 800; line-height: 1.2; }
-.rep-card__hint { font-size: 9px; color: #6b7280; }
+.rep-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 14px 0; }
+.rep-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; background: #f8fafc; }
+.rep-card__label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.03em; }
+.rep-card__value { font-size: 24px; font-weight: 800; line-height: 1.25; color: #0f172a; }
+.rep-card__hint { font-size: 9px; color: #94a3b8; }
 .rep-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; margin-top: 4px; }
 .rep-mode { display: flex; align-items: center; gap: 4px; font-size: 9.5px; }
 .rep-mode__dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -225,15 +225,21 @@ function prazoDate(item) {
 .rep-table { width: 100%; border-collapse: collapse; font-size: 9.5px; table-layout: fixed; }
 .rep-table td, .rep-table th { overflow-wrap: anywhere; word-break: break-word; }
 .rep-table th {
-  text-align: left; padding: 6px 6px; background: #f3f4f6; border-bottom: 1px solid #d1d5db;
-  font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.02em; color: #4b5563; font-weight: 700;
+  text-align: left; padding: 7px 7px; background: #0f172a; border-bottom: 1px solid #0f172a;
+  font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.02em; color: #fff; font-weight: 700;
 }
-.rep-table td { padding: 6px 6px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
-.rep-strong { font-weight: 600; }
-.rep-sub { font-size: 8.5px; color: #6b7280; }
+.rep-table td { padding: 6px 7px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+.rep-table tbody tr:nth-child(even) { background: #f8fafc; }
+/* Alinhamento: # (1), Qtd (3), Modalidade (7) e Data (8) centralizados */
+.rep-table th:nth-child(1), .rep-table td:nth-child(1),
+.rep-table th:nth-child(3), .rep-table td:nth-child(3),
+.rep-table th:nth-child(7), .rep-table td:nth-child(7),
+.rep-table th:nth-child(8), .rep-table td:nth-child(8) { text-align: center; }
+.rep-strong { font-weight: 600; color: #1f2937; }
+.rep-sub { font-size: 8px; color: #6b7280; margin-top: 1px; }
 .rep-late { color: #b45309; }
-.rep-mono { font-family: Consolas, monospace; font-size: 9px; }
-.rep-mode-badge { display: inline-block; padding: 1px 7px; border: 1px solid; border-radius: 999px; font-size: 8.5px; font-weight: 700; }
+.rep-mono { font-family: Consolas, monospace; font-size: 8.5px; color: #475569; }
+.rep-mode-badge { display: inline-block; padding: 2px 8px; border: 1px solid; border-radius: 999px; font-size: 8px; font-weight: 700; white-space: nowrap; }
 .rep-empty { text-align: center; color: #6b7280; padding: 20px; }
 
 .rep-footer {
