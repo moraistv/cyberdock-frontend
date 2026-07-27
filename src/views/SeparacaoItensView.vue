@@ -27,53 +27,72 @@
 
         <!-- Filtros -->
         <div class="filters-card">
-          <div class="filters-grid">
-            <div class="filter-group">
-              <label>Período da Venda</label>
+          <!-- Datas + presets -->
+          <div class="filters-dates">
+            <div class="filter-block">
+              <label class="filter-label">Período da Venda</label>
               <div class="date-range">
-                <input type="date" v-model="filters.saleDateStart" />
+                <input type="date" v-model="filters.saleDateStart" @change="activeVendaPreset = null" />
                 <span>até</span>
-                <input type="date" v-model="filters.saleDateEnd" />
+                <input type="date" v-model="filters.saleDateEnd" @change="activeVendaPreset = null" />
+              </div>
+              <div class="preset-chips">
+                <button :class="{ active: activeVendaPreset === 'hoje' }" @click="setVendaPeriodo('hoje')">Hoje</button>
+                <button :class="{ active: activeVendaPreset === '7dias' }" @click="setVendaPeriodo('7dias')">7 dias</button>
+                <button :class="{ active: activeVendaPreset === '30dias' }" @click="setVendaPeriodo('30dias')">30 dias</button>
+                <button :class="{ active: activeVendaPreset === 'mes' }" @click="setVendaPeriodo('mes')">Este mês</button>
               </div>
             </div>
-            <div class="filter-group">
-              <label>Prazo para Despachar</label>
+
+            <div class="filter-block">
+              <label class="filter-label">Prazo para Despachar</label>
               <div class="date-range">
-                <input type="date" v-model="filters.shippingLimitStart" />
+                <input type="date" v-model="filters.shippingLimitStart" @change="activePrazoPreset = null" />
                 <span>até</span>
-                <input type="date" v-model="filters.shippingLimitEnd" />
+                <input type="date" v-model="filters.shippingLimitEnd" @change="activePrazoPreset = null" />
+              </div>
+              <div class="preset-chips">
+                <button class="chip-danger" :class="{ active: activePrazoPreset === 'atrasados' }" @click="setPrazoPeriodo('atrasados')">Atrasados</button>
+                <button :class="{ active: activePrazoPreset === 'hoje' }" @click="setPrazoPeriodo('hoje')">Hoje</button>
+                <button :class="{ active: activePrazoPreset === 'amanha' }" @click="setPrazoPeriodo('amanha')">Amanhã</button>
+                <button :class="{ active: activePrazoPreset === '7dias' }" @click="setPrazoPeriodo('7dias')">7 dias</button>
               </div>
             </div>
-            <div class="filter-group">
-              <label>Modalidade de Envio</label>
-              <select v-model="filters.shippingMode">
-                <option value="">Todas</option>
-                <option v-for="m in modeOptions" :key="m" :value="m">{{ m }}</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label>Conta</label>
-              <select v-model="filters.account">
-                <option value="">Todas as contas</option>
-                <option v-for="acc in accountOptions" :key="acc" :value="acc">{{ acc }}</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label>Usuário</label>
-              <select v-model="filters.userNickname">
-                <option value="">Todos os usuários</option>
-                <option v-for="usr in userOptions" :key="usr" :value="usr">{{ usr }}</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label>Situação de Despacho</label>
+          </div>
+
+          <!-- Selects -->
+          <div class="filters-selects">
+            <div class="filter-block">
+              <label class="filter-label">Situação de Despacho</label>
               <select v-model="filters.despacho" @change="aplicarFiltros">
                 <option value="nao">A despachar</option>
                 <option value="sim">Já despachados</option>
                 <option value="todos">Todos</option>
               </select>
             </div>
+            <div class="filter-block">
+              <label class="filter-label">Modalidade de Envio</label>
+              <select v-model="filters.shippingMode">
+                <option value="">Todas</option>
+                <option v-for="m in modeOptions" :key="m" :value="m">{{ m }}</option>
+              </select>
+            </div>
+            <div class="filter-block">
+              <label class="filter-label">Conta</label>
+              <select v-model="filters.account">
+                <option value="">Todas as contas</option>
+                <option v-for="acc in accountOptions" :key="acc" :value="acc">{{ acc }}</option>
+              </select>
+            </div>
+            <div class="filter-block">
+              <label class="filter-label">Usuário</label>
+              <select v-model="filters.userNickname">
+                <option value="">Todos os usuários</option>
+                <option v-for="usr in userOptions" :key="usr" :value="usr">{{ usr }}</option>
+              </select>
+            </div>
           </div>
+
           <div class="filters-actions">
             <button class="btn-link" @click="limparFiltros">
               <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
@@ -302,6 +321,57 @@ const isExporting = ref(false);
 const isPrinting = ref(false);
 const error = ref(null);
 
+// Presets ativos (para destaque dos chips)
+const activeVendaPreset = ref(null);
+const activePrazoPreset = ref(null);
+
+function ymd(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function addDays(base, n) {
+  const d = new Date(base);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+function setVendaPeriodo(kind) {
+  const hoje = new Date();
+  if (kind === 'hoje') {
+    filters.saleDateStart = ymd(hoje);
+    filters.saleDateEnd = ymd(hoje);
+  } else if (kind === '7dias') {
+    filters.saleDateStart = ymd(addDays(hoje, -6));
+    filters.saleDateEnd = ymd(hoje);
+  } else if (kind === '30dias') {
+    filters.saleDateStart = ymd(addDays(hoje, -29));
+    filters.saleDateEnd = ymd(hoje);
+  } else if (kind === 'mes') {
+    filters.saleDateStart = ymd(new Date(hoje.getFullYear(), hoje.getMonth(), 1));
+    filters.saleDateEnd = ymd(hoje);
+  }
+  activeVendaPreset.value = kind;
+  aplicarFiltros();
+}
+
+function setPrazoPeriodo(kind) {
+  const hoje = new Date();
+  if (kind === 'atrasados') {
+    filters.shippingLimitStart = '';
+    filters.shippingLimitEnd = ymd(addDays(hoje, -1));
+  } else if (kind === 'hoje') {
+    filters.shippingLimitStart = ymd(hoje);
+    filters.shippingLimitEnd = ymd(hoje);
+  } else if (kind === 'amanha') {
+    filters.shippingLimitStart = ymd(addDays(hoje, 1));
+    filters.shippingLimitEnd = ymd(addDays(hoje, 1));
+  } else if (kind === '7dias') {
+    filters.shippingLimitStart = ymd(hoje);
+    filters.shippingLimitEnd = ymd(addDays(hoje, 7));
+  }
+  activePrazoPreset.value = kind;
+  aplicarFiltros();
+}
+
 // ---- Relatório de impressão ----
 const reportRows = ref([]);
 const reportReady = ref(false);
@@ -372,6 +442,8 @@ function limparFiltros() {
   filters.userNickname = '';
   filters.despacho = 'nao';
   filters.sort = 'prazo_asc';
+  activeVendaPreset.value = null;
+  activePrazoPreset.value = null;
   aplicarFiltros();
 }
 
@@ -538,6 +610,11 @@ async function imprimirPdf() {
 }
 
 onMounted(() => {
+  // Padrão ao abrir: itens a despachar HOJE
+  const hoje = ymd(new Date());
+  filters.shippingLimitStart = hoje;
+  filters.shippingLimitEnd = hoje;
+  activePrazoPreset.value = 'hoje';
   fetchFilterOptions();
   fetchData();
 });
@@ -584,17 +661,32 @@ onMounted(() => {
 
 /* Filtros */
 .filters-card { background: #fff; border: 1px solid var(--color-border); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.25rem; }
-.filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
-.filter-group { display: flex; flex-direction: column; gap: 0.4rem; }
-.filter-group label { font-size: 0.75rem; font-weight: 600; color: var(--color-text-secondary); }
-.filter-group input[type="date"], .filter-group select {
+.filters-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+.filters-selects { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1.1rem; }
+.filter-block { display: flex; flex-direction: column; gap: 0.4rem; }
+.filter-label { font-size: 0.75rem; font-weight: 600; color: var(--color-text-secondary); }
+.filter-block input[type="date"], .filter-block select {
   border: 1px solid var(--color-border); border-radius: 8px; padding: 0.5rem 0.6rem;
   font-size: 0.85rem; color: var(--color-text); background: #fff; width: 100%;
 }
-.filter-group input:focus, .filter-group select:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+.filter-block input:focus, .filter-block select:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
 .date-range { display: flex; align-items: center; gap: 0.4rem; }
+.date-range input { flex: 1; min-width: 0; }
 .date-range span { color: var(--color-text-secondary); font-size: 0.8rem; }
-.filters-actions { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; margin-top: 1rem; }
+.preset-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.15rem; }
+.preset-chips button {
+  padding: 0.25rem 0.65rem; font-size: 0.72rem; font-weight: 600; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--color-border); background: #fff; color: var(--color-text-secondary); transition: all 0.15s ease;
+}
+.preset-chips button:hover { background: var(--color-bg-soft); color: var(--color-text); }
+.preset-chips button.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.preset-chips button.chip-danger.active { background: #dc2626; border-color: #dc2626; }
+.filters-actions { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; margin-top: 1.1rem; border-top: 1px solid var(--color-border); padding-top: 1rem; }
+
+@media (max-width: 900px) {
+  .filters-dates { grid-template-columns: 1fr; }
+  .filters-selects { grid-template-columns: 1fr 1fr; }
+}
 
 /* Cards de resumo */
 .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }

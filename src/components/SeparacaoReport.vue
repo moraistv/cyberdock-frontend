@@ -79,6 +79,17 @@
 
       <!-- Tabela da página -->
       <table class="rep-table">
+        <colgroup>
+          <col style="width: 3%" />
+          <col style="width: 13%" />
+          <col style="width: 4%" />
+          <col style="width: 12%" />
+          <col style="width: 27%" />
+          <col style="width: 16%" />
+          <col style="width: 11%" />
+          <col style="width: 8%" />
+          <col style="width: 6%" />
+        </colgroup>
         <thead>
           <tr>
             <th>#</th>
@@ -211,7 +222,8 @@ function prazoDate(item) {
 .rep-mode__count { font-weight: 700; }
 .rep-mode__name { color: #6b7280; text-transform: uppercase; font-size: 8px; }
 
-.rep-table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+.rep-table { width: 100%; border-collapse: collapse; font-size: 9.5px; table-layout: fixed; }
+.rep-table td, .rep-table th { overflow-wrap: anywhere; word-break: break-word; }
 .rep-table th {
   text-align: left; padding: 6px 6px; background: #f3f4f6; border-bottom: 1px solid #d1d5db;
   font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.02em; color: #4b5563; font-weight: 700;
