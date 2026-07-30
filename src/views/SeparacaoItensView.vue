@@ -191,31 +191,27 @@
             <table class="sep-table">
               <thead>
                 <tr>
-                  <th>Conta</th>
-                  <th class="ta-center">Qtd.</th>
-                  <th>SKU</th>
-                  <th>Descrição do Produto</th>
-                  <th>Variação</th>
-                  <th>Comprador</th>
-                  <th>Modalidade de Envio</th>
-                  <th>Data para Despachar</th>
-                  <th>ID da Venda</th>
+                  <th class="col-qtd">Qtd.</th>
+                  <th class="col-produto">Produto</th>
+                  <th class="col-conta">Conta / Cliente</th>
+                  <th class="col-comprador">Comprador</th>
+                  <th class="col-envio">Envio</th>
+                  <th class="col-prazo">Despachar</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="item in items" :key="`${item.id}-${item.sku}-${item.uid}`">
-                  <td>
-                    <div class="cell-strong">{{ item.account_nickname || '—' }}</div>
-                    <div class="cell-sub">{{ item.user_nickname || '—' }}</div>
+                  <!-- Qtd em destaque: é o número que o separador precisa ver primeiro -->
+                  <td class="col-qtd">
+                    <span class="qty-badge" :class="{ 'qty-badge--multi': Number(item.quantity) > 1 }">
+                      {{ item.quantity }}
+                    </span>
                   </td>
-                  <td class="ta-center">
-                    <span class="qty">{{ item.quantity }}</span>
-                    <span class="qty-un">un.</span>
-                  </td>
-                  <td><span class="mono">{{ item.sku || '—' }}</span></td>
-                  <td class="cell-desc" :title="descricaoTitle(item)">
-                    <span class="desc-wrap">
-                      <span class="desc-origin" :class="temDescricaoInterna(item) ? 'desc-origin--cd' : 'desc-origin--ml'">
+
+                  <!-- Produto: descrição + SKU + variação juntos (antes eram 3 colunas) -->
+                  <td class="col-produto">
+                    <div class="prod">
+                      <span class="desc-origin" :class="temDescricaoInterna(item) ? 'desc-origin--cd' : 'desc-origin--ml'" :title="descricaoTitle(item)">
                         <svg v-if="temDescricaoInterna(item)" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                           <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
@@ -223,28 +219,51 @@
                         </svg>
                         <img v-else src="/img/ml-logo.svg" alt="Mercado Livre" class="desc-origin__img" />
                       </span>
-                      <span class="desc-text">{{ descricaoProduto(item) }}</span>
-                    </span>
+                      <div class="prod__body">
+                        <div class="prod__desc" :title="descricaoProduto(item)">{{ descricaoProduto(item) }}</div>
+                        <div class="prod__meta">
+                          <span class="chip chip--sku" :title="`SKU: ${item.sku || '—'}`">{{ item.sku || '—' }}</span>
+                          <span v-if="variacao(item)" class="chip chip--var" :title="variacao(item)">{{ variacao(item) }}</span>
+                        </div>
+                      </div>
+                    </div>
                   </td>
-                  <td>
-                    <span v-if="variacao(item)" class="variation-tag" :title="variacao(item)">{{ variacao(item) }}</span>
-                    <span v-else class="text-muted">—</span>
+
+                  <!-- Conta / Cliente -->
+                  <td class="col-conta">
+                    <div class="cell-strong">{{ item.account_nickname || '—' }}</div>
+                    <div class="cell-sub">{{ item.user_nickname || '—' }}</div>
                   </td>
-                  <td>
-                    <div class="cell-strong">{{ item.buyer_nickname || '—' }}</div>
-                    <div class="cell-sub">{{ customerName(item) }}</div>
+
+                  <!-- Comprador -->
+                  <td class="col-comprador">
+                    <div class="cell-strong">{{ customerName(item) }}</div>
+                    <div class="cell-sub">{{ item.buyer_nickname || '—' }}</div>
                   </td>
-                  <td>
+
+                  <!-- Modalidade de envio -->
+                  <td class="col-envio">
                     <span class="mode-badge" :style="{ background: modeMeta(item.shipping_mode).bg, color: modeMeta(item.shipping_mode).color }">
                       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="modeMeta(item.shipping_mode).icon"></svg>
                       {{ modeMeta(item.shipping_mode).label }}
                     </span>
                   </td>
-                  <td>
-                    <div class="prazo" :class="{ 'prazo--late': isLate(prazoDate(item)) }">{{ formatDate(prazoDate(item)) }}</div>
-                    <div class="prazo-rel">{{ relativeDay(prazoDate(item)) }}</div>
+
+                  <!-- Prazo + ID da venda (com copiar, sem cortar) -->
+                  <td class="col-prazo">
+                    <div class="prazo" :class="{ 'prazo--late': isLate(prazoDate(item)) }">
+                      {{ formatDate(prazoDate(item)) }}
+                      <span class="prazo-rel-inline">{{ relativeDay(prazoDate(item)) }}</span>
+                    </div>
+                    <button type="button" class="id-copy" :title="`Copiar ID da venda: ${item.id}`" @click="copiarId(item.id)">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                      </svg>
+                      <span>{{ item.id }}</span>
+                      <span v-if="idCopiado === String(item.id)" class="id-copy__ok">copiado</span>
+                    </button>
                   </td>
-                  <td><span class="mono id-venda">{{ item.id }}</span></td>
                 </tr>
               </tbody>
             </table>
@@ -339,6 +358,20 @@ const isLoading = ref(false);
 const isExporting = ref(false);
 const isPrinting = ref(false);
 const error = ref(null);
+
+// Feedback do "copiar ID da venda"
+const idCopiado = ref(null);
+async function copiarId(id) {
+  try {
+    await navigator.clipboard.writeText(String(id));
+    idCopiado.value = String(id);
+    setTimeout(() => {
+      if (idCopiado.value === String(id)) idCopiado.value = null;
+    }, 1500);
+  } catch {
+    // clipboard bloqueado pelo navegador — ignora silenciosamente
+  }
+}
 
 // Presets ativos (para destaque dos chips)
 const activeVendaPreset = ref(null);
@@ -765,43 +798,80 @@ onMounted(() => {
 
 .table-state { padding: 3rem; text-align: center; color: var(--color-text-secondary); }
 .table-state.error { color: #dc2626; }
-.table-scroll { overflow-x: auto; }
-.sep-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.table-scroll { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 260px); }
+.sep-table { width: 100%; min-width: 940px; border-collapse: collapse; font-size: 0.85rem; table-layout: fixed; }
 .sep-table thead th {
-  text-align: left; padding: 0.75rem 1rem; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.03em; color: var(--color-text-secondary); background: var(--color-bg-soft); border-bottom: 1px solid var(--color-border); white-space: nowrap;
+  text-align: left; padding: 0.7rem 0.9rem; font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--color-text-secondary); background: var(--color-bg-soft);
+  border-bottom: 1px solid var(--color-border); white-space: nowrap;
+  position: sticky; top: 0; z-index: 2;
 }
-.sep-table tbody td { padding: 0.7rem 1rem; border-bottom: 1px solid #f3f4f6; color: var(--color-text); vertical-align: middle; }
-.sep-table tbody tr:hover { background: #fafafe; }
+.sep-table tbody td { padding: 0.7rem 0.9rem; border-bottom: 1px solid #f3f4f6; color: var(--color-text); vertical-align: middle; }
+.sep-table tbody tr:nth-child(even) { background: #fcfcfd; }
+.sep-table tbody tr:hover { background: #f5f6ff; }
+
+/* Larguras — sobra espaço para o produto e o ID não corta mais */
+.col-qtd { width: 62px; text-align: center; }
+.col-produto { width: auto; }
+.col-conta { width: 160px; }
+.col-comprador { width: 180px; }
+.col-envio { width: 140px; }
+.col-prazo { width: 200px; }
+
 .ta-center { text-align: center; }
-.cell-strong { font-weight: 600; color: var(--color-text); }
-.cell-sub { font-size: 0.75rem; color: var(--color-text-secondary); }
-.cell-desc { max-width: 260px; }
-.desc-wrap { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
-.desc-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell-strong { font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell-sub { font-size: 0.72rem; color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Quantidade em destaque */
+.qty-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 26px;
+  padding: 0 0.4rem; border-radius: 8px; background: #f1f5f9; border: 1px solid #e2e8f0;
+  font-size: 0.85rem; font-weight: 700; color: #334155;
+}
+.qty-badge--multi { background: #eef2ff; border-color: #c7d2fe; color: #4338ca; }
+
+/* Produto: descrição + SKU + variação em um só bloco */
+.prod { display: flex; align-items: flex-start; gap: 0.5rem; min-width: 0; }
+.prod__body { min-width: 0; flex: 1; }
+.prod__desc {
+  font-weight: 600; color: var(--color-text); line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.prod__meta { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.2rem; flex-wrap: wrap; }
+.chip {
+  display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 0.05rem 0.4rem; border-radius: 5px; font-size: 0.7rem; font-weight: 600; line-height: 1.5;
+}
+.chip--sku { font-family: 'SFMono-Regular', Consolas, monospace; background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }
+.chip--var { background: #eef2ff; border: 1px solid #e0e7ff; color: #4338ca; }
 /* Indicador da origem da descrição (CyberDock x Mercado Livre) */
 .desc-origin {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
+  width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; margin-top: 1px;
 }
 .desc-origin--cd { background: #eef2ff; color: #4f46e5; border: 1px solid #e0e7ff; }
 .desc-origin--ml { background: #fffbeb; border: 1px solid #fef3c7; }
 .desc-origin__img { width: 12px; height: 12px; object-fit: contain; }
-/* Variação escolhida na venda */
-.variation-tag {
-  display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  padding: 0.1rem 0.45rem; border-radius: 999px; background: #f1f5f9; border: 1px solid #e2e8f0;
-  color: #334155; font-size: 0.75rem; font-weight: 600;
-}
 .text-muted { color: var(--color-text-secondary); }
 .mono { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.8rem; }
-.id-venda { color: var(--color-text-secondary); }
-.qty { font-weight: 700; }
-.qty-un { font-size: 0.7rem; color: var(--color-text-secondary); margin-left: 2px; }
 .mode-badge { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
-.prazo { font-weight: 600; color: #b45309; }
+
+/* Prazo + ID da venda */
+.prazo { font-weight: 700; color: #b45309; white-space: nowrap; }
 .prazo--late { color: #dc2626; }
-.prazo-rel { font-size: 0.72rem; color: var(--color-text-secondary); }
+.prazo-rel-inline { font-weight: 500; font-size: 0.72rem; color: var(--color-text-secondary); margin-left: 0.35rem; }
+.id-copy {
+  display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.25rem; padding: 0.1rem 0.4rem 0.1rem 0.3rem;
+  border: 1px solid transparent; border-radius: 6px; background: none; cursor: pointer;
+  font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.72rem; color: var(--color-text-secondary);
+  max-width: 100%;
+}
+.id-copy:hover { background: #f1f5f9; border-color: var(--color-border); color: var(--color-text); }
+.id-copy svg { flex-shrink: 0; opacity: 0.7; }
+.id-copy__ok {
+  font-family: 'Inter', sans-serif; font-weight: 700; color: #16a34a; font-size: 0.65rem;
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
 
 /* Paginação */
 .pagination { display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1.2rem; border-top: 1px solid var(--color-border); flex-wrap: wrap; gap: 0.75rem; }
