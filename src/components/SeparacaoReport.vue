@@ -68,58 +68,63 @@
     <table class="rep-table">
       <colgroup>
         <col style="width: 3%" />
+        <col style="width: 5%" />
+        <col style="width: 34%" />
+        <col style="width: 14%" />
+        <col style="width: 15%" />
         <col style="width: 12%" />
-        <col style="width: 4%" />
-        <col style="width: 11%" />
-        <col style="width: 23%" />
-        <col style="width: 12%" />
-        <col style="width: 13%" />
-        <col style="width: 10%" />
-        <col style="width: 7%" />
-        <col style="width: 7%" />
+        <col style="width: 17%" />
       </colgroup>
       <thead>
         <tr>
           <th>#</th>
-          <th>Conta</th>
           <th>Qtd.</th>
-          <th>SKU</th>
-          <th>Descrição do Produto</th>
-          <th>Variação</th>
+          <th>Produto</th>
+          <th>Conta / Cliente</th>
           <th>Comprador</th>
-          <th>Modalidade</th>
+          <th>Envio</th>
           <th>Despachar</th>
-          <th>ID da Venda</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="(item, idx) in rows" :key="`${item.id}-${item.sku}-${item.uid}`">
           <td>{{ idx + 1 }}</td>
+          <!-- Quantidade destacada (realce quando for mais de 1 unidade) -->
+          <td>
+            <span class="rep-qty" :class="{ 'rep-qty--multi': Number(item.quantity) > 1 }">{{ item.quantity }}</span>
+          </td>
+          <!-- Produto: descrição + SKU + variação juntos -->
+          <td>
+            <div class="rep-prod-desc">{{ descricaoProduto(item) }}</div>
+            <div class="rep-prod-meta">
+              <span class="rep-chip rep-chip--sku">{{ item.sku || '—' }}</span>
+              <span v-if="variacao(item)" class="rep-chip rep-chip--var">{{ variacao(item) }}</span>
+            </div>
+          </td>
           <td>
             <div class="rep-strong">{{ item.account_nickname || '—' }}</div>
             <div class="rep-sub">{{ item.user_nickname || '—' }}</div>
           </td>
-          <td>{{ item.quantity }}</td>
-          <td class="rep-mono">{{ item.sku || '—' }}</td>
-          <td>{{ descricaoProduto(item) }}</td>
-          <td>{{ variacao(item) || '—' }}</td>
           <td>
-            <div class="rep-strong">{{ item.buyer_nickname || '—' }}</div>
-            <div class="rep-sub">{{ customerName(item) }}</div>
+            <div class="rep-strong">{{ customerName(item) }}</div>
+            <div class="rep-sub">{{ item.buyer_nickname || '—' }}</div>
           </td>
           <td>
             <span class="rep-mode-badge" :style="{ borderColor: modeMeta(item.shipping_mode).color, color: modeMeta(item.shipping_mode).color }">
               {{ modeMeta(item.shipping_mode).label }}
             </span>
           </td>
+          <!-- Prazo + ID da venda -->
           <td>
-            <div class="rep-strong">{{ formatDate(prazoDate(item)) }}</div>
-            <div class="rep-sub rep-late">{{ relativeDay(prazoDate(item)) }}</div>
+            <div class="rep-strong">
+              {{ formatDate(prazoDate(item)) }}
+              <span class="rep-rel">{{ relativeDay(prazoDate(item)) }}</span>
+            </div>
+            <div class="rep-sub rep-mono">{{ item.id }}</div>
           </td>
-          <td class="rep-mono">{{ item.id }}</td>
         </tr>
         <tr v-if="rows.length === 0">
-          <td colspan="10" class="rep-empty">Nenhum item encontrado para os filtros selecionados.</td>
+          <td colspan="7" class="rep-empty">Nenhum item encontrado para os filtros selecionados.</td>
         </tr>
       </tbody>
     </table>
@@ -200,17 +205,31 @@ function variacao(item) {
 }
 .rep-table td { padding: 6px 7px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
 .rep-table tbody tr:nth-child(even) { background: #f8fafc; }
-/* Centraliza #, Qtd., Modalidade e Despachar */
+/* Centraliza # , Qtd. e Envio */
 .rep-table th:nth-child(1), .rep-table td:nth-child(1),
-.rep-table th:nth-child(3), .rep-table td:nth-child(3),
-.rep-table th:nth-child(8), .rep-table td:nth-child(8),
-.rep-table th:nth-child(9), .rep-table td:nth-child(9) { text-align: center; }
+.rep-table th:nth-child(2), .rep-table td:nth-child(2),
+.rep-table th:nth-child(6), .rep-table td:nth-child(6) { text-align: center; }
 .rep-strong { font-weight: 600; color: #1f2937; }
 .rep-sub { font-size: 8px; color: #6b7280; margin-top: 1px; }
 .rep-late { color: #b45309; }
+.rep-rel { font-weight: 500; font-size: 8px; color: #b45309; margin-left: 3px; }
 .rep-mono { font-family: Consolas, monospace; font-size: 8.5px; color: #475569; }
 .rep-mode-badge { display: inline-block; padding: 2px 8px; border: 1px solid; border-radius: 999px; font-size: 8px; font-weight: 700; white-space: nowrap; }
 .rep-empty { text-align: center; color: #6b7280; padding: 20px; }
+
+/* Quantidade destacada */
+.rep-qty {
+  display: inline-block; min-width: 18px; padding: 1px 4px; border-radius: 4px;
+  background: #f1f5f9; border: 1px solid #e2e8f0; color: #334155; font-weight: 700; font-size: 9px;
+}
+.rep-qty--multi { background: #eef2ff; border-color: #c7d2fe; color: #4338ca; }
+
+/* Produto: descrição + chips de SKU e variação */
+.rep-prod-desc { font-weight: 600; color: #1f2937; line-height: 1.3; }
+.rep-prod-meta { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
+.rep-chip { display: inline-block; padding: 0 4px; border-radius: 3px; font-size: 8px; font-weight: 600; line-height: 1.6; }
+.rep-chip--sku { font-family: Consolas, monospace; background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }
+.rep-chip--var { background: #eef2ff; border: 1px solid #e0e7ff; color: #4338ca; }
 
 .rep-footer {
   display: flex; justify-content: space-between; font-size: 9px; color: #6b7280;
