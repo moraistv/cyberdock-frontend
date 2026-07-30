@@ -330,10 +330,20 @@
                                     <span class="sale-card__date-mobile">{{ formatDateTime(sale.sale_date) }}</span>
                                 </div>
                                 
-                                <!-- Título do Produto -->
+                                <!-- Descrição do produto: prioriza a cadastrada no Armazenamento (CyberDock) -->
                                 <div class="sale-card__title-row">
-                                    <h3 class="sale-card__product-title" :title="sale.product_title">
-                                        {{ sale.product_title || 'Produto sem título' }}
+                                    <span class="desc-origin"
+                                          :class="hasInternalDescription(sale) ? 'desc-origin--cd' : 'desc-origin--ml'"
+                                          :title="hasInternalDescription(sale) ? 'Descrição cadastrada na CyberDock (Armazenamento)' : 'Título original do anúncio no Mercado Livre'">
+                                        <svg v-if="hasInternalDescription(sale)" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                                            <line x1="12" y1="22.08" x2="12" y2="12" />
+                                        </svg>
+                                        <img v-else src="/img/ml-logo.svg" alt="Mercado Livre" class="desc-origin__img" />
+                                    </span>
+                                    <h3 class="sale-card__product-title" :title="getProductDescription(sale)">
+                                        {{ getProductDescription(sale) }}
                                     </h3>
                                     <div class="sale-card__badges">
                                         <span class="channel-badge ml">{{ sale.channel }}</span>
@@ -661,6 +671,17 @@ const filters = reactive({
     shippingStatus: null,
 });
 
+// Descrição do produto: prioridade 1 = descrição cadastrada no Armazenamento.
+// Sem ela, cai no título original do anúncio do Mercado Livre.
+function hasInternalDescription(sale) {
+    return !!(sale?.sku_descricao && String(sale.sku_descricao).trim());
+}
+
+function getProductDescription(sale) {
+    if (hasInternalDescription(sale)) return String(sale.sku_descricao).trim();
+    return sale?.product_title || 'Produto sem título';
+}
+
 function getThumbUrl(sale) {
     let thumbUrl = sale.product_thumbnail;
     if (thumbUrl === 'not_found') return null;
@@ -742,6 +763,7 @@ const filteredUserSales = computed(() => {
         const query = searchQuery.value.toLowerCase();
         tempSales = tempSales.filter(s =>
             (s.product_title?.toLowerCase().includes(query)) ||
+            (s.sku_descricao?.toLowerCase().includes(query)) ||
             (s.sku?.toLowerCase().includes(query)) ||
             (s.account_nickname?.toLowerCase().includes(query))
         );
@@ -3394,6 +3416,21 @@ onUnmounted(() => {
     margin-bottom: 0.5rem;
     flex-wrap: wrap;
 }
+
+/* Indicador da origem da descrição (CyberDock x Mercado Livre) */
+.desc-origin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+.desc-origin--cd { background: #eef2ff; color: #4f46e5; border: 1px solid #e0e7ff; }
+.desc-origin--ml { background: #fffbeb; border: 1px solid #fef3c7; }
+.desc-origin__img { width: 14px; height: 14px; object-fit: contain; }
 
 .sale-card__product-title {
     font-size: 1.05rem;

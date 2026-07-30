@@ -282,13 +282,25 @@
                                     </div>
                                     <span class="sale-card__date-mobile">{{ formatDateTime(sale.sale_date) }}</span>
                                 </div>
-                                <!-- Título do Produto (clicável) + Logo ML + Conta -->
+                                <!-- Descrição do produto: prioriza a cadastrada no Armazenamento (CyberDock) -->
                                 <div class="sale-card__title-row">
-                                    <a v-if="getProductLink(sale)" :href="getProductLink(sale)" target="_blank" rel="noopener" class="sale-card__product-link" :title="sale.product_title">
-                                        {{ sale.product_title || 'Produto sem título' }}
+                                    <span class="desc-origin"
+                                          :class="hasInternalDescription(sale) ? 'desc-origin--cd' : 'desc-origin--ml'"
+                                          :title="hasInternalDescription(sale) ? 'Descrição cadastrada na CyberDock (Armazenamento)' : 'Título original do anúncio no Mercado Livre'">
+                                        <!-- CyberDock: descrição interna -->
+                                        <svg v-if="hasInternalDescription(sale)" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                                            <line x1="12" y1="22.08" x2="12" y2="12" />
+                                        </svg>
+                                        <!-- Mercado Livre: título original do anúncio -->
+                                        <img v-else src="/img/ml-logo.svg" alt="Mercado Livre" class="desc-origin__img" />
+                                    </span>
+                                    <a v-if="getProductLink(sale)" :href="getProductLink(sale)" target="_blank" rel="noopener" class="sale-card__product-link" :title="getProductDescription(sale)">
+                                        {{ getProductDescription(sale) }}
                                     </a>
-                                    <h3 v-else class="sale-card__product-title" :title="sale.product_title">
-                                        {{ sale.product_title || 'Produto sem título' }}
+                                    <h3 v-else class="sale-card__product-title" :title="getProductDescription(sale)">
+                                        {{ getProductDescription(sale) }}
                                     </h3>
                                     <div class="sale-card__badges">
                                         <img v-if="sale.channel?.toLowerCase() === 'ml'" src="/img/ml-logo.svg" alt="Mercado Livre" class="sale-card__ml-logo" />
@@ -1136,6 +1148,17 @@ function getProductLink(sale) {
     return null;
 }
 
+// Descrição do produto: prioridade 1 = descrição cadastrada no Armazenamento
+// (tabela skus, por conta/cliente). Sem ela, cai no título original do anúncio.
+function hasInternalDescription(sale) {
+    return !!(sale?.sku_descricao && String(sale.sku_descricao).trim());
+}
+
+function getProductDescription(sale) {
+    if (hasInternalDescription(sale)) return String(sale.sku_descricao).trim();
+    return sale?.product_title || 'Produto sem título';
+}
+
 // Thumbnail - usa o proxy do backend para servir imagens do ML sem 403
 function getThumbUrl(sale) {
     let thumbUrl = sale.product_thumbnail;
@@ -1688,6 +1711,32 @@ function getThumbUrl(sale) {
     gap: 0.75rem;
     margin-bottom: 0.5rem;
     flex-wrap: wrap;
+}
+
+/* Indicador da origem da descrição (CyberDock x Mercado Livre) */
+.desc-origin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+.desc-origin--cd {
+    background: #eef2ff;
+    color: #4f46e5;
+    border: 1px solid #e0e7ff;
+}
+.desc-origin--ml {
+    background: #fffbeb;
+    border: 1px solid #fef3c7;
+}
+.desc-origin__img {
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
 }
 
 .sale-card__product-title,

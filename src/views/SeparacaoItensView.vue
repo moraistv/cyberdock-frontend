@@ -212,7 +212,19 @@
                     <span class="qty-un">un.</span>
                   </td>
                   <td><span class="mono">{{ item.sku || '—' }}</span></td>
-                  <td class="cell-desc" :title="item.product_title">{{ item.product_title || '—' }}</td>
+                  <td class="cell-desc" :title="descricaoTitle(item)">
+                    <span class="desc-wrap">
+                      <span class="desc-origin" :class="temDescricaoInterna(item) ? 'desc-origin--cd' : 'desc-origin--ml'">
+                        <svg v-if="temDescricaoInterna(item)" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                          <line x1="12" y1="22.08" x2="12" y2="12" />
+                        </svg>
+                        <img v-else src="/img/ml-logo.svg" alt="Mercado Livre" class="desc-origin__img" />
+                      </span>
+                      <span class="desc-text">{{ descricaoProduto(item) }}</span>
+                    </span>
+                  </td>
                   <td>
                     <div class="cell-strong">{{ item.buyer_nickname || '—' }}</div>
                     <div class="cell-sub">{{ customerName(item) }}</div>
@@ -271,6 +283,7 @@
       :format-date="formatDate"
       :relative-day="relativeDay"
       :customer-name="customerName"
+      :descricao-produto="descricaoProduto"
     />
   </div>
 </template>
@@ -514,6 +527,23 @@ function customerName(item) {
   return parts.join(' ') || '—';
 }
 
+// Descrição do produto: prioridade 1 = descrição cadastrada no Armazenamento
+// (por conta/cliente). Sem ela, usa o título original do anúncio do ML.
+function temDescricaoInterna(item) {
+  return !!(item?.sku_descricao && String(item.sku_descricao).trim());
+}
+
+function descricaoProduto(item) {
+  if (temDescricaoInterna(item)) return String(item.sku_descricao).trim();
+  return item?.product_title || '—';
+}
+
+function descricaoTitle(item) {
+  return temDescricaoInterna(item)
+    ? `${descricaoProduto(item)} (descrição CyberDock)`
+    : `${descricaoProduto(item)} (título do anúncio no Mercado Livre)`;
+}
+
 const MODE_META = {
   FULL: { label: 'FULL', color: '#4f46e5', bg: '#eef2ff', icon: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" />' },
   FLEX: { label: 'FLEX', color: '#ea580c', bg: '#fff7ed', icon: '<circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" />' },
@@ -547,7 +577,7 @@ async function exportCsv() {
         it.user_nickname || '',
         it.quantity ?? '',
         it.sku || '',
-        it.product_title || '',
+        descricaoProduto(it),
         it.buyer_nickname || '',
         customerName(it),
         modeMeta(it.shipping_mode).label,
@@ -733,7 +763,17 @@ onMounted(() => {
 .ta-center { text-align: center; }
 .cell-strong { font-weight: 600; color: var(--color-text); }
 .cell-sub { font-size: 0.75rem; color: var(--color-text-secondary); }
-.cell-desc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell-desc { max-width: 260px; }
+.desc-wrap { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
+.desc-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Indicador da origem da descrição (CyberDock x Mercado Livre) */
+.desc-origin {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
+}
+.desc-origin--cd { background: #eef2ff; color: #4f46e5; border: 1px solid #e0e7ff; }
+.desc-origin--ml { background: #fffbeb; border: 1px solid #fef3c7; }
+.desc-origin__img { width: 12px; height: 12px; object-fit: contain; }
 .mono { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.8rem; }
 .id-venda { color: var(--color-text-secondary); }
 .qty { font-weight: 700; }

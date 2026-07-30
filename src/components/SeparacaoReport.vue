@@ -112,7 +112,7 @@
             </td>
             <td>{{ item.quantity }}</td>
             <td class="rep-mono">{{ item.sku || '—' }}</td>
-            <td>{{ item.product_title || '—' }}</td>
+            <td>{{ descricaoProduto(item) }}</td>
             <td>
               <div class="rep-strong">{{ item.buyer_nickname || '—' }}</div>
               <div class="rep-sub">{{ customerName(item) }}</div>
@@ -157,6 +157,7 @@ const props = defineProps({
   formatDate: { type: Function, required: true },
   relativeDay: { type: Function, required: true },
   customerName: { type: Function, required: true },
+  descricaoProduto: { type: Function, required: true },
 });
 
 const emissionDate = new Date().toLocaleString('pt-BR', {
