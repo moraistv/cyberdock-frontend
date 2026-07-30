@@ -446,6 +446,7 @@ import { useMasterSales } from '@/composables/useMasterSales';
 import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
 import { API_BASE_URL } from '@/config';
+import { formatVariation } from '@/utils/variation';
 import UniversalModal from './UniversalModal.vue';
 
 // ===== UTILITY FUNCTIONS FOR CUSTOMER DATA =====
@@ -1167,25 +1168,8 @@ function getProductDescription(sale) {
     return sale?.product_title || 'Produto sem título';
 }
 
-// Variação escolhida na venda (ex.: "Cor: Azul · Tamanho: M").
-// Vem de variation_attributes do item do pedido; se não houver, fica vazio.
-function formatVariation(attrs) {
-    let list = attrs;
-    if (typeof list === 'string') {
-        try { list = JSON.parse(list); } catch { return ''; }
-    }
-    if (!Array.isArray(list) || list.length === 0) return '';
-    return list
-        .map((a) => {
-            const nome = a?.name ? String(a.name).trim() : '';
-            const valor = a?.value_name ? String(a.value_name).trim() : '';
-            if (!valor) return '';
-            return nome ? `${nome}: ${valor}` : valor;
-        })
-        .filter(Boolean)
-        .join(' · ');
-}
-
+// Variação escolhida na venda (ex.: "Cor: Preto · Tamanho: 42 BR").
+// Só atributos relevantes para a separação — ver src/utils/variation.js.
 function getVariation(sale) {
     // Pacote agrupado: junta as variações dos itens que tiverem
     if (Array.isArray(sale?._items) && sale._items.length > 0) {

@@ -537,6 +537,7 @@
 <script setup>
 /* eslint-disable no-unused-vars */
 import { defineProps, ref, onMounted, onUnmounted, computed, watch, nextTick, toRefs, reactive } from 'vue';
+import { formatVariation } from '@/utils/variation';
 import gsap from 'gsap';
 import { useSalesForUser } from '@/composables/useSalesForUser';
 import { useUserStorage } from '@/composables/useUserStorage';
@@ -690,22 +691,10 @@ function getProductDescription(sale) {
     return sale?.product_title || 'Produto sem título';
 }
 
-// Variação escolhida na venda (ex.: "Cor: Azul · Tamanho: M")
+// Variação escolhida na venda (ex.: "Cor: Preto · Tamanho: 42 BR").
+// Só atributos relevantes para a separação — ver src/utils/variation.js.
 function getVariation(sale) {
-    let list = sale?.variation_attributes;
-    if (typeof list === 'string') {
-        try { list = JSON.parse(list); } catch { return ''; }
-    }
-    if (!Array.isArray(list) || list.length === 0) return '';
-    return list
-        .map((a) => {
-            const nome = a?.name ? String(a.name).trim() : '';
-            const valor = a?.value_name ? String(a.value_name).trim() : '';
-            if (!valor) return '';
-            return nome ? `${nome}: ${valor}` : valor;
-        })
-        .filter(Boolean)
-        .join(' · ');
+    return formatVariation(sale?.variation_attributes);
 }
 
 function getThumbUrl(sale) {

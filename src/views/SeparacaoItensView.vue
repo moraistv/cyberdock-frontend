@@ -300,6 +300,7 @@ import TopbarComponent from '@/components/TopbarComponent.vue';
 import SeparacaoReport from '@/components/SeparacaoReport.vue';
 import { useApi } from '@/composables/useApi';
 import { useAuth } from '@/composables/useAuth';
+import { formatVariation } from '@/utils/variation';
 
 const api = useApi();
 const { user } = useAuth();
@@ -549,22 +550,10 @@ function descricaoTitle(item) {
     : `${descricaoProduto(item)} (título do anúncio no Mercado Livre)`;
 }
 
-// Variação escolhida na venda (ex.: "Cor: Azul · Tamanho: M")
+// Variação escolhida na venda (ex.: "Cor: Preto · Tamanho: 42 BR").
+// Só atributos relevantes para a separação — ver src/utils/variation.js.
 function variacao(item) {
-  let list = item?.variation_attributes;
-  if (typeof list === 'string') {
-    try { list = JSON.parse(list); } catch { return ''; }
-  }
-  if (!Array.isArray(list) || list.length === 0) return '';
-  return list
-    .map((a) => {
-      const nome = a?.name ? String(a.name).trim() : '';
-      const valor = a?.value_name ? String(a.value_name).trim() : '';
-      if (!valor) return '';
-      return nome ? `${nome}: ${valor}` : valor;
-    })
-    .filter(Boolean)
-    .join(' · ');
+  return formatVariation(item?.variation_attributes);
 }
 
 const MODE_META = {

@@ -135,6 +135,7 @@
 <script setup>
 import { defineProps } from 'vue';
 import logo from '@/assets/logo.png';
+import { formatVariation } from '@/utils/variation';
 
 defineProps({
   rows: { type: Array, default: () => [] },
@@ -156,22 +157,9 @@ function prazoDate(item) {
   return item.sla_expected_date || item.shipping_limit_date || null;
 }
 
-// Variação escolhida na venda (ex.: "Cor: Azul · Tamanho: M")
+// Variação escolhida na venda (só atributos relevantes para a separação)
 function variacao(item) {
-  let list = item?.variation_attributes;
-  if (typeof list === 'string') {
-    try { list = JSON.parse(list); } catch { return ''; }
-  }
-  if (!Array.isArray(list) || list.length === 0) return '';
-  return list
-    .map((a) => {
-      const nome = a?.name ? String(a.name).trim() : '';
-      const valor = a?.value_name ? String(a.value_name).trim() : '';
-      if (!valor) return '';
-      return nome ? `${nome}: ${valor}` : valor;
-    })
-    .filter(Boolean)
-    .join(' · ');
+  return formatVariation(item?.variation_attributes);
 }
 </script>
 
