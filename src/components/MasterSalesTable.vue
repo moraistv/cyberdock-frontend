@@ -342,6 +342,14 @@
                                         <span class="sale-card__spec-label">QTD:</span>
                                         <span class="sale-card__spec-value">{{ sale._totalQty }}</span>
                                     </span>
+                                    <!-- Variação escolhida na venda (cor, tamanho...) -->
+                                    <template v-if="getVariation(sale)">
+                                        <span class="sale-card__divider">|</span>
+                                        <span class="sale-card__spec">
+                                            <span class="sale-card__spec-label">Variação:</span>
+                                            <span class="variation-tag" :title="getVariation(sale)">{{ getVariation(sale) }}</span>
+                                        </span>
+                                    </template>
                                 </div>
 
                                 <!-- Footer: Vendedor • Comprador • Modo Envio -->
@@ -1159,6 +1167,34 @@ function getProductDescription(sale) {
     return sale?.product_title || 'Produto sem título';
 }
 
+// Variação escolhida na venda (ex.: "Cor: Azul · Tamanho: M").
+// Vem de variation_attributes do item do pedido; se não houver, fica vazio.
+function formatVariation(attrs) {
+    let list = attrs;
+    if (typeof list === 'string') {
+        try { list = JSON.parse(list); } catch { return ''; }
+    }
+    if (!Array.isArray(list) || list.length === 0) return '';
+    return list
+        .map((a) => {
+            const nome = a?.name ? String(a.name).trim() : '';
+            const valor = a?.value_name ? String(a.value_name).trim() : '';
+            if (!valor) return '';
+            return nome ? `${nome}: ${valor}` : valor;
+        })
+        .filter(Boolean)
+        .join(' · ');
+}
+
+function getVariation(sale) {
+    // Pacote agrupado: junta as variações dos itens que tiverem
+    if (Array.isArray(sale?._items) && sale._items.length > 0) {
+        const todas = sale._items.map((it) => formatVariation(it.variation_attributes)).filter(Boolean);
+        if (todas.length > 0) return [...new Set(todas)].join(' | ');
+    }
+    return formatVariation(sale?.variation_attributes);
+}
+
 // Thumbnail - usa o proxy do backend para servir imagens do ML sem 403
 function getThumbUrl(sale) {
     let thumbUrl = sale.product_thumbnail;
@@ -1737,6 +1773,23 @@ function getThumbUrl(sale) {
     width: 14px;
     height: 14px;
     object-fit: contain;
+}
+
+/* Variação escolhida na venda */
+.variation-tag {
+    display: inline-block;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+    font-size: 0.78rem;
+    font-weight: 600;
 }
 
 .sale-card__product-title,

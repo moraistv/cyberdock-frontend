@@ -195,6 +195,7 @@
                   <th class="ta-center">Qtd.</th>
                   <th>SKU</th>
                   <th>Descrição do Produto</th>
+                  <th>Variação</th>
                   <th>Comprador</th>
                   <th>Modalidade de Envio</th>
                   <th>Data para Despachar</th>
@@ -224,6 +225,10 @@
                       </span>
                       <span class="desc-text">{{ descricaoProduto(item) }}</span>
                     </span>
+                  </td>
+                  <td>
+                    <span v-if="variacao(item)" class="variation-tag" :title="variacao(item)">{{ variacao(item) }}</span>
+                    <span v-else class="text-muted">—</span>
                   </td>
                   <td>
                     <div class="cell-strong">{{ item.buyer_nickname || '—' }}</div>
@@ -544,6 +549,24 @@ function descricaoTitle(item) {
     : `${descricaoProduto(item)} (título do anúncio no Mercado Livre)`;
 }
 
+// Variação escolhida na venda (ex.: "Cor: Azul · Tamanho: M")
+function variacao(item) {
+  let list = item?.variation_attributes;
+  if (typeof list === 'string') {
+    try { list = JSON.parse(list); } catch { return ''; }
+  }
+  if (!Array.isArray(list) || list.length === 0) return '';
+  return list
+    .map((a) => {
+      const nome = a?.name ? String(a.name).trim() : '';
+      const valor = a?.value_name ? String(a.value_name).trim() : '';
+      if (!valor) return '';
+      return nome ? `${nome}: ${valor}` : valor;
+    })
+    .filter(Boolean)
+    .join(' · ');
+}
+
 const MODE_META = {
   FULL: { label: 'FULL', color: '#4f46e5', bg: '#eef2ff', icon: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" />' },
   FLEX: { label: 'FLEX', color: '#ea580c', bg: '#fff7ed', icon: '<circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" />' },
@@ -565,7 +588,7 @@ async function exportCsv() {
     const qs = buildQuery({ full: '1' });
     const data = await api.get(`sales/separacao?${qs}`);
     const rows = data.items || [];
-    const header = ['Conta', 'Usuario', 'Qtd', 'SKU', 'Descricao', 'Apelido Comprador', 'Nome Comprador', 'Modalidade', 'Data para Despachar', 'ID da Venda'];
+    const header = ['Conta', 'Usuario', 'Qtd', 'SKU', 'Descricao', 'Variacao', 'Apelido Comprador', 'Nome Comprador', 'Modalidade', 'Data para Despachar', 'ID da Venda'];
     const csvEscape = (v) => {
       const s = String(v ?? '');
       return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -578,6 +601,7 @@ async function exportCsv() {
         it.quantity ?? '',
         it.sku || '',
         descricaoProduto(it),
+        variacao(it),
         it.buyer_nickname || '',
         customerName(it),
         modeMeta(it.shipping_mode).label,
@@ -774,6 +798,13 @@ onMounted(() => {
 .desc-origin--cd { background: #eef2ff; color: #4f46e5; border: 1px solid #e0e7ff; }
 .desc-origin--ml { background: #fffbeb; border: 1px solid #fef3c7; }
 .desc-origin__img { width: 12px; height: 12px; object-fit: contain; }
+/* Variação escolhida na venda */
+.variation-tag {
+  display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 0.1rem 0.45rem; border-radius: 999px; background: #f1f5f9; border: 1px solid #e2e8f0;
+  color: #334155; font-size: 0.75rem; font-weight: 600;
+}
+.text-muted { color: var(--color-text-secondary); }
 .mono { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.8rem; }
 .id-venda { color: var(--color-text-secondary); }
 .qty { font-weight: 700; }
