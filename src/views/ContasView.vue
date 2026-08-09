@@ -7,9 +7,19 @@
 
       <div class="dashboard-content">
         <div class="header" ref="headerRef">
-          <div>
+          <div class="header__intro">
             <h1 class="dashboard-title">Gerenciar Contas</h1>
-            <p class="dashboard-subtitle">Conecte e gerencie suas contas de e-commerce aqui.</p>
+            <p class="dashboard-subtitle">Conecte suas contas de marketplace para sincronizar vendas automaticamente.</p>
+            <div class="header__marketplaces">
+              <span class="mk-chip">
+                <img src="/img/ml-logo.svg" alt="Mercado Livre" class="mk-chip__logo" />
+                Mercado Livre
+              </span>
+              <span class="mk-chip">
+                <img src="/img/shopee-logo.svg" alt="Shopee" class="mk-chip__logo" />
+                Shopee
+              </span>
+            </div>
           </div>
           <div class="header-actions">
             <MercadoLivreConnect />
@@ -17,11 +27,55 @@
           </div>
         </div>
 
+        <div v-if="!isLoading" class="stats-row">
+          <div class="stat-card">
+            <span class="stat-card__icon stat-card__icon--total">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" /></svg>
+            </span>
+            <div class="stat-card__body">
+              <span class="stat-card__value">{{ totalAccounts }}</span>
+              <span class="stat-card__label">Contas conectadas</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-card__icon stat-card__icon--ml">
+              <img src="/img/ml-logo.svg" alt="" class="stat-card__logo" />
+            </span>
+            <div class="stat-card__body">
+              <span class="stat-card__value">{{ accounts.mercadoLivre.length }}</span>
+              <span class="stat-card__label">Mercado Livre</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-card__icon stat-card__icon--shopee">
+              <img src="/img/shopee-logo.svg" alt="" class="stat-card__logo" />
+            </span>
+            <div class="stat-card__body">
+              <span class="stat-card__value">{{ accounts.shopee.length }}</span>
+              <span class="stat-card__label">Shopee</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-card__icon stat-card__icon--active">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+            </span>
+            <div class="stat-card__body">
+              <span class="stat-card__value">{{ activeAccountsCount }}</span>
+              <span class="stat-card__label">Ativas</span>
+            </div>
+          </div>
+        </div>
+
         <div class="accounts-list-wrapper">
           <div v-if="isLoading">
-            <h2 class="list-title" ref="listTitleRef">Contas Conectadas <span class="platform-tag ml-tag">Mercado Livre</span></h2>
+            <div class="section-head">
+              <div class="skeleton-line" style="width: 190px; height: 20px;"></div>
+            </div>
             <div class="accounts-grid">
-              <div v-for="n in 2" :key="'ml-skel-' + n" class="skeleton-card">
+              <div v-for="n in 3" :key="'skel-' + n" class="skeleton-card">
                 <div class="skeleton-header">
                   <div class="skeleton-line icon"></div>
                   <div class="skeleton-line title"></div>
@@ -35,41 +89,88 @@
           </div>
 
           <div v-else>
-            <div v-if="accounts.mercadoLivre.length > 0" class="platform-section">
-              <h2 class="list-title" ref="listTitleRef">
-                Contas Conectadas <span class="platform-tag ml-tag">Mercado Livre</span>
-              </h2>
+            <!-- ================= MERCADO LIVRE ================= -->
+            <section v-if="accounts.mercadoLivre.length > 0" class="platform-section">
+              <div class="section-head" ref="listTitleRef">
+                <div class="section-head__brand">
+                  <span class="section-head__logo section-head__logo--ml">
+                    <img src="/img/ml-logo.svg" alt="Mercado Livre" />
+                  </span>
+                  <div>
+                    <h2 class="section-head__title">Mercado Livre</h2>
+                    <p class="section-head__sub">{{ accounts.mercadoLivre.length }} conta(s) conectada(s)</p>
+                  </div>
+                </div>
+              </div>
 
               <div class="accounts-grid" ref="mlGrid">
-                <div v-for="account in accounts.mercadoLivre" :key="account.user_id" class="account-card" @mouseenter="hoverCard($event, true)" @mouseleave="hoverCard($event, false)">
-                  <div class="account-card-header">
-                    <div class="account-title">
-                      <span class="account-nickname">{{ account.nickname }}</span>
+                <article
+                  v-for="account in accounts.mercadoLivre"
+                  :key="account.user_id"
+                  class="account-card account-card--ml"
+                  @mouseenter="hoverCard($event, true)"
+                  @mouseleave="hoverCard($event, false)"
+                >
+                  <span class="account-card__stripe account-card__stripe--ml" aria-hidden="true"></span>
+
+                  <header class="account-card__top">
+                    <div class="account-card__identity">
+                      <span class="account-card__avatar account-card__avatar--ml">
+                        <img src="/img/ml-logo.svg" alt="Mercado Livre" />
+                      </span>
+                      <div class="account-card__names">
+                        <span class="account-nickname" :title="account.nickname">{{ account.nickname }}</span>
+                        <span class="account-id">ID {{ account.user_id }}</span>
+                      </div>
                     </div>
-                    <div class="status-display" :data-status="account.status">
+
+                    <div class="status-pill" :data-status="account.status">
                       <span class="status-dot" :class="account.status"></span>
-                      <span class="status-text">{{ getStatusText(account.status) }}</span>
+                      {{ getStatusText(account.status) }}
                     </div>
+                  </header>
+
+                  <div class="account-card__meta">
+                    <span class="meta-item">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                      Conectada em {{ formatDate(account.connected_at) }}
+                    </span>
                   </div>
 
-                  <p class="account-id">ID: {{ account.user_id }}</p>
-
-                  <div class="account-actions">
+                  <footer class="account-card__foot">
                     <button
-                      v-if="userRole === 'master'"
                       @mousedown="press"
-                      @click="requestDelete(account, 'ml')"
-                      class="action-btn delete-btn"
-                      aria-label="Excluir Conta"
-                      title="Excluir Conta"
+                      @click="handleSyncMl(account)"
+                      class="btn-sync btn-sync--ml"
+                      :disabled="syncState.isSyncing"
+                      title="Sincronizar vendas desta conta"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                      <svg :class="{ 'is-spinning': syncState.isSyncing }" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                      {{ syncState.isSyncing ? 'Sincronizando...' : 'Sincronizar' }}
                     </button>
-                  </div>
 
-                  <button @mousedown="press" @click="toggleDetails(account)" class="details-toggle">
-                    {{ account.isExpanded ? 'Ocultar detalhes' : 'Mostrar detalhes' }}
-                  </button>
+                    <div class="account-actions">
+                      <button
+                        @mousedown="press"
+                        @click="toggleDetails(account)"
+                        class="action-btn"
+                        :aria-label="account.isExpanded ? 'Ocultar detalhes' : 'Mostrar detalhes'"
+                        :title="account.isExpanded ? 'Ocultar detalhes' : 'Mostrar detalhes'"
+                      >
+                        <svg class="details-toggle__chev" :class="{ 'is-open': account.isExpanded }" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+                      </button>
+                      <button
+                        v-if="userRole === 'master'"
+                        @mousedown="press"
+                        @click="requestDelete(account, 'ml')"
+                        class="action-btn delete-btn"
+                        aria-label="Excluir Conta"
+                        title="Excluir Conta"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                      </button>
+                    </div>
+                  </footer>
 
                   <Transition @enter="onEnter" @leave="onLeave">
                     <div v-if="account.isExpanded" class="details-content">
@@ -95,79 +196,119 @@
                         </div>
                       </div>
 
-                      <div class="token-info">
-                        <label>Conectado em</label>
-                        <div class="token-value">
-                          <code>{{ formatDate(account.connected_at) }}</code>
+                      <div class="token-grid">
+                        <div class="token-info">
+                          <label>Conectado em</label>
+                          <div class="token-value">
+                            <code>{{ formatDate(account.connected_at) }}</code>
+                          </div>
                         </div>
-                      </div>
-                      <div class="token-info">
-                        <label>Expira em</label>
-                        <div class="token-value">
-                          <code>{{ formatExpiration(account.connected_at, account.expires_in) }}</code>
+                        <div class="token-info">
+                          <label>Expira em</label>
+                          <div class="token-value">
+                            <code>{{ formatExpiration(account.connected_at, account.expires_in) }}</code>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </Transition>
+                </article>
+              </div>
+            </section>
+
+            <!-- ==================== SHOPEE ==================== -->
+            <section v-if="accounts.shopee.length > 0" class="platform-section">
+              <div class="section-head">
+                <div class="section-head__brand">
+                  <span class="section-head__logo section-head__logo--shopee">
+                    <img src="/img/shopee-logo.svg" alt="Shopee" />
+                  </span>
+                  <div>
+                    <h2 class="section-head__title">Shopee</h2>
+                    <p class="section-head__sub">{{ accounts.shopee.length }} loja(s) conectada(s)</p>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div v-if="accounts.shopee.length > 0" class="platform-section">
-              <h2 class="list-title">
-                Contas Conectadas <span class="platform-tag shopee-tag">Shopee</span>
-              </h2>
 
               <div class="accounts-grid" ref="shopeeGrid">
-                <div v-for="account in accounts.shopee" :key="account.shop_id" class="account-card" @mouseenter="hoverCard($event, true)" @mouseleave="hoverCard($event, false)">
-                  <div class="account-card-header">
-                    <div class="account-title">
-                      <span class="account-nickname">{{ account.shop_name || account.shop_id }}</span>
+                <article
+                  v-for="account in accounts.shopee"
+                  :key="account.shop_id"
+                  class="account-card account-card--shopee"
+                  @mouseenter="hoverCard($event, true)"
+                  @mouseleave="hoverCard($event, false)"
+                >
+                  <span class="account-card__stripe account-card__stripe--shopee" aria-hidden="true"></span>
+
+                  <header class="account-card__top">
+                    <div class="account-card__identity">
+                      <span class="account-card__avatar account-card__avatar--shopee">
+                        <img src="/img/shopee-logo.svg" alt="Shopee" />
+                      </span>
+                      <div class="account-card__names">
+                        <span class="account-nickname" :title="account.shop_name || account.shop_id">
+                          {{ account.shop_name || account.shop_id }}
+                        </span>
+                        <span class="account-id">Loja {{ account.shop_id }}</span>
+                      </div>
                     </div>
-                    <div class="status-display" :data-status="account.status">
+
+                    <div class="status-pill" :data-status="account.status">
                       <span class="status-dot" :class="account.status"></span>
-                      <span class="status-text">{{ getStatusText(account.status) }}</span>
+                      {{ getStatusText(account.status) }}
                     </div>
+                  </header>
+
+                  <div class="account-card__meta">
+                    <span class="meta-item">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                      Conectada em {{ formatDate(account.connected_at) }}
+                    </span>
                   </div>
 
-                  <p class="account-id">Loja: {{ account.shop_id }}</p>
-
-                  <div class="account-actions">
+                  <footer class="account-card__foot">
                     <button
                       @mousedown="press"
                       @click="handleSyncShopee(account)"
-                      class="action-btn"
+                      class="btn-sync"
                       :disabled="shopeeSyncState.isSyncing"
-                      aria-label="Sincronizar Loja"
-                      title="Sincronizar Vendas"
+                      title="Sincronizar vendas desta loja"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                      <svg :class="{ 'is-spinning': shopeeSyncState.isSyncing }" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                      {{ shopeeSyncState.isSyncing ? 'Sincronizando...' : 'Sincronizar' }}
                     </button>
-                    <button
-                      v-if="userRole === 'master'"
-                      @mousedown="press"
-                      @click="requestDelete(account, 'shopee')"
-                      class="action-btn delete-btn"
-                      aria-label="Excluir Loja"
-                      title="Excluir Loja"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
-                    </button>
-                  </div>
 
-                  <div class="token-info">
-                    <label>Conectado em</label>
-                    <div class="token-value">
-                      <code>{{ formatDate(account.connected_at) }}</code>
+                    <div class="account-actions">
+                      <button
+                        v-if="userRole === 'master'"
+                        @mousedown="press"
+                        @click="requestDelete(account, 'shopee')"
+                        class="action-btn delete-btn"
+                        aria-label="Excluir Loja"
+                        title="Excluir Loja"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                      </button>
                     </div>
-                  </div>
-                </div>
+                  </footer>
+                </article>
               </div>
-            </div>
+            </section>
 
-            <div v-if="!isLoading && accounts.mercadoLivre.length === 0 && accounts.shopee.length === 0" class="no-accounts">
-              <p>Nenhuma conta conectada ainda.</p>
-              <span>Clique nos botões acima para conectar sua primeira conta.</span>
+            <!-- =================== VAZIO =================== -->
+            <div v-if="accounts.mercadoLivre.length === 0 && accounts.shopee.length === 0" class="no-accounts">
+              <div class="no-accounts__logos">
+                <img src="/img/ml-logo.svg" alt="Mercado Livre" />
+                <img src="/img/shopee-logo.svg" alt="Shopee" />
+              </div>
+              <h3 class="no-accounts__title">Nenhuma conta conectada ainda</h3>
+              <p class="no-accounts__text">
+                Conecte uma conta do Mercado Livre ou uma loja Shopee para começar a sincronizar suas vendas.
+              </p>
+              <div class="no-accounts__actions">
+                <MercadoLivreConnect />
+                <ShopeeConnect />
+              </div>
             </div>
           </div>
         </div>
@@ -193,18 +334,24 @@
     </div>
   </Transition>
 
-  <!-- Toast Notification for Sync Status -->
-  <ToastNotification 
-    :is-visible="syncState.isVisible" 
-    :title="syncState.title"
-    :description="syncState.description" 
-    :progress="syncState.progress" 
-    :type="syncState.type" 
+  <!--
+    Toast único e compartilhado. Os três emissores (sync ML, sync Shopee e
+    avisos simples) usariam a mesma posição fixa e ficariam sobrepostos, então
+    exibimos apenas o de maior prioridade — na prática só há uma sincronização
+    por vez.
+  -->
+  <ToastNotification
+    :is-visible="activeToast.isVisible"
+    :title="activeToast.title"
+    :description="activeToast.description"
+    :progress="activeToast.progress"
+    :type="activeToast.type"
+    @close="dismissToast"
   />
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import gsap from 'gsap';
 
@@ -225,7 +372,7 @@ const {
   fetchShopeeAccounts: fetchShopeeAccountsFromAuth,
 } = useAuth();
 const api = useApi();
-const { syncState } = useSyncManager();
+const { syncState, syncAccount: syncMlAccount } = useSyncManager();
 const { syncState: shopeeSyncState, syncAccount: syncShopeeAccount } = useShopeeSyncManager();
 const route = useRoute();
 const router = useRouter();
@@ -242,14 +389,68 @@ let ctx;
 const accounts = ref({ mercadoLivre: [], shopee: [] });
 const isLoading = ref(true);
 
-const accountToDelete = ref(null);
-const notification = ref({ show: false, title: '', message: '' });
+const totalAccounts = computed(
+  () => accounts.value.mercadoLivre.length + accounts.value.shopee.length
+);
 
-const showSimpleNotification = (title, message) => {
-  notification.value = { show: true, title, message };
-  setTimeout(() => {
+const activeAccountsCount = computed(() =>
+  [...accounts.value.mercadoLivre, ...accounts.value.shopee].filter(
+    (acc) => acc.status === 'active'
+  ).length
+);
+
+const accountToDelete = ref(null);
+const notification = ref({ show: false, title: '', message: '', type: 'info' });
+let notificationTimer = null;
+
+const showSimpleNotification = (title, message, type = 'info') => {
+  notification.value = { show: true, title, message, type };
+  if (notificationTimer) clearTimeout(notificationTimer);
+  notificationTimer = setTimeout(() => {
     notification.value.show = false;
-  }, 3000);
+  }, 5000);
+};
+
+/**
+ * Toast exibido: a sincronização em andamento tem prioridade sobre os avisos
+ * simples, e a Shopee vem antes do ML apenas por ser a ação disparada nesta
+ * tela (a do ML roda na Tabela de Vendas).
+ */
+const activeToast = computed(() => {
+  if (shopeeSyncState.value.isVisible) {
+    return {
+      isVisible: true,
+      title: shopeeSyncState.value.title,
+      description: shopeeSyncState.value.description,
+      progress: shopeeSyncState.value.progress,
+      type: shopeeSyncState.value.type,
+    };
+  }
+  if (syncState.value.isVisible) {
+    return {
+      isVisible: true,
+      title: syncState.value.title,
+      description: syncState.value.description,
+      progress: syncState.value.progress,
+      type: syncState.value.type,
+    };
+  }
+  if (notification.value.show) {
+    return {
+      isVisible: true,
+      title: notification.value.title,
+      description: notification.value.message,
+      progress: 0,
+      type: notification.value.type,
+    };
+  }
+  return { isVisible: false, title: '', description: '', progress: 0, type: 'info' };
+});
+
+const dismissToast = () => {
+  if (shopeeSyncState.value.isVisible) shopeeSyncState.value.isVisible = false;
+  else if (syncState.value.isVisible) syncState.value.isVisible = false;
+  else notification.value.show = false;
 };
 
 const addExtraProperties = (acc) => ({
@@ -292,9 +493,18 @@ const fetchAllAccounts = async () => {
 const handleSyncShopee = async (account) => {
   try {
     await syncShopeeAccount(account.shop_id, account.shop_name || account.shop_id);
-    showSimpleNotification('Sucesso!', `Loja "${account.shop_name || account.shop_id}" sincronizada.`);
+    await fetchAllAccounts();
   } catch (error) {
-    showSimpleNotification('Erro', error.message || 'Não foi possível sincronizar a loja.');
+    showSimpleNotification('Erro', error.message || 'Não foi possível sincronizar a loja.', 'error');
+  }
+};
+
+const handleSyncMl = async (account) => {
+  try {
+    await syncMlAccount(account.user_id, account.nickname);
+    await fetchAllAccounts();
+  } catch (error) {
+    showSimpleNotification('Erro', error.message || 'Não foi possível sincronizar a conta.', 'error');
   }
 };
 
@@ -506,8 +716,57 @@ onUnmounted(() => {
 }
 .main-content { flex: 1; display: flex; flex-direction: column; }
 .dashboard-content { flex: 1; padding: 1.75rem 2rem 2.25rem; }
-.header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 2rem; }
-.header-actions { display: flex; gap: 0.75rem; align-items: center; }
+.header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.header__intro { min-width: 0; }
+.header-actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+
+/* Chips de marketplace no header */
+.header__marketplaces { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.85rem; flex-wrap: wrap; }
+.mk-chip {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  padding: 0.3rem 0.7rem 0.3rem 0.45rem;
+  background: #fff; border: 1px solid var(--border); border-radius: 9999px;
+  font-size: 0.78rem; font-weight: 600; color: var(--muted);
+}
+.mk-chip__logo { width: 18px; height: 18px; object-fit: contain; border-radius: 4px; }
+
+/* ===================== Cards de estatística ===================== */
+.stats-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem; margin-bottom: 2rem;
+}
+.stat-card {
+  display: flex; align-items: center; gap: 0.85rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 0.9rem 1rem;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+.stat-card__icon {
+  display: grid; place-items: center; width: 38px; height: 38px;
+  border-radius: 10px; flex-shrink: 0;
+}
+.stat-card__icon--total { background: #eef2ff; color: #4f46e5; }
+.stat-card__icon--active { background: #ecfdf5; color: #059669; }
+.stat-card__icon--ml { background: #fff9db; }
+.stat-card__icon--shopee { background: #fff1ec; }
+.stat-card__logo { width: 22px; height: 22px; object-fit: contain; border-radius: 5px; }
+.stat-card__body { display: flex; flex-direction: column; min-width: 0; }
+.stat-card__value { font-size: 1.4rem; font-weight: 700; line-height: 1.1; color: var(--text); font-variant-numeric: tabular-nums; }
+.stat-card__label { font-size: 0.78rem; color: var(--subtle); margin-top: 0.15rem; }
+
+/* ===================== Cabeçalho de seção ===================== */
+.platform-section { margin-bottom: 2.25rem; }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.section-head__brand { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+.section-head__logo {
+  display: grid; place-items: center; width: 40px; height: 40px;
+  border-radius: 11px; border: 1px solid var(--border); background: #fff; flex-shrink: 0;
+}
+.section-head__logo img { width: 26px; height: 26px; object-fit: contain; border-radius: 6px; }
+.section-head__logo--ml { background: #fffdf2; border-color: #f2e6a8; }
+.section-head__logo--shopee { background: #fff6f2; border-color: #f8c6b4; }
+.section-head__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.section-head__sub { margin: 0.1rem 0 0; font-size: 0.8rem; color: var(--subtle); }
 
 .btn {
   padding: 0.6rem 1.2rem;
@@ -569,22 +828,88 @@ onUnmounted(() => {
 .dashboard-title { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.01em; color: var(--text); margin: 0; }
 .dashboard-subtitle { margin-top: 0.3rem; font-size: 0.95rem; color: var(--subtle); }
 .list-title { font-size: 1.1rem; font-weight: 600; color: #1f2937; margin: 0 0 1rem; display: flex; align-items: center; gap: 0.6rem; }
-.accounts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
-.account-card { background: var(--surface); border-radius: 14px; border: 1px solid var(--border); padding: 1.25rem; box-shadow: 0 0 0 1px var(--border); transition: box-shadow 180ms, transform 180ms; will-change: transform; }
-.account-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; }
-.account-title { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; color: #111827; }
-.account-nickname { font-weight: 600; color: #111827; }
-.account-id { font-size: 0.85rem; color: #6b7280; margin-bottom: 0.9rem; }
-.account-actions { display: flex; gap: 0.5rem; margin-bottom: 0.8rem; }
-.action-btn { height: 36px; width: 36px; display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 1px solid var(--border); border-radius: 10px; color: #334155; cursor: pointer; transition: background 140ms, border-color 140ms, color 140ms, box-shadow 140ms; }
+.accounts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 1rem; }
+
+/* ===================== Card de conta ===================== */
+.account-card {
+  position: relative; overflow: hidden;
+  background: var(--surface); border-radius: 14px; border: 1px solid var(--border);
+  padding: 1.1rem 1.15rem; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  transition: box-shadow 180ms, transform 180ms, border-color 180ms; will-change: transform;
+  display: flex; flex-direction: column;
+}
+.account-card:hover { border-color: #dbe1ea; }
+.account-card__stripe { position: absolute; inset: 0 auto 0 0; width: 3px; }
+.account-card__stripe--ml { background: linear-gradient(180deg, #f8d135, #ffe680); }
+.account-card__stripe--shopee { background: linear-gradient(180deg, #ee4d2d, #ff8b6b); }
+
+.account-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+.account-card__identity { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
+.account-card__avatar {
+  display: grid; place-items: center; width: 40px; height: 40px;
+  border-radius: 11px; border: 1px solid var(--border); background: #fff; flex-shrink: 0;
+}
+.account-card__avatar img { width: 25px; height: 25px; object-fit: contain; border-radius: 6px; }
+.account-card__avatar--ml { background: #fffdf2; border-color: #f2e6a8; }
+.account-card__avatar--shopee { background: #fff6f2; border-color: #f8c6b4; }
+.account-card__names { display: flex; flex-direction: column; min-width: 0; }
+.account-nickname {
+  font-weight: 650; color: #111827; font-size: 0.95rem; line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.account-id {
+  font-size: 0.76rem; color: #94a3b8; margin: 0.12rem 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.account-card__meta { margin-top: 0.85rem; display: flex; flex-wrap: wrap; gap: 0.5rem 0.9rem; }
+.meta-item { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; color: var(--subtle); }
+
+.account-card__foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid var(--border);
+}
+
+/* Pílula de status */
+.status-pill {
+  display: inline-flex; align-items: center; gap: 0.4rem; flex-shrink: 0;
+  padding: 0.28rem 0.6rem; border-radius: 9999px;
+  background: #f8fafc; border: 1px solid var(--border);
+  font-size: 0.74rem; font-weight: 600; color: #334155; white-space: nowrap;
+}
+.status-pill[data-status="active"] { background: #ecfdf5; border-color: #c7f0dc; color: #047857; }
+.status-pill[data-status="attention"] { background: #fffbeb; border-color: #fde9b8; color: #b45309; }
+.status-pill[data-status="error"] { background: #fef2f2; border-color: #fdd8d8; color: #b91c1c; }
+
+.account-actions { display: flex; gap: 0.4rem; }
+.action-btn { height: 34px; width: 34px; display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 1px solid var(--border); border-radius: 9px; color: #334155; cursor: pointer; transition: background 140ms, border-color 140ms, color 140ms, box-shadow 140ms; }
 .action-btn:hover:not(:disabled) { background: #f8fafc; border-color: #dbe1ea; color: #111827; box-shadow: 0 0 0 4px var(--ring); }
 .action-btn:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--ring); }
 .action-btn:disabled { cursor: not-allowed; opacity: 0.55; }
 .action-btn.delete-btn:hover { background: #fff7f7; border-color: #fde2e2; color: #b91c1c; }
-.details-toggle { background: none; border: none; color: var(--brand); font-size: 0.9rem; font-weight: 500; cursor: pointer; padding: 0; margin-top: auto; }
-.details-toggle:hover { text-decoration: underline; }
-.details-toggle:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--ring); border-radius: 6px; }
-.details-content { overflow: hidden; border-top: 1px solid var(--border); }
+
+/* Botão de sincronizar (Shopee) */
+.btn-sync {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  height: 34px; padding: 0 0.85rem; border-radius: 9px;
+  background: #ee4d2d; border: 1px solid #ee4d2d; color: #fff;
+  font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  transition: background 140ms, box-shadow 140ms, opacity 140ms;
+}
+.btn-sync:hover:not(:disabled) { background: #d8401f; box-shadow: 0 0 0 4px rgba(238, 77, 45, 0.12); }
+.btn-sync:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-sync .is-spinning { animation: spin-sync 1.1s linear infinite; }
+
+/* Variante Mercado Livre: amarelo da marca exige texto escuro para contraste. */
+.btn-sync--ml { background: #f8d135; color: #2b3375; }
+.btn-sync--ml:hover:not(:disabled) { background: #f0c518; box-shadow: 0 0 0 4px rgba(248, 209, 53, 0.22); }
+@keyframes spin-sync { to { transform: rotate(360deg); } }
+
+.details-toggle__chev { transition: transform 200ms ease; }
+.details-toggle__chev.is-open { transform: rotate(180deg); }
+
+.details-content { overflow: hidden; }
+.token-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 .token-info { margin-top: 0.9rem; }
 .token-info label { display: block; font-size: 0.75rem; font-weight: 600; color: #374151; margin-bottom: 0.25rem; }
 .token-value { display: flex; align-items: center; gap: 0.5rem; background: #f8fafc; padding: 0.55rem 0.75rem; border-radius: 8px; border: 1px solid #eef2f7; }
@@ -609,7 +934,20 @@ onUnmounted(() => {
 .skeleton-actions { display: flex; gap: 0.5rem; }
 .skeleton-line.button { width: 36px; height: 36px; border-radius: 10px; }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-.no-accounts { display: grid; place-items: center; padding: 2.5rem 1rem; text-align: center; color: #475569; border: 2px dashed var(--border); background: #fff; border-radius: 14px; }
+.no-accounts {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 3rem 1.5rem; text-align: center; color: #475569;
+  border: 2px dashed var(--border); background: #fff; border-radius: 16px;
+}
+.no-accounts__logos { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.1rem; }
+.no-accounts__logos img {
+  width: 44px; height: 44px; object-fit: contain;
+  padding: 7px; background: #fff; border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+}
+.no-accounts__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text); }
+.no-accounts__text { margin: 0.5rem 0 0; max-width: 420px; font-size: 0.9rem; line-height: 1.5; color: var(--subtle); }
+.no-accounts__actions { display: flex; gap: 0.6rem; margin-top: 1.5rem; flex-wrap: wrap; justify-content: center; }
 
 .modal-overlay {
   position: fixed;
