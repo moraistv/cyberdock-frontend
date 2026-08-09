@@ -12,6 +12,7 @@ import AdminView from '../views/AdminView.vue';
 import ManageUsersView from '../views/ManageUsersView.vue';
 import MasterResumoCobranca from '../views/MasterResumoCobranca.vue';
 import ServiceHistory from '../views/ServiceHistory.vue';
+import ShopeeCallbackView from '../views/ShopeeCallbackView.vue';
 
 const routes = [
   {
@@ -53,6 +54,14 @@ const routes = [
     path: '/contas',
     name: 'ContasView',
     component: ContasView,
+    meta: { requiresAuth: true }
+  },
+  {
+    // Retorno da autorização da Shopee. Precisa estar sob o domínio do
+    // frontend porque é o domínio declarado no console do parceiro Shopee.
+    path: '/shopee/callback',
+    name: 'ShopeeCallback',
+    component: ShopeeCallbackView,
     meta: { requiresAuth: true }
   },
   {
