@@ -141,11 +141,11 @@
                     <button
                       @mousedown="press"
                       @click="handleSyncMl(account)"
-                      class="btn-sync btn-sync--ml"
+                      class="btn-sync"
                       :disabled="syncState.isSyncing"
                       title="Sincronizar vendas desta conta"
                     >
-                      <svg :class="{ 'is-spinning': syncState.isSyncing }" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                      <svg class="btn-sync__icon" :class="{ 'is-spinning': syncState.isSyncing }" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline points="21 3 21 9 15 9" /></svg>
                       {{ syncState.isSyncing ? 'Sincronizando...' : 'Sincronizar' }}
                     </button>
 
@@ -274,7 +274,7 @@
                       :disabled="shopeeSyncState.isSyncing"
                       title="Sincronizar vendas desta loja"
                     >
-                      <svg :class="{ 'is-spinning': shopeeSyncState.isSyncing }" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                      <svg class="btn-sync__icon" :class="{ 'is-spinning': shopeeSyncState.isSyncing }" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline points="21 3 21 9 15 9" /></svg>
                       {{ shopeeSyncState.isSyncing ? 'Sincronizando...' : 'Sincronizar' }}
                     </button>
 
@@ -888,21 +888,23 @@ onUnmounted(() => {
 .action-btn:disabled { cursor: not-allowed; opacity: 0.55; }
 .action-btn.delete-btn:hover { background: #fff7f7; border-color: #fde2e2; color: #b91c1c; }
 
-/* Botão de sincronizar (Shopee) */
+/*
+  Botão de sincronizar: estilo neutro de propósito. Usar a cor da marca do
+  marketplace aqui competia com o logo do card e sugeria "ação destrutiva/
+  primária" onde é só uma atualização de dados.
+*/
 .btn-sync {
   display: inline-flex; align-items: center; gap: 0.45rem;
   height: 34px; padding: 0 0.85rem; border-radius: 9px;
-  background: #ee4d2d; border: 1px solid #ee4d2d; color: #fff;
+  background: #fff; border: 1px solid var(--border); color: var(--muted);
   font-size: 0.82rem; font-weight: 600; cursor: pointer;
-  transition: background 140ms, box-shadow 140ms, opacity 140ms;
+  transition: background 140ms, border-color 140ms, color 140ms, box-shadow 140ms, opacity 140ms;
 }
-.btn-sync:hover:not(:disabled) { background: #d8401f; box-shadow: 0 0 0 4px rgba(238, 77, 45, 0.12); }
-.btn-sync:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-sync:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; color: var(--text); box-shadow: 0 0 0 4px var(--ring); }
+.btn-sync:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 4px var(--ring); }
+.btn-sync:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn-sync .is-spinning { animation: spin-sync 1.1s linear infinite; }
-
-/* Variante Mercado Livre: amarelo da marca exige texto escuro para contraste. */
-.btn-sync--ml { background: #f8d135; color: #2b3375; }
-.btn-sync--ml:hover:not(:disabled) { background: #f0c518; box-shadow: 0 0 0 4px rgba(248, 209, 53, 0.22); }
+.btn-sync__icon { color: var(--brand); flex-shrink: 0; }
 @keyframes spin-sync { to { transform: rotate(360deg); } }
 
 .details-toggle__chev { transition: transform 200ms ease; }
