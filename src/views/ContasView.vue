@@ -13,6 +13,7 @@
           </div>
           <div class="header-actions">
             <MercadoLivreConnect />
+            <ShopeeConnect />
           </div>
         </div>
 
@@ -57,7 +58,7 @@
                     <button
                       v-if="userRole === 'master'"
                       @mousedown="press"
-                      @click="requestDelete(account)"
+                      @click="requestDelete(account, 'ml')"
                       class="action-btn delete-btn"
                       aria-label="Excluir Conta"
                       title="Excluir Conta"
@@ -112,9 +113,61 @@
               </div>
             </div>
 
-            <div v-if="!isLoading && accounts.mercadoLivre.length === 0" class="no-accounts">
+            <div v-if="accounts.shopee.length > 0" class="platform-section">
+              <h2 class="list-title">
+                Contas Conectadas <span class="platform-tag shopee-tag">Shopee</span>
+              </h2>
+
+              <div class="accounts-grid" ref="shopeeGrid">
+                <div v-for="account in accounts.shopee" :key="account.shop_id" class="account-card" @mouseenter="hoverCard($event, true)" @mouseleave="hoverCard($event, false)">
+                  <div class="account-card-header">
+                    <div class="account-title">
+                      <span class="account-nickname">{{ account.shop_name || account.shop_id }}</span>
+                    </div>
+                    <div class="status-display" :data-status="account.status">
+                      <span class="status-dot" :class="account.status"></span>
+                      <span class="status-text">{{ getStatusText(account.status) }}</span>
+                    </div>
+                  </div>
+
+                  <p class="account-id">Loja: {{ account.shop_id }}</p>
+
+                  <div class="account-actions">
+                    <button
+                      @mousedown="press"
+                      @click="handleSyncShopee(account)"
+                      class="action-btn"
+                      :disabled="shopeeSyncState.isSyncing"
+                      aria-label="Sincronizar Loja"
+                      title="Sincronizar Vendas"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                    </button>
+                    <button
+                      v-if="userRole === 'master'"
+                      @mousedown="press"
+                      @click="requestDelete(account, 'shopee')"
+                      class="action-btn delete-btn"
+                      aria-label="Excluir Loja"
+                      title="Excluir Loja"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                    </button>
+                  </div>
+
+                  <div class="token-info">
+                    <label>Conectado em</label>
+                    <div class="token-value">
+                      <code>{{ formatDate(account.connected_at) }}</code>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="!isLoading && accounts.mercadoLivre.length === 0 && accounts.shopee.length === 0" class="no-accounts">
               <p>Nenhuma conta conectada ainda.</p>
-              <span>Clique no botão acima para conectar sua primeira conta.</span>
+              <span>Clique nos botões acima para conectar sua primeira conta.</span>
             </div>
           </div>
         </div>
@@ -130,7 +183,7 @@
           <button @click="cancelDelete" class="close-btn" aria-label="Fechar modal">&times;</button>
         </div>
         <div class="modal-body">
-          <p>Você tem certeza que deseja excluir a conta "<strong>{{ accountToDelete.nickname }}</strong>"? Esta ação não pode ser desfeita.</p>
+          <p>Você tem certeza que deseja excluir a conta "<strong>{{ accountToDelete.nickname || accountToDelete.shop_name || accountToDelete.shop_id }}</strong>"? Esta ação não pode ser desfeita.</p>
         </div>
         <div class="modal-footer">
           <button @click="cancelDelete" class="btn-cancel">Cancelar</button>
@@ -158,15 +211,22 @@ import gsap from 'gsap';
 import SidebarComponent from '../components/SidebarComponent.vue';
 import TopbarComponent from '../components/TopbarComponent.vue';
 import MercadoLivreConnect from '../components/MercadoLivreConnect.vue';
+import ShopeeConnect from '../components/ShopeeConnect.vue';
 import ToastNotification from '../components/ToastNotification.vue';
 
 import { useAuth } from '@/composables/useAuth';
 import { useApi } from '@/composables/useApi';
 import { useSyncManager } from '@/composables/useSyncManager';
+import { useShopeeSyncManager } from '@/composables/useShopeeSyncManager';
 
-const { user, userRole, isAuthReady, fetchMercadoLivreAccounts: fetchAccountsFromAuth } = useAuth();
+const {
+  user, userRole, isAuthReady,
+  fetchMercadoLivreAccounts: fetchAccountsFromAuth,
+  fetchShopeeAccounts: fetchShopeeAccountsFromAuth,
+} = useAuth();
 const api = useApi();
 const { syncState } = useSyncManager();
+const { syncState: shopeeSyncState, syncAccount: syncShopeeAccount } = useShopeeSyncManager();
 const route = useRoute();
 const router = useRouter();
 
@@ -176,9 +236,10 @@ const rootRef = ref(null);
 const headerRef = ref(null);
 const listTitleRef = ref(null);
 const mlGrid = ref(null);
+const shopeeGrid = ref(null);
 let ctx;
 
-const accounts = ref({ mercadoLivre: [] });
+const accounts = ref({ mercadoLivre: [], shopee: [] });
 const isLoading = ref(true);
 
 const accountToDelete = ref(null);
@@ -201,7 +262,11 @@ const addExtraProperties = (acc) => ({
 const fetchAllAccounts = async () => {
   isLoading.value = true;
   try {
-    const mlData = await fetchAccountsFromAuth();
+    const [mlData, shopeeData] = await Promise.all([
+      fetchAccountsFromAuth(),
+      fetchShopeeAccountsFromAuth(),
+    ]);
+
     if (mlData && mlData.error) {
       showSimpleNotification('Erro', mlData.error);
       accounts.value.mercadoLivre = [];
@@ -212,8 +277,24 @@ const fetchAllAccounts = async () => {
       });
       accounts.value.mercadoLivre = processedMlData;
     }
+
+    if (shopeeData && shopeeData.error) {
+      showSimpleNotification('Erro', shopeeData.error);
+      accounts.value.shopee = [];
+    } else {
+      accounts.value.shopee = shopeeData || [];
+    }
   } finally {
     isLoading.value = false;
+  }
+};
+
+const handleSyncShopee = async (account) => {
+  try {
+    await syncShopeeAccount(account.shop_id, account.shop_name || account.shop_id);
+    showSimpleNotification('Sucesso!', `Loja "${account.shop_name || account.shop_id}" sincronizada.`);
+  } catch (error) {
+    showSimpleNotification('Erro', error.message || 'Não foi possível sincronizar a loja.');
   }
 };
 
@@ -239,12 +320,12 @@ const formatExpiration = (connectedAt, expiresIn) => {
   return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR');
 };
 
-const requestDelete = (account) => {
+const requestDelete = (account, platform = 'ml') => {
   if (userRole.value !== 'master') {
     showSimpleNotification('Acesso Negado', 'Você não tem permissão para excluir contas.');
     return;
   }
-  accountToDelete.value = account;
+  accountToDelete.value = { ...account, platform };
 };
 
 const cancelDelete = () => {
@@ -259,11 +340,14 @@ const confirmDelete = async () => {
   }
 
   const account = accountToDelete.value;
-  const id = account.user_id;
+  const isShopee = account.platform === 'shopee';
+  const id = isShopee ? account.shop_id : account.user_id;
+  const label = isShopee ? (account.shop_name || account.shop_id) : account.nickname;
+  const endpoint = isShopee ? `/shopee/contas/${id}` : `/ml/contas/${id}`;
 
   try {
-    await api.delete(`/ml/contas/${id}`);
-    showSimpleNotification('Sucesso!', `A conta "${account.nickname}" foi excluída.`);
+    await api.delete(endpoint);
+    showSimpleNotification('Sucesso!', `A conta "${label}" foi excluída.`);
     await fetchAllAccounts();
   } catch (error) {
     const errorMessage = error.data?.error || 'Não foi possível excluir a conta.';
@@ -514,6 +598,7 @@ onUnmounted(() => {
 .status-dot.attention { background-color: var(--warn); }
 .status-dot.error { background-color: var(--danger); }
 .platform-tag { font-size: 0.78rem; font-weight: 600; padding: 0.22rem 0.6rem; border-radius: 9999px; border: 1px solid #f5e6a3; background: #fff7bf; color: #3a3a3a; }
+.platform-tag.shopee-tag { border-color: #f8c6b4; background: #fff1ec; color: #b3401f; }
 .skeleton-card { background-color: var(--surface); padding: 1.25rem; border-radius: 14px; border: 1px solid var(--border); }
 .skeleton-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.8rem; }
 .skeleton-line { position: relative; overflow: hidden; background: linear-gradient(90deg, rgba(2,6,23,0.06) 25%, rgba(2,6,23,0.08) 37%, rgba(2,6,23,0.06) 63%); background-size: 400% 100%; animation: shimmer 1.4s infinite; border-radius: 8px; }

@@ -8,6 +8,8 @@ const isAuthReady = ref(false);
 
 // ✅ NOVO: estado reativo das contas ML
 const mlAccounts = ref([]);
+// ✅ NOVO: estado reativo das lojas Shopee
+const shopeeAccounts = ref([]);
 
 export function useAuth() {
     const router = useRouter();
@@ -44,6 +46,7 @@ export function useAuth() {
             loggedInUser.value = null;
             // ✅ limpa contas ao sair
             mlAccounts.value = [];
+            shopeeAccounts.value = [];
         }
     };
 
@@ -121,6 +124,29 @@ export function useAuth() {
         }
     }
 
+    // ✅ Popula shopeeAccounts.value
+    async function fetchShopeeAccounts() {
+        const uid = loggedInUser.value?.uid;
+        if (!uid) {
+            shopeeAccounts.value = [];
+            return [];
+        }
+        try {
+            const response = await fetch(`${API_BASE_URL}/shopee/contas/${uid}`, {
+                headers: { 'Authorization': `Bearer ${token.value}` }
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data?.error || 'Erro ao buscar lojas Shopee');
+
+            shopeeAccounts.value = Array.isArray(data) ? data : [];
+            return shopeeAccounts.value;
+        } catch (err) {
+            console.error("Erro em fetchShopeeAccounts:", err);
+            shopeeAccounts.value = [];
+            return { error: err.message };
+        }
+    }
+
     onMounted(async () => {
         const storedToken = localStorage.getItem('authToken');
         if (storedToken) {
@@ -137,6 +163,7 @@ export function useAuth() {
         // ✅ tenta carregar contas assim que possível
         if (loggedInUser.value?.uid) {
             await fetchMercadoLivreAccounts();
+            await fetchShopeeAccounts();
         }
     });
 
@@ -144,8 +171,10 @@ export function useAuth() {
     watch(() => loggedInUser.value?.uid, async (uid) => {
         if (uid) {
             await fetchMercadoLivreAccounts();
+            await fetchShopeeAccounts();
         } else {
             mlAccounts.value = [];
+            shopeeAccounts.value = [];
         }
     });
 
@@ -164,6 +193,8 @@ export function useAuth() {
         // ✅ expõe o estado reativo e a função
         mlAccounts,
         fetchMercadoLivreAccounts,
+        shopeeAccounts,
+        fetchShopeeAccounts,
         refreshUserData,
     };
 }
