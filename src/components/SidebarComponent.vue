@@ -64,7 +64,7 @@
       <!-- Seção de Contas (mostrada quando NÃO está em modo admin) -->
       <div v-else class="account-status-wrapper">
         <div class="account-status-header" @click="isAccountsSectionCollapsed = !isAccountsSectionCollapsed">
-          <h3 class="account-status-title">Contas Mercado Livre</h3>
+          <h3 class="account-status-title">Contas conectadas</h3>
           <svg class="collapse-icon" :class="{ 'is-collapsed': isAccountsSectionCollapsed }" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </div>
         <div class="account-status-section" :class="{ 'is-collapsed': isAccountsSectionCollapsed }">
@@ -75,9 +75,10 @@
             <p>Erro ao buscar contas.</p>
             <button @click="handleRetry" class="retry-button">Tentar Novamente</button>
           </div>
-          <ul v-else-if="connectedAccounts.length > 0" class="account-status-list">
-            <li v-for="account in connectedAccounts" :key="account.user_id" class="account-status-item" @mouseenter="showTooltip($event, account)" @mouseleave="hideTooltip" @contextmenu.prevent="showContextMenu($event, account)">
+          <ul v-else-if="allConnectedAccounts.length > 0" class="account-status-list">
+            <li v-for="account in allConnectedAccounts" :key="account.key" class="account-status-item" @mouseenter="showTooltip($event, account)" @mouseleave="hideTooltip" @contextmenu.prevent="showContextMenu($event, account)">
               <span class="status-dot" :class="account.status"></span>
+              <img :src="account.logo" :alt="account.marketplace" class="account-mk-logo" />
               <span class="account-nickname">{{ account.nickname }}</span>
             </li>
           </ul>
@@ -115,7 +116,12 @@ import { useAuth } from '@/composables/useAuth';
 import { useAdminMode } from '@/composables/useAdminMode';
 import { useAdminMetrics } from '@/composables/useAdminMetrics';
 
-const { user, userRole, fetchMercadoLivreAccounts } = useAuth();
+const { user, userRole, fetchMercadoLivreAccounts, fetchShopeeAccounts } = useAuth();
+
+const MK_LOGOS = {
+  ML: '/img/ml-logo.svg',
+  Shopee: '/img/shopee-logo.svg',
+};
 const { isAdminMode } = useAdminMode();
 const { metrics, isLoading: isLoadingMetrics, fetchMetrics } = useAdminMetrics();
 
@@ -178,22 +184,45 @@ watch(() => [route.path, navItems.value], () => {
 }, { immediate: true, deep: true });
 
 const connectedAccounts = ref([]);
+const connectedShopeeAccounts = ref([]);
 const isLoadingAccounts = ref(true);
 const accountsError = ref(null);
 const isAccountsSectionCollapsed = ref(false);
 
+/** Lista única dos dois marketplaces, normalizada para o item da sidebar. */
+const allConnectedAccounts = computed(() => [
+  ...connectedAccounts.value.map((acc) => ({
+    key: `ml-${acc.user_id}`,
+    nickname: acc.nickname || String(acc.user_id),
+    status: acc.status,
+    marketplace: 'Mercado Livre',
+    logo: MK_LOGOS.ML,
+  })),
+  ...connectedShopeeAccounts.value.map((acc) => ({
+    key: `sp-${acc.shop_id}`,
+    nickname: acc.shop_name || String(acc.shop_id),
+    status: acc.status,
+    marketplace: 'Shopee',
+    logo: MK_LOGOS.Shopee,
+  })),
+]);
+
 async function fetchAccounts() {
   if (!user.value || !user.value.uid) {
     connectedAccounts.value = [];
+    connectedShopeeAccounts.value = [];
     isLoadingAccounts.value = false;
     return;
   }
   isLoadingAccounts.value = true;
   accountsError.value = null;
   try {
-    const accountsData = await fetchMercadoLivreAccounts();
+    const [accountsData, shopeeData] = await Promise.all([
+      fetchMercadoLivreAccounts(),
+      fetchShopeeAccounts(),
+    ]);
     if (accountsData && accountsData.error) throw new Error(accountsData.error);
-    
+
     connectedAccounts.value = (accountsData || []).map(acc => {
       if (acc.status === 'active' && acc.expires_in && acc.connected_at) {
         const expirationTime = new Date(acc.connected_at).getTime() + (acc.expires_in * 1000);
@@ -204,9 +233,14 @@ async function fetchAccounts() {
       }
       return acc;
     });
+
+    // A Shopee renova o token no próprio job de sincronização, então aqui só
+    // refletimos o status salvo; não há alerta de expiração como no ML.
+    connectedShopeeAccounts.value = (shopeeData && shopeeData.error) ? [] : (shopeeData || []);
   } catch (err) {
     accountsError.value = err.message;
     connectedAccounts.value = [];
+    connectedShopeeAccounts.value = [];
   } finally {
     isLoadingAccounts.value = false;
   }
@@ -346,6 +380,13 @@ watch(() => route.fullPath, (newPath) => {
 .status-dot.active { background-color: var(--color-success); }
 .status-dot.attention { background-color: var(--color-warning); }
 .status-dot.error { background-color: var(--color-danger); }
+.account-mk-logo {
+    width: 16px; height: 16px; object-fit: contain;
+    border-radius: 4px; margin-right: 0.5rem; flex-shrink: 0;
+}
+.account-status-item .account-nickname {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 @keyframes pulse-dot {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.2); opacity: 0.7; }

@@ -8,8 +8,19 @@
                 <div class="header">
                     <div>
                         <h1 class="dashboard-title">Tabela de vendas</h1>
-                        <p class="dashboard-subtitle">As suas vendas do Mercado Livre são sincronizadas automaticamente.
+                        <p class="dashboard-subtitle">
+                            As suas vendas do Mercado Livre e da Shopee são sincronizadas automaticamente.
                         </p>
+                        <div class="mk-legend">
+                            <span class="mk-legend__item">
+                                <img src="/img/ml-logo.svg" alt="" class="mk-legend__logo" />
+                                Mercado Livre
+                            </span>
+                            <span class="mk-legend__item">
+                                <img src="/img/shopee-logo.svg" alt="" class="mk-legend__logo" />
+                                Shopee
+                            </span>
+                        </div>
                     </div>
                                     <div class="header-buttons">
                     <button @click="handleUnifiedSync" :disabled="syncState.isSyncing || isFetchingAccounts"
@@ -69,6 +80,35 @@
                             </div>
                         </div>
 
+                        <div class="filter-container" ref="marketplaceFilterContainerRef">
+                            <button @click="toggleMarketplaceDropdown" class="filter-btn">
+                                <span class="filter-btn-label">Canal:</span>
+                                <img v-if="selectedMarketplaceLogo" :src="selectedMarketplaceLogo" alt=""
+                                    class="filter-btn__logo" />
+                                <span>{{ selectedMarketplaceLabel }}</span>
+                                <svg :class="{ 'rotate-180': isMarketplaceDropdownOpen }"
+                                    xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </button>
+                            <div v-if="isMarketplaceDropdownOpen" ref="marketplaceFilterDropdownRef"
+                                class="filter-dropdown">
+                                <ul>
+                                    <li @click="applyMarketplaceFilter(null)">Todos os Canais</li>
+                                    <li @click="applyMarketplaceFilter('ML')">
+                                        <img src="/img/ml-logo.svg" alt="" class="filter-dropdown__logo" />
+                                        Mercado Livre
+                                    </li>
+                                    <li @click="applyMarketplaceFilter('Shopee')">
+                                        <img src="/img/shopee-logo.svg" alt="" class="filter-dropdown__logo" />
+                                        Shopee
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
                         <div class="filter-container" ref="accountFilterContainerRef">
                             <button @click="toggleAccountDropdown" class="filter-btn">
                                 <span class="filter-btn-label">Conta:</span>
@@ -82,10 +122,11 @@
                             <div v-if="isAccountDropdownOpen" ref="accountFilterDropdownRef" class="filter-dropdown">
                                 <ul>
                                     <li @click="applyAccountFilter(null)">Todas as Contas</li>
-                                    <li v-for="account in mlAccounts" :key="account.user_id"
-                                        @click="applyAccountFilter(account.user_id)">
-                                        {{ account.nickname }} <small style="color:#6b7280">({{ account.user_id
-                                        }})</small>
+                                    <li v-for="account in allAccountOptions" :key="account.key"
+                                        @click="applyAccountFilter(account.value)">
+                                        <img :src="account.logo" alt="" class="filter-dropdown__logo" />
+                                        {{ account.label }}
+                                        <small style="color:#6b7280">({{ account.id }})</small>
                                     </li>
                                 </ul>
                             </div>
@@ -127,13 +168,21 @@
                     <div v-if="showAdvancedFilters" class="advanced-filters">
                         <div class="filter-row">
                             <div class="filter-group">
-                                <label for="conta-ml-filter">Conta ML</label>
+                                <label for="conta-ml-filter">Conta</label>
                                 <select id="conta-ml-filter" v-model="filters.accountId">
                                     <option :value="null">Todas as Contas</option>
-                                    <option v-for="account in mlAccounts" :key="account.user_id"
-                                        :value="account.user_id">
-                                        {{ account.nickname }}
-                                    </option>
+                                    <optgroup label="Mercado Livre">
+                                        <option v-for="account in mlAccounts" :key="'ml-' + account.user_id"
+                                            :value="String(account.user_id)">
+                                            {{ account.nickname }}
+                                        </option>
+                                    </optgroup>
+                                    <optgroup label="Shopee">
+                                        <option v-for="account in shopeeAccounts" :key="'sp-' + account.shop_id"
+                                            :value="String(account.shop_id)">
+                                            {{ account.shop_name || account.shop_id }}
+                                        </option>
+                                    </optgroup>
                                 </select>
                             </div>
                             <div class="filter-group date-range-group">
@@ -247,7 +296,8 @@
                                                 {{ sale.product_title || 'Produto sem título' }}
                                             </h3>
                                             <div class="sale-card__badges">
-                                                <img src="/img/ml-logo.svg" alt="Mercado Livre" class="sale-card__ml-logo" />
+                                                <img :src="marketplaceLogo(sale)" :alt="marketplaceLabel(sale)"
+                                                    :title="marketplaceLabel(sale)" class="sale-card__ml-logo" />
                                             </div>
                                         </div>
 
@@ -507,19 +557,52 @@ import { useApi } from '@/composables/useApi';
 
 // ===== UTILITY FUNCTIONS FOR CUSTOMER DATA =====
 
+const MK_LOGOS = {
+    ML: '/img/ml-logo.svg',
+    Shopee: '/img/shopee-logo.svg',
+};
+
+/**
+ * Marketplace da venda. O backend envia `marketplace` pela view unificada;
+ * `channel` é o campo antigo e serve de fallback para dados já em cache.
+ */
+function saleMarketplace(sale) {
+    const raw = String(sale?.marketplace || sale?.channel || 'ML').toLowerCase();
+    return raw.includes('shopee') || raw === 'sp' ? 'Shopee' : 'ML';
+}
+
+function marketplaceLogo(sale) {
+    return MK_LOGOS[saleMarketplace(sale)];
+}
+
+function marketplaceLabel(sale) {
+    return saleMarketplace(sale) === 'Shopee' ? 'Shopee' : 'Mercado Livre';
+}
+
 /**
  * Retorna URL da thumbnail do produto via proxy do backend
  */
 function getThumbUrl(sale) {
     let thumbUrl = sale.product_thumbnail;
     if (thumbUrl === 'not_found') return null;
+
+    // Fallback lendo o payload bruto: o formato difere por marketplace.
     if (!thumbUrl && sale.raw_api_data?.order_items) {
         const itemObj = sale.raw_api_data.order_items.find(
             it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku
         );
         if (itemObj?.item?.thumbnail) thumbUrl = itemObj.item.thumbnail;
     }
+    if (!thumbUrl && Array.isArray(sale.raw_api_data?.item_list)) {
+        const itemObj = sale.raw_api_data.item_list.find(
+            it => it.item_sku === sale.sku || it.model_sku === sale.sku
+        ) || sale.raw_api_data.item_list[0];
+        if (itemObj?.image_info?.image_url) thumbUrl = itemObj.image_info.image_url;
+    }
     if (!thumbUrl) return null;
+
+    // O proxy do backend aceita as imagens dos dois marketplaces (whitelist em
+    // router/mercadolivre.js) e resolve o bloqueio de hotlink dos CDNs.
     return `${API_BASE_URL}/ml/img-proxy?url=${encodeURIComponent(thumbUrl)}`;
 }
 
@@ -637,7 +720,11 @@ function showToast(message, type = 'info') {
 
 // ===== END UTILITY FUNCTIONS =====
 
-const { user, userRole, isAuthReady, mlAccounts, fetchMercadoLivreAccounts } = useAuth();
+const {
+    user, userRole, isAuthReady,
+    mlAccounts, fetchMercadoLivreAccounts,
+    shopeeAccounts, fetchShopeeAccounts,
+} = useAuth();
 const { sales, isLoading, error, totalSales, currentPage, totalPages, pageSize, fetchSales } = useSales();
 const userUid = computed(() => user.value?.uid);
 const { allStatuses: customStatuses } = useStatusesForUser(userUid);
@@ -832,11 +919,26 @@ async function processSingleSale(sale) {
     if (isProcessing.value) return;
     isProcessing.value = true;
     try {
-        await api.post('/sales/process', { sale_id: sale.id, sku: sale.sku });
+        // Cada marketplace tem seu endpoint de abatimento, porque a venda é
+        // atualizada na tabela correspondente (sales x shopee_sales). O payload
+        // é sempre uma lista, no mesmo formato do processamento em lote.
+        const isShopee = saleMarketplace(sale) === 'Shopee';
+        const endpoint = isShopee ? '/shopee/process' : '/sales/process';
+        const item = isShopee
+            ? { orderSn: sale.id, sku: sale.sku, uid: sale.uid, quantity: sale.quantity }
+            : { id: sale.id, sku: sale.sku, uid: sale.uid, quantity: sale.quantity };
+
+        const result = await api.post(endpoint, { salesToProcess: [item] });
+
+        // O endpoint responde 200 mesmo com falha por item (lote parcial), por
+        // isso conferimos a lista de erros antes de marcar como processada.
+        const failure = result?.failed?.[0];
+        if (failure) throw new Error(failure.reason || 'Falha ao processar a venda.');
+
         sale.processed_at = new Date().toISOString();
     } catch (err) {
         console.error('Erro ao processar venda:', err);
-        alert(err?.response?.data?.message || err?.message || 'Erro ao processar venda');
+        alert(err?.data?.error || err?.message || 'Erro ao processar venda');
     } finally {
         isProcessing.value = false;
     }
@@ -866,13 +968,53 @@ const isShippingModeDropdownOpen = ref(false);
 const shippingModeFilterContainerRef = ref(null);
 const shippingModeFilterDropdownRef = ref(null);
 
+// Filtro de canal (marketplace): null = todos.
+const selectedMarketplaceFilter = ref(null);
+const isMarketplaceDropdownOpen = ref(false);
+const marketplaceFilterContainerRef = ref(null);
+const marketplaceFilterDropdownRef = ref(null);
+
 const filters = reactive({
     accountId: null,
+    marketplace: null,
     saleDateStart: '',
     saleDateEnd: '',
     shippingLimitStart: '',
     shippingLimitEnd: '',
 });
+
+/**
+ * Contas dos dois marketplaces numa lista só, para o filtro de conta.
+ * O backend casa o filtro por identificador OU por nickname, então enviamos o
+ * identificador (seller_id no ML, shop_id na Shopee).
+ */
+const allAccountOptions = computed(() => {
+    const ml = (mlAccounts.value || []).map((a) => ({
+        key: `ml-${a.user_id}`,
+        id: a.user_id,
+        value: String(a.user_id),
+        label: a.nickname || String(a.user_id),
+        logo: MK_LOGOS.ML,
+    }));
+    const shopee = (shopeeAccounts.value || []).map((a) => ({
+        key: `sp-${a.shop_id}`,
+        id: a.shop_id,
+        value: String(a.shop_id),
+        label: a.shop_name || String(a.shop_id),
+        logo: MK_LOGOS.Shopee,
+    }));
+    return [...ml, ...shopee];
+});
+
+const selectedMarketplaceLabel = computed(() => {
+    if (selectedMarketplaceFilter.value === 'ML') return 'Mercado Livre';
+    if (selectedMarketplaceFilter.value === 'Shopee') return 'Shopee';
+    return 'Todos';
+});
+
+const selectedMarketplaceLogo = computed(() =>
+    selectedMarketplaceFilter.value ? MK_LOGOS[selectedMarketplaceFilter.value] : null
+);
 
 // --- INÍCIO DAS ALTERAÇÕES ---
 
@@ -952,8 +1094,8 @@ const normalizeId = (id) => (id === null || id === undefined ? null : String(id)
 const selectedAccountNickname = computed(() => {
     const id = selectedAccountFilterId.value;
     if (!id) return 'Todas';
-    const acc = (mlAccounts.value || []).find(a => String(a.user_id) === String(id));
-    return acc?.nickname ?? 'Conta';
+    const acc = allAccountOptions.value.find(a => String(a.value) === String(id));
+    return acc?.label ?? 'Conta';
 });
 
 const availableShippingModes = computed(() => {
@@ -1135,6 +1277,8 @@ watch(() => syncState.value.isSyncing, (newValue, oldValue) => {
 
 watch(selectedAccountFilterId, (v) => { filters.accountId = v ?? null; currentPage.value = 1; });
 watch(() => filters.accountId, (v) => { selectedAccountFilterId.value = v ?? null; });
+watch(selectedMarketplaceFilter, (v) => { filters.marketplace = v ?? null; currentPage.value = 1; });
+watch(() => filters.marketplace, (v) => { selectedMarketplaceFilter.value = v ?? null; });
 
 const triggerServerFetch = (resetPage = false) => {
     if (resetPage) currentPage.value = 1;
@@ -1147,6 +1291,7 @@ const triggerServerFetch = (resetPage = false) => {
     if (searchQuery.value) params.search = searchQuery.value;
     if (selectedStatusFilter.value) params.shippingStatus = selectedStatusFilter.value;
     if (filters.accountId) params.account = filters.accountId;
+    if (filters.marketplace) params.marketplace = filters.marketplace;
     if (selectedShippingModeFilter.value) params.shippingMode = selectedShippingModeFilter.value;
     
     if (filters.saleDateStart) params.saleDateStart = toLocalDateInputValue(filters.saleDateStart);
@@ -1165,7 +1310,7 @@ watch(searchQuery, () => {
     }, 400);
 });
 
-watch([selectedStatusFilter, selectedAccountFilterId, selectedShippingModeFilter, filters], () => {
+watch([selectedStatusFilter, selectedAccountFilterId, selectedMarketplaceFilter, selectedShippingModeFilter, filters], () => {
     triggerServerFetch(true);
 }, { deep: true });
 
@@ -1184,10 +1329,13 @@ function closeDropdownOnClickOutside(event) {
     if (shippingModeFilterContainerRef.value && !shippingModeFilterContainerRef.value.contains(target)) {
         isShippingModeDropdownOpen.value = false;
     }
+    if (marketplaceFilterContainerRef.value && !marketplaceFilterContainerRef.value.contains(target)) {
+        isMarketplaceDropdownOpen.value = false;
+    }
 }
 
 onMounted(async () => {
-    await fetchMercadoLivreAccounts();
+    await Promise.all([fetchMercadoLivreAccounts(), fetchShopeeAccounts()]);
     if (isAuthReady.value && user.value) {
         triggerServerFetch(false);
     }
@@ -1207,6 +1355,11 @@ function toggleAdvancedFilters() { showAdvancedFilters.value = !showAdvancedFilt
 function toggleFilterDropdown() { isFilterDropdownOpen.value = !isFilterDropdownOpen.value; }
 function applyStatusFilter(status) { selectedStatusFilter.value = status; isFilterDropdownOpen.value = false; }
 function toggleAccountDropdown() { isAccountDropdownOpen.value = !isAccountDropdownOpen.value; }
+function toggleMarketplaceDropdown() { isMarketplaceDropdownOpen.value = !isMarketplaceDropdownOpen.value; }
+function applyMarketplaceFilter(mk) {
+    selectedMarketplaceFilter.value = mk ?? null;
+    isMarketplaceDropdownOpen.value = false;
+}
 function applyAccountFilter(id) { selectedAccountFilterId.value = id ?? null; isAccountDropdownOpen.value = false; }
 function toggleShippingModeDropdown() { isShippingModeDropdownOpen.value = !isShippingModeDropdownOpen.value; }
 function applyShippingModeFilter(mode) {
@@ -1274,6 +1427,7 @@ function clearFilters() {
     searchQuery.value = '';
     selectedStatusFilter.value = null;
     selectedAccountFilterId.value = null;
+    selectedMarketplaceFilter.value = null;
     selectedShippingModeFilter.value = null;
 }
 
@@ -2273,6 +2427,43 @@ function hideTooltip() {
     .sale-card__date-mobile { display: inline; }
     .sale-card__actions { justify-content: flex-start; }
     .sale-card__product-title { max-width: 100%; }
+}
+
+/* === Marketplaces: legenda e logos nos filtros === */
+.mk-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
+.mk-legend__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+}
+.mk-legend__logo {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    border-radius: 4px;
+}
+.filter-btn__logo {
+    width: 15px;
+    height: 15px;
+    object-fit: contain;
+    border-radius: 3px;
+}
+.filter-dropdown__logo {
+    width: 15px;
+    height: 15px;
+    object-fit: contain;
+    border-radius: 3px;
+    margin-right: 0.4rem;
+    vertical-align: text-bottom;
 }
 
 /* === ESTILOS EXTRAS DO MASTER === */

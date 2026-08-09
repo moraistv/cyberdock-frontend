@@ -124,7 +124,11 @@ router.beforeEach(async (to, from, next) => {
   const isAuthenticated = payload && payload.exp * 1000 > Date.now();
   const userRole = payload ? payload.role : null;
 
-  if (requiresAuth && !isAuthenticated) {
+  // A raiz é apenas um portão: manda para o dashboard quando logado, senão
+  // para o login. Resolver aqui evita renderizar a tela intermediária.
+  if (to.path === '/') {
+    next(isAuthenticated ? '/dashboard' : '/auth');
+  } else if (requiresAuth && !isAuthenticated) {
     next('/auth');
   } else if (requiresMaster && userRole !== 'master') {
     next('/dashboard'); // Redireciona se não for master

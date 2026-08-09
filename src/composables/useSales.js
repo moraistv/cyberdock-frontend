@@ -28,6 +28,8 @@ export function useSales() {
       if (params.shippingLimitStart) queryParams.set('shippingLimitStart', params.shippingLimitStart);
       if (params.shippingLimitEnd) queryParams.set('shippingLimitEnd', params.shippingLimitEnd);
       if (params.shippingMode) queryParams.set('shippingMode', params.shippingMode);
+      // 'ML' | 'Shopee' — vazio traz os dois canais.
+      if (params.marketplace) queryParams.set('marketplace', params.marketplace);
 
       const result = await api.get(`/sales/my-sales?${queryParams.toString()}`);
       
