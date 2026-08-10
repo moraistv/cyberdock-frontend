@@ -59,9 +59,10 @@
 
                         <div class="filter-container" ref="filterContainerRef">
                             <button @click="toggleFilterDropdown" class="filter-btn">
+                                <svg class="filter-btn__icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                 <span class="filter-btn-label">Status:</span>
                                 <span>{{ selectedStatusFilter ? getStatusLabel(selectedStatusFilter) : 'Todos' }}</span>
-                                <svg :class="{ 'rotate-180': isFilterDropdownOpen }" xmlns="http://www.w3.org/2000/svg"
+                                <svg class="filter-btn__chev" :class="{ 'rotate-180': isFilterDropdownOpen }" xmlns="http://www.w3.org/2000/svg"
                                     width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="6 9 12 15 18 9"></polyline>
@@ -82,11 +83,12 @@
 
                         <div class="filter-container" ref="marketplaceFilterContainerRef">
                             <button @click="toggleMarketplaceDropdown" class="filter-btn">
-                                <span class="filter-btn-label">Canal:</span>
                                 <img v-if="selectedMarketplaceLogo" :src="selectedMarketplaceLogo" alt=""
                                     class="filter-btn__logo" />
+                                <svg v-else class="filter-btn__icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
+                                <span class="filter-btn-label">Canal:</span>
                                 <span>{{ selectedMarketplaceLabel }}</span>
-                                <svg :class="{ 'rotate-180': isMarketplaceDropdownOpen }"
+                                <svg class="filter-btn__chev" :class="{ 'rotate-180': isMarketplaceDropdownOpen }"
                                     xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                     stroke-linejoin="round">
@@ -111,9 +113,10 @@
 
                         <div class="filter-container" ref="accountFilterContainerRef">
                             <button @click="toggleAccountDropdown" class="filter-btn">
+                                <svg class="filter-btn__icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
                                 <span class="filter-btn-label">Conta:</span>
                                 <span>{{ selectedAccountNickname }}</span>
-                                <svg :class="{ 'rotate-180': isAccountDropdownOpen }" xmlns="http://www.w3.org/2000/svg"
+                                <svg class="filter-btn__chev" :class="{ 'rotate-180': isAccountDropdownOpen }" xmlns="http://www.w3.org/2000/svg"
                                     width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="6 9 12 15 18 9"></polyline>
@@ -134,9 +137,10 @@
 
                         <div class="filter-container" ref="shippingModeFilterContainerRef">
                             <button @click="toggleShippingModeDropdown" class="filter-btn">
+                                <svg class="filter-btn__icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                 <span class="filter-btn-label">Envio:</span>
                                 <span>{{ selectedShippingModeFilter || 'Todos' }}</span>
-                                <svg :class="{ 'rotate-180': isShippingModeDropdownOpen }"
+                                <svg class="filter-btn__chev" :class="{ 'rotate-180': isShippingModeDropdownOpen }"
                                     xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                     stroke-linejoin="round">
@@ -155,9 +159,11 @@
                             </div>
                         </div>
 
-                        <button @click="toggleAdvancedFilters" class="filter-btn advanced-filter-toggle">
+                        <button @click="toggleAdvancedFilters" class="filter-btn advanced-filter-toggle" :class="{ 'is-active': activeAdvancedCount > 0 }">
+                            <svg class="filter-btn__icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></svg>
                             Filtros Avançados
-                            <svg :class="{ 'rotate-180': showAdvancedFilters }" xmlns="http://www.w3.org/2000/svg"
+                            <span v-if="activeAdvancedCount > 0" class="filter-btn__count">{{ activeAdvancedCount }}</span>
+                            <svg class="filter-btn__chev" :class="{ 'rotate-180': showAdvancedFilters }" xmlns="http://www.w3.org/2000/svg"
                                 width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="6 9 12 15 18 9"></polyline>
@@ -165,57 +171,87 @@
                         </button>
                     </div>
 
-                    <div v-if="showAdvancedFilters" class="advanced-filters">
-                        <div class="filter-row">
-                            <div class="filter-group">
-                                <label for="conta-ml-filter">Conta</label>
-                                <select id="conta-ml-filter" v-model="filters.accountId">
-                                    <option :value="null">Todas as Contas</option>
-                                    <optgroup label="Mercado Livre">
-                                        <option v-for="account in mlAccounts" :key="'ml-' + account.user_id"
-                                            :value="String(account.user_id)">
-                                            {{ account.nickname }}
-                                        </option>
-                                    </optgroup>
-                                    <optgroup label="Shopee">
-                                        <option v-for="account in shopeeAccounts" :key="'sp-' + account.shop_id"
-                                            :value="String(account.shop_id)">
-                                            {{ account.shop_name || account.shop_id }}
-                                        </option>
-                                    </optgroup>
-                                </select>
-                            </div>
-                            <div class="filter-group date-range-group">
-                                <label for="sale-date-start">Data da Venda</label>
-                                <div class="date-inputs">
-                                    <input id="sale-date-start" type="date" v-model="filters.saleDateStart">
-                                    <span>até</span>
-                                    <input id="sale-date-end" type="date" v-model="filters.saleDateEnd">
+                    <Transition @before-enter="advBeforeEnter" @enter="advEnter" @leave="advLeave">
+                        <div v-if="showAdvancedFilters" class="advanced-filters">
+                            <div class="filter-row">
+                                <div class="filter-group">
+                                    <label for="conta-ml-filter">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                                        Conta
+                                    </label>
+                                    <select id="conta-ml-filter" v-model="filters.accountId">
+                                        <option :value="null">Todas as Contas</option>
+                                        <optgroup label="Mercado Livre">
+                                            <option v-for="account in mlAccounts" :key="'ml-' + account.user_id"
+                                                :value="String(account.user_id)">
+                                                {{ account.nickname }}
+                                            </option>
+                                        </optgroup>
+                                        <optgroup label="Shopee">
+                                            <option v-for="account in shopeeAccounts" :key="'sp-' + account.shop_id"
+                                                :value="String(account.shop_id)">
+                                                {{ account.shop_name || account.shop_id }}
+                                            </option>
+                                        </optgroup>
+                                    </select>
+                                </div>
+                                <div class="filter-group date-range-group">
+                                    <label for="sale-date-start">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                                        Data da Venda
+                                    </label>
+                                    <div class="date-inputs">
+                                        <input id="sale-date-start" type="date" v-model="filters.saleDateStart">
+                                        <span>até</span>
+                                        <input id="sale-date-end" type="date" v-model="filters.saleDateEnd">
+                                    </div>
+                                </div>
+                                <div class="filter-group date-range-group">
+                                    <label for="shipping-limit-start">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                                        Limite de Envio
+                                    </label>
+                                    <div class="date-inputs">
+                                        <input id="shipping-limit-start" type="date" v-model="filters.shippingLimitStart">
+                                        <span>até</span>
+                                        <input id="shipping-limit-end" type="date" v-model="filters.shippingLimitEnd">
+                                    </div>
+                                    <div class="period-buttons">
+                                        <button @click="setShippingLimitPeriod('yesterday')" :class="{ 'is-active': shippingLimitPeriodActive === 'yesterday' }">Ontem</button>
+                                        <button @click="setShippingLimitPeriod('today')" :class="{ 'is-active': shippingLimitPeriodActive === 'today' }">Hoje</button>
+                                        <button @click="setShippingLimitPeriod('tomorrow')" :class="{ 'is-active': shippingLimitPeriodActive === 'tomorrow' }">Amanhã</button>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="filter-group date-range-group">
-                                <label for="shipping-limit-start">Limite de Envio</label>
-                                <div class="date-inputs">
-                                    <input id="shipping-limit-start" type="date" v-model="filters.shippingLimitStart">
-                                    <span>até</span>
-                                    <input id="shipping-limit-end" type="date" v-model="filters.shippingLimitEnd">
-                                </div>
-                                <div class="period-buttons">
-                                    <button @click="setShippingLimitPeriod('yesterday')">Ontem</button>
-                                    <button @click="setShippingLimitPeriod('today')">Hoje</button>
-                                    <button @click="setShippingLimitPeriod('tomorrow')">Amanhã</button>
-                                </div>
+                            <div class="filter-actions">
+                                <button @click="clearFilters" class="btn-clear-filters">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+                                    Limpar Filtros
+                                </button>
                             </div>
                         </div>
-                        <div class="filter-actions">
-                            <button @click="clearFilters" class="btn-clear-filters">Limpar Filtros</button>
-                        </div>
-                    </div>
+                    </Transition>
                 </div>
 
                 <div class="sales-table-container">
-                    <div v-if="isLoading && sales.length === 0" class="loading-state">
-                        <p>A carregar vendas...</p>
+                    <!--
+                        Skeleton no lugar de um texto "A carregar...": dá a
+                        percepção de que a tela já está montada e só o
+                        conteúdo está chegando, o que é bem mais rápido aos
+                        olhos do que uma tela em branco com uma frase.
+                    -->
+                    <div v-if="isLoading && sales.length === 0" class="sale-cards-list" aria-busy="true" aria-label="Carregando vendas">
+                        <div v-for="n in 6" :key="'sale-skel-' + n" class="sale-card sale-card--skeleton">
+                            <div class="sale-card__layout">
+                                <div class="skel skel--thumb"></div>
+                                <div class="sale-card__main">
+                                    <div class="skel skel--line" style="width: 40%;"></div>
+                                    <div class="skel skel--line" style="width: 70%; height: 14px; margin-top: 8px;"></div>
+                                    <div class="skel skel--line" style="width: 55%; margin-top: 10px;"></div>
+                                </div>
+                                <div class="skel skel--line" style="width: 90px; height: 28px;"></div>
+                            </div>
+                        </div>
                     </div>
                     <div v-else-if="error" class="error-state">
                         <p>{{ error }}</p>
@@ -223,7 +259,7 @@
                     <div v-else-if="sales.length === 0" class="empty-state">
                         <h3 class="empty-state-title">Nenhuma venda encontrada</h3>
                         <p class="empty-state-text">Clique em "Sincronizar Vendas" para buscar os dados do Mercado
-                            Livre.</p>
+                            Livre ou da Shopee.</p>
                     </div>
 
                     <div v-else>
@@ -1335,7 +1371,15 @@ function closeDropdownOnClickOutside(event) {
 }
 
 onMounted(async () => {
-    await Promise.all([fetchMercadoLivreAccounts(), fetchShopeeAccounts()]);
+    // As vendas são o conteúdo principal da tela e não dependem das contas
+    // (a lista de contas só alimenta os dropdowns de filtro). Antes, o
+    // `await` bloqueava a busca de vendas até as duas chamadas de conta
+    // terminarem — em sequência, isso somava latência sem necessidade.
+    // Disparando tudo junto, a tabela aparece assim que a resposta de
+    // vendas chega, sem esperar pelas contas.
+    fetchMercadoLivreAccounts();
+    fetchShopeeAccounts();
+
     if (isAuthReady.value && user.value) {
         triggerServerFetch(false);
     }
@@ -1400,6 +1444,11 @@ function getStatusColorClass(statusValue) {
     return 'status-badge-default';
 }
 
+// Marca qual botão de atalho (Ontem/Hoje/Amanhã) está selecionado, só para
+// realce visual — recalculado a cada clique e zerado se o usuário editar a
+// data manualmente.
+const shippingLimitPeriodActive = ref(null);
+
 function setShippingLimitPeriod(period) {
     const base = new Date();
     base.setHours(0, 0, 0, 0);
@@ -1416,7 +1465,17 @@ function setShippingLimitPeriod(period) {
         filters.shippingLimitStart = toLocalDateInputValue(tomorrow);
         filters.shippingLimitEnd = toLocalDateInputValue(tomorrow);
     }
+    shippingLimitPeriodActive.value = period;
 }
+
+// Contagem de filtros avançados em uso, para o badge no botão que abre o painel.
+const activeAdvancedCount = computed(() => {
+    let count = 0;
+    if (filters.accountId) count++;
+    if (filters.saleDateStart || filters.saleDateEnd) count++;
+    if (filters.shippingLimitStart || filters.shippingLimitEnd) count++;
+    return count;
+});
 
 function clearFilters() {
     filters.accountId = null;
@@ -1429,7 +1488,14 @@ function clearFilters() {
     selectedAccountFilterId.value = null;
     selectedMarketplaceFilter.value = null;
     selectedShippingModeFilter.value = null;
+    shippingLimitPeriodActive.value = null;
 }
+
+// Animação leve de expansão/recolhimento do painel de filtros avançados —
+// mesmo padrão gsap já usado no resto da tela.
+function advBeforeEnter(el) { gsap.set(el, { opacity: 0, height: 0 }); }
+function advEnter(el, done) { gsap.to(el, { opacity: 1, height: 'auto', duration: 0.25, ease: 'power2.out', onComplete: done }); }
+function advLeave(el, done) { gsap.to(el, { opacity: 0, height: 0, duration: 0.2, ease: 'power2.in', onComplete: done }); }
 
 function showTooltip(event, text) {
     const el = event.target;
@@ -1627,11 +1693,43 @@ function hideTooltip() {
     border: 1px solid #d1d5db;
     border-radius: 0.5rem;
     cursor: pointer;
+    transition: border-color 140ms, box-shadow 140ms, background-color 140ms;
 }
+.filter-btn:hover { border-color: #a5b4fc; background-color: #f8fafc; }
+.filter-btn:focus-visible { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
 
 .filter-btn-label {
     color: #6b7280;
 }
+
+/* Ícone fixo à esquerda de cada botão de filtro, para reconhecimento visual
+   rápido do que cada dropdown representa, sem precisar ler o texto. */
+.filter-btn__icon {
+    color: #9ca3af;
+    flex-shrink: 0;
+}
+.filter-btn__chev {
+    transition: transform 0.2s ease;
+}
+.filter-btn__count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9999px;
+    background: #4f46e5;
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+}
+.advanced-filter-toggle.is-active {
+    border-color: #a5b4fc;
+    background-color: #eef2ff;
+    color: #4338ca;
+}
+.advanced-filter-toggle.is-active .filter-btn__icon { color: #4f46e5; }
 
 .filter-btn svg {
     transition: transform 0.3s ease;
@@ -1694,6 +1792,9 @@ function hideTooltip() {
 }
 
 .filter-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     font-size: 0.875rem;
     font-weight: 500;
     color: #374151;
@@ -1737,6 +1838,11 @@ function hideTooltip() {
     background-color: #f3f4f6;
     border-color: #a5b4fc;
 }
+.period-buttons button.is-active {
+    background-color: #4f46e5;
+    border-color: #4f46e5;
+    color: #fff;
+}
 
 .filter-actions {
     display: flex;
@@ -1745,6 +1851,9 @@ function hideTooltip() {
 }
 
 .btn-clear-filters {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
     font-size: 0.875rem;
     font-weight: 500;
     color: #4f46e5;
@@ -1923,6 +2032,29 @@ function hideTooltip() {
     text-align: center;
     padding: 4rem 2rem;
     color: #6b7280;
+}
+
+/* Skeleton do carregamento inicial: placeholders com shimmer no lugar de
+   texto "carregando", para dar a sensação de que a tela já está pronta e o
+   conteúdo real está só um instante atrás. */
+.sale-card--skeleton { pointer-events: none; }
+.sale-card--skeleton .sale-card__layout { align-items: center; }
+.skel {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #eef0f3 25%, #f5f6f8 37%, #eef0f3 63%);
+    background-size: 400% 100%;
+    animation: skel-shimmer 1.4s ease infinite;
+}
+.skel--thumb { width: 58px; height: 58px; flex-shrink: 0; border-radius: 10px; }
+.skel--line { height: 11px; border-radius: 6px; }
+@keyframes skel-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .skel { animation: none; }
 }
 
 .empty-state-title {

@@ -11,6 +11,13 @@ const mlAccounts = ref([]);
 // ✅ NOVO: estado reativo das lojas Shopee
 const shopeeAccounts = ref([]);
 
+// useAuth() é chamado por vários componentes na mesma página (Sidebar,
+// Topbar, a própria view). Sem esta guarda, o onMounted abaixo roda uma vez
+// por componente montado e refaz login/refreshUserData/fetchContas a cada
+// vez — na prática, o mesmo boot de autenticação repetido 5+ vezes por
+// navegação, sobrecarregando o log e a rede sem necessidade.
+let authBootStarted = false;
+
 export function useAuth() {
     const router = useRouter();
 
@@ -147,7 +154,15 @@ export function useAuth() {
         }
     }
 
+    // onMounted é registrado uma vez PARA CADA componente que chama useAuth()
+    // (Sidebar, Topbar, a view da página...). A guarda `authBootStarted`
+    // garante que o trabalho de boot (ler token, revalidar sessão, buscar
+    // contas ML/Shopee) rode uma única vez por carregamento de página, e não
+    // uma vez por componente.
     onMounted(async () => {
+        if (authBootStarted) return;
+        authBootStarted = true;
+
         const storedToken = localStorage.getItem('authToken');
         if (storedToken) {
             const userData = parseJwt(storedToken);
@@ -167,7 +182,9 @@ export function useAuth() {
         }
     });
 
-    // ✅ ao mudar o usuário (login/logout/troca), refaz a lista de contas
+    // ✅ ao mudar o usuário (login/logout/troca), refaz a lista de contas.
+    // watch() acumularia um listener por componente também, mas aqui o custo
+    // é apenas a checagem do uid — mantido simples e sem guarda extra.
     watch(() => loggedInUser.value?.uid, async (uid) => {
         if (uid) {
             await fetchMercadoLivreAccounts();
