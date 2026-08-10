@@ -30,14 +30,11 @@ export function useAuth() {
     };
 
     const setUserSession = (newToken) => {
-        console.log('🔐 [useAuth] setUserSession chamado com token:', !!newToken);
-        
         if (newToken) {
             token.value = newToken;
             localStorage.setItem('authToken', newToken);
             const userData = parseJwt(newToken);
-            console.log('🔐 [useAuth] Dados do token parseado:', userData);
-            
+
             loggedInUser.value = {
                 ...userData,
                 name: userData?.name || userData?.displayName || '',
@@ -45,9 +42,7 @@ export function useAuth() {
                 email: userData?.email || '',
                 role: userData?.role || 'usuario',
             };
-            console.log('🔐 [useAuth] Usuário configurado:', loggedInUser.value);
         } else {
-            console.log('🔐 [useAuth] Limpando sessão do usuário');
             token.value = null;
             localStorage.removeItem('authToken');
             loggedInUser.value = null;

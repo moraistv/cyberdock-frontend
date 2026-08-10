@@ -24,18 +24,21 @@
                     </div>
                                     <div class="header-buttons">
                     <button @click="handleUnifiedSync" :disabled="syncState.isSyncing || isFetchingAccounts"
-                        :class="['btn', 'sync-btn', 'btn-primary']" 
-                        title="Clique para sincronizar vendas">
-                        <svg v-if="syncState.isSyncing" class="sync-spinner"
-                            xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        class="btn-sync-sales"
+                        :class="{ 'is-busy': syncState.isSyncing || isFetchingAccounts }"
+                        title="Buscar vendas novas nas contas conectadas">
+                        <svg class="btn-sync-sales__icon"
+                            :class="{ 'is-spinning': syncState.isSyncing || isFetchingAccounts }"
+                            xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
                             stroke-linejoin="round">
                             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                            <polyline points="21 3 21 9 15 9" />
                         </svg>
-                        <span v-if="isFetchingAccounts">Buscando...</span>
+                        <span v-if="isFetchingAccounts">Buscando contas...</span>
                         <span v-else-if="syncState.isSyncing">Sincronizando...</span>
-                        <span v-else>Sincronizar Vendas</span>
-                        
+                        <span v-else>Sincronizar vendas</span>
+
                         <!-- Badge com contador de novas vendas -->
                         <span v-if="syncState.newSalesCount > 0" class="new-sales-badge">
                             {{ syncState.newSalesCount }}
@@ -1263,22 +1266,28 @@ const handleSync = async () => {
         await fetchSales();
         const totalNewSales = batch.totalNewSales;
 
-        // Mostra o modal de resultados sempre que houver contas processadas.
-        if (totalAccounts >= 1) {
-            syncResults.value = {
-                title: errorCount > 0 ? 'Sincronização finalizada com problemas' : 'Sincronização finalizada',
-                type: errorCount > 0 ? 'warning' : 'success',
-                accounts: accountResults,
-                summary: {
-                    total: totalAccounts,
-                    successful: successCount,
-                    failed: errorCount
-                },
-                totalNewSales: totalNewSales,
-                totalUpdated: batch.totalUpdated,
-                totalSkipped: batch.totalSkipped,
-                totalDurationMs: batch.totalDurationMs
-            };
+        syncResults.value = {
+            title: errorCount > 0 ? 'Sincronização finalizada com problemas' : 'Sincronização finalizada',
+            type: errorCount > 0 ? 'warning' : 'success',
+            accounts: accountResults,
+            summary: {
+                total: totalAccounts,
+                successful: successCount,
+                failed: errorCount
+            },
+            totalNewSales: totalNewSales,
+            totalUpdated: batch.totalUpdated,
+            totalSkipped: batch.totalSkipped,
+            totalDurationMs: batch.totalDurationMs
+        };
+
+        // O modal só interrompe o usuário quando há algo para conferir: falha
+        // em alguma conta, ou vendas novas/atualizadas. No caso comum ("nada
+        // mudou"), o toast que o useSyncManager já exibe ao finalizar é
+        // suficiente — abrir um modal cheio a cada clique era só ruído, e
+        // exigia um fechamento manual sem motivo.
+        const hasNovidade = errorCount > 0 || totalNewSales > 0 || (batch.totalUpdated || 0) > 0;
+        if (hasNovidade) {
             isSyncResultsModalOpen.value = true;
         }
 
@@ -1618,6 +1627,42 @@ function hideTooltip() {
     gap: 0.5rem;
     position: relative;
 }
+
+/*
+  Botão de sincronizar vendas: sólido para deixar claro que é a ação
+  principal da tela, mas sem gradiente/sombra exagerada. O ícone traz a seta
+  de fechamento do ciclo (desenho universal de "atualizar") e gira enquanto
+  a operação está em curso.
+*/
+.btn-sync-sales {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 40px;
+    padding: 0 1.1rem;
+    border: 1px solid #4f46e5;
+    border-radius: 0.6rem;
+    background-color: #4f46e5;
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 140ms, border-color 140ms, box-shadow 140ms, opacity 140ms;
+}
+.btn-sync-sales:hover:not(:disabled) {
+    background-color: #4338ca;
+    border-color: #4338ca;
+    box-shadow: 0 4px 12px -4px rgba(79, 70, 229, 0.45);
+}
+.btn-sync-sales:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
+}
+.btn-sync-sales:disabled { cursor: not-allowed; opacity: 0.75; }
+.btn-sync-sales__icon { flex-shrink: 0; }
+.btn-sync-sales__icon.is-spinning { animation: spin 1s linear infinite; }
 
 .mode-indicator {
     margin-left: 0.25rem;

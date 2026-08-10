@@ -13,10 +13,6 @@ export function useApi() {
   const { token } = useAuth();
 
   const request = async (endpoint, options = {}) => {
-    console.log('🌐 [useApi] Fazendo requisição para:', endpoint);
-    console.log('🔑 [useApi] Token presente:', !!token?.value);
-    console.log('🔑 [useApi] Token valor:', token?.value ? `${token.value.substring(0, 20)}...` : 'Nenhum');
-    
     const headers = {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -24,34 +20,25 @@ export function useApi() {
 
     if (token?.value) {
       headers.Authorization = `Bearer ${token.value}`;
-      console.log('✅ [useApi] Token adicionado ao header');
-    } else {
-      console.warn('⚠️ [useApi] Nenhum token encontrado');
     }
 
     const url = joinUrl(API_BASE_URL, endpoint);
-    console.log('📡 [useApi] URL final:', url);
-    console.log('📤 [useApi] Opções da requisição:', { ...options, headers: { ...headers, Authorization: headers.Authorization ? 'Bearer [HIDDEN]' : 'Nenhum' } });
-    
+
     try {
       const res = await fetch(url, { ...options, headers });
-      console.log('📥 [useApi] Resposta recebida:', res.status, res.statusText);
 
       if (res.status === 204) return {};
 
       if (res.ok) {
         // Se a resposta é um blob (arquivo), retorna o blob diretamente
         if (options.responseType === 'blob') {
-          console.log('✅ [useApi] Blob recebido com sucesso');
           return await res.blob();
         }
-        
+
         try {
-          const data = await res.json();
-          console.log('✅ [useApi] Dados recebidos com sucesso');
-          return data;
-        } catch (e) {
-          console.log('⚠️ [useApi] Resposta não é JSON válido, retornando objeto vazio');
+          return await res.json();
+        } catch {
+          // Resposta sem corpo JSON válido: trata como vazia.
           return {};
         }
       }
@@ -59,9 +46,7 @@ export function useApi() {
       let data = null;
       try {
         data = await res.json();
-        console.error('❌ [useApi] Erro da API:', data);
-      } catch (e) {
-        console.error('❌ [useApi] Resposta de erro não é JSON');
+      } catch {
         data = null;
       }
 
@@ -69,15 +54,14 @@ export function useApi() {
         (data && (data.message || data.error)) ||
         `Erro ${res.status} ${res.statusText}`;
 
-      console.error('💥 [useApi] Erro final:', msg);
-
       const err = new Error(msg);
       err.status = res.status;
       err.data = data;
       err.url = url;
       throw err;
     } catch (fetchError) {
-      console.error('💥 [useApi] Erro na requisição fetch:', fetchError);
+      // Mantém o log só do erro: é o que realmente importa para diagnóstico.
+      console.error(`[useApi] ${options.method || 'GET'} ${endpoint} falhou:`, fetchError.message);
       throw fetchError;
     }
   };
