@@ -310,7 +310,9 @@
                                              :src="getThumbUrl(sale)"
                                              :alt="sale.product_title"
                                              class="sale-card__thumb-img"
-                                             loading="lazy" />
+                                             loading="lazy"
+                                             decoding="async"
+                                             @error="onThumbError" />
                                         <div v-else class="sale-card__thumb-placeholder">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                                         </div>
@@ -640,9 +642,25 @@ function getThumbUrl(sale) {
     }
     if (!thumbUrl) return null;
 
-    // O proxy do backend aceita as imagens dos dois marketplaces (whitelist em
-    // router/mercadolivre.js) e resolve o bloqueio de hotlink dos CDNs.
-    return `${API_BASE_URL}/ml/img-proxy?url=${encodeURIComponent(thumbUrl)}`;
+    // Carrega DIRETO do CDN do marketplace. Antes tudo passava pelo proxy do
+    // backend, que refazia um fetch ao marketplace para cada imagem — com 50
+    // cards e o limite de conexões por host do navegador, isso virava vários
+    // segundos só de imagem. O proxy continua existindo como fallback em
+    // onThumbError, para os casos em que o CDN bloqueia o acesso direto.
+    return thumbUrl.replace(/^http:\/\//i, 'https://');
+}
+
+/**
+ * Se o CDN recusar o acesso direto (hotlink bloqueado), tenta uma única vez
+ * pelo proxy do backend. O flag evita laço infinito de erro.
+ */
+function onThumbError(event) {
+    const img = event?.target;
+    if (!img || img.dataset.proxied === '1') return;
+    const original = img.getAttribute('src');
+    if (!original || original.includes('/ml/img-proxy')) return;
+    img.dataset.proxied = '1';
+    img.src = `${API_BASE_URL}/ml/img-proxy?url=${encodeURIComponent(original)}`;
 }
 
 /**
@@ -1422,9 +1440,26 @@ function applyShippingModeFilter(mode) {
 function nextPage() { if (currentPage.value < totalPages.value) currentPage.value++; }
 function prevPage() { if (currentPage.value > 1) currentPage.value--; }
 
-function showJsonModal(sale) {
-    selectedSaleJson.value = JSON.stringify(sale.raw_api_data, null, 2);
+async function showJsonModal(sale) {
+    // A listagem traz um raw_api_data reduzido (só o que a tela usa), para não
+    // trafegar megabytes de payload por página. O JSON completo é buscado aqui,
+    // apenas para a venda escolhida.
     isJsonModalOpen.value = true;
+    selectedSaleJson.value = 'Carregando payload completo...';
+    try {
+        const mk = saleMarketplace(sale) === 'Shopee' ? 'shopee' : 'ml';
+        const result = await api.get(
+            `/sales/raw/${mk}/${encodeURIComponent(sale.id)}/${encodeURIComponent(sale.sku)}`
+        );
+        selectedSaleJson.value = JSON.stringify(result?.raw_api_data ?? {}, null, 2);
+    } catch (err) {
+        // Sem o payload completo, mostra o resumido que já veio na listagem.
+        selectedSaleJson.value = JSON.stringify(
+            { erro: err?.data?.error || err.message, resumo_disponivel: sale.raw_api_data },
+            null,
+            2
+        );
+    }
 }
 
 function formatDateTime(d) {
