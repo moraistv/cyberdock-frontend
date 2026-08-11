@@ -334,19 +334,22 @@
                                 <div class="sale-card__title-row">
                                     <span class="desc-origin"
                                           :class="hasInternalDescription(sale) ? 'desc-origin--cd' : 'desc-origin--ml'"
-                                          :title="hasInternalDescription(sale) ? 'Descrição cadastrada na CyberDock (Armazenamento)' : 'Título original do anúncio no Mercado Livre'">
+                                          :title="hasInternalDescription(sale) ? 'Descrição cadastrada na CyberDock (Armazenamento)' : `Título original do anúncio no ${saleMarketplaceLabel(sale)}`">
                                         <svg v-if="hasInternalDescription(sale)" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                                             <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
                                             <line x1="12" y1="22.08" x2="12" y2="12" />
                                         </svg>
-                                        <img v-else src="/img/ml-logo.svg" alt="Mercado Livre" class="desc-origin__img" />
+                                        <img v-else :src="saleLogo(sale)" :alt="saleMarketplaceLabel(sale)" class="desc-origin__img" />
                                     </span>
                                     <h3 class="sale-card__product-title" :title="getProductDescription(sale)">
                                         {{ getProductDescription(sale) }}
                                     </h3>
                                     <div class="sale-card__badges">
-                                        <span class="channel-badge ml">{{ sale.channel }}</span>
+                                        <span class="channel-badge" :title="saleMarketplaceLabel(sale)">
+                                            <img :src="saleLogo(sale)" :alt="saleMarketplaceLabel(sale)" class="channel-badge__logo" />
+                                            {{ saleMarketplaceLabel(sale) }}
+                                        </span>
                                     </div>
                                 </div>
 
@@ -682,6 +685,21 @@ const filters = reactive({
 
 // Descrição do produto: prioridade 1 = descrição cadastrada no Armazenamento.
 // Sem ela, cai no título original do anúncio do Mercado Livre.
+// Canal da venda. A lista vem da view unificada, então `marketplace` é a fonte
+// preferida; `channel` fica como fallback para respostas antigas em cache.
+const MK_LOGOS = { ML: '/img/ml-logo.svg', Shopee: '/img/shopee-logo.svg' };
+
+function saleMarketplace(sale) {
+    const raw = String(sale?.marketplace || sale?.channel || 'ML').toLowerCase();
+    return raw.includes('shopee') ? 'Shopee' : 'ML';
+}
+function saleMarketplaceLabel(sale) {
+    return saleMarketplace(sale) === 'Shopee' ? 'Shopee' : 'Mercado Livre';
+}
+function saleLogo(sale) {
+    return MK_LOGOS[saleMarketplace(sale)];
+}
+
 function hasInternalDescription(sale) {
     return !!(sale?.sku_descricao && String(sale.sku_descricao).trim());
 }
@@ -2603,14 +2621,26 @@ onUnmounted(() => {
     cursor: pointer;
 }
 
-.channel-badge.ml {
-    background-color: #ffe600;
-    color: #333;
-    display: inline-block;
+/* Pílula do canal da venda. Antes era fixa na cor do Mercado Livre; agora usa
+   o logo SVG do marketplace, já que a lista traz ML e Shopee juntos. */
+.channel-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
     padding: 0.25rem 0.6rem;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 600;
+    color: #374151;
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
     border-radius: 9999px;
+    white-space: nowrap;
+}
+
+.channel-badge__logo {
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
 }
 
 .status-badge {
