@@ -61,10 +61,10 @@
                         </div>
 
                         <div class="filter-container" ref="filterContainerRef">
-                            <button @click="toggleFilterDropdown" class="filter-btn">
+                            <button @click="toggleFilterDropdown" class="filter-btn" :class="{ 'is-active': selectedStatuses.length > 0 }">
                                 <svg class="filter-btn__icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                 <span class="filter-btn-label">Status:</span>
-                                <span>{{ selectedStatusFilter ? getStatusLabel(selectedStatusFilter) : 'Todos' }}</span>
+                                <span>{{ statusFilterSummary }}</span>
                                 <svg class="filter-btn__chev" :class="{ 'rotate-180': isFilterDropdownOpen }" xmlns="http://www.w3.org/2000/svg"
                                     width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -72,20 +72,33 @@
                                 </svg>
                             </button>
                             <div v-if="isFilterDropdownOpen" ref="filterDropdownRef" class="filter-dropdown">
+                                <div class="filter-dropdown__head">
+                                    <span>Selecione um ou mais</span>
+                                    <button v-if="selectedStatuses.length" class="filter-dropdown__clear"
+                                        @click="selectedStatuses = []">Limpar</button>
+                                </div>
                                 <ul>
-                                    <li @click="applyStatusFilter(null)">Todos os Status</li>
-                                    <!-- INÍCIO DA ALTERAÇÃO: Usar 'statusOptions' para o filtro -->
+                                    <li class="filter-dropdown__all" :class="{ 'is-checked': !selectedStatuses.length }"
+                                        @click="selectedStatuses = []">
+                                        <span class="checkbox" :class="{ 'is-checked': !selectedStatuses.length }">
+                                            <svg v-if="!selectedStatuses.length" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                        </span>
+                                        Todos os Status
+                                    </li>
                                     <li v-for="status in statusOptions" :key="status.value"
-                                        @click="applyStatusFilter(status.value)">
+                                        :class="{ 'is-checked': selectedStatuses.includes(status.value) }"
+                                        @click="toggleInList(selectedStatuses, status.value)">
+                                        <span class="checkbox" :class="{ 'is-checked': selectedStatuses.includes(status.value) }">
+                                            <svg v-if="selectedStatuses.includes(status.value)" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                        </span>
                                         {{ status.label }}
                                     </li>
-                                    <!-- FIM DA ALTERAÇÃO -->
                                 </ul>
                             </div>
                         </div>
 
                         <div class="filter-container" ref="marketplaceFilterContainerRef">
-                            <button @click="toggleMarketplaceDropdown" class="filter-btn">
+                            <button @click="toggleMarketplaceDropdown" class="filter-btn" :class="{ 'is-active': selectedMarketplaces.length > 0 }">
                                 <img v-if="selectedMarketplaceLogo" :src="selectedMarketplaceLogo" alt=""
                                     class="filter-btn__logo" />
                                 <svg v-else class="filter-btn__icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
@@ -100,22 +113,34 @@
                             </button>
                             <div v-if="isMarketplaceDropdownOpen" ref="marketplaceFilterDropdownRef"
                                 class="filter-dropdown">
+                                <div class="filter-dropdown__head">
+                                    <span>Selecione um ou mais</span>
+                                    <button v-if="selectedMarketplaces.length" class="filter-dropdown__clear"
+                                        @click="selectedMarketplaces = []">Limpar</button>
+                                </div>
                                 <ul>
-                                    <li @click="applyMarketplaceFilter(null)">Todos os Canais</li>
-                                    <li @click="applyMarketplaceFilter('ML')">
-                                        <img src="/img/ml-logo.svg" alt="" class="filter-dropdown__logo" />
-                                        Mercado Livre
+                                    <li class="filter-dropdown__all" :class="{ 'is-checked': !selectedMarketplaces.length }"
+                                        @click="selectedMarketplaces = []">
+                                        <span class="checkbox" :class="{ 'is-checked': !selectedMarketplaces.length }">
+                                            <svg v-if="!selectedMarketplaces.length" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                        </span>
+                                        Todos os Canais
                                     </li>
-                                    <li @click="applyMarketplaceFilter('Shopee')">
-                                        <img src="/img/shopee-logo.svg" alt="" class="filter-dropdown__logo" />
-                                        Shopee
+                                    <li v-for="mk in marketplaceOptions" :key="mk.value"
+                                        :class="{ 'is-checked': selectedMarketplaces.includes(mk.value) }"
+                                        @click="toggleInList(selectedMarketplaces, mk.value)">
+                                        <span class="checkbox" :class="{ 'is-checked': selectedMarketplaces.includes(mk.value) }">
+                                            <svg v-if="selectedMarketplaces.includes(mk.value)" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                        </span>
+                                        <img :src="mk.logo" alt="" class="filter-dropdown__logo" />
+                                        {{ mk.label }}
                                     </li>
                                 </ul>
                             </div>
                         </div>
 
                         <div class="filter-container" ref="accountFilterContainerRef">
-                            <button @click="toggleAccountDropdown" class="filter-btn">
+                            <button @click="toggleAccountDropdown" class="filter-btn" :class="{ 'is-active': selectedAccountIds.length > 0 }">
                                 <svg class="filter-btn__icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
                                 <span class="filter-btn-label">Conta:</span>
                                 <span>{{ selectedAccountNickname }}</span>
@@ -126,10 +151,25 @@
                                 </svg>
                             </button>
                             <div v-if="isAccountDropdownOpen" ref="accountFilterDropdownRef" class="filter-dropdown">
+                                <div class="filter-dropdown__head">
+                                    <span>Selecione uma ou mais</span>
+                                    <button v-if="selectedAccountIds.length" class="filter-dropdown__clear"
+                                        @click="selectedAccountIds = []">Limpar</button>
+                                </div>
                                 <ul>
-                                    <li @click="applyAccountFilter(null)">Todas as Contas</li>
+                                    <li class="filter-dropdown__all" :class="{ 'is-checked': !selectedAccountIds.length }"
+                                        @click="selectedAccountIds = []">
+                                        <span class="checkbox" :class="{ 'is-checked': !selectedAccountIds.length }">
+                                            <svg v-if="!selectedAccountIds.length" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                        </span>
+                                        Todas as Contas
+                                    </li>
                                     <li v-for="account in allAccountOptions" :key="account.key"
-                                        @click="applyAccountFilter(account.value)">
+                                        :class="{ 'is-checked': selectedAccountIds.includes(account.value) }"
+                                        @click="toggleInList(selectedAccountIds, account.value)">
+                                        <span class="checkbox" :class="{ 'is-checked': selectedAccountIds.includes(account.value) }">
+                                            <svg v-if="selectedAccountIds.includes(account.value)" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                        </span>
                                         <img :src="account.logo" alt="" class="filter-dropdown__logo" />
                                         {{ account.label }}
                                         <small style="color:#6b7280">({{ account.id }})</small>
@@ -139,10 +179,10 @@
                         </div>
 
                         <div class="filter-container" ref="shippingModeFilterContainerRef">
-                            <button @click="toggleShippingModeDropdown" class="filter-btn">
+                            <button @click="toggleShippingModeDropdown" class="filter-btn" :class="{ 'is-active': selectedShippingModes.length > 0 }">
                                 <svg class="filter-btn__icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                 <span class="filter-btn-label">Envio:</span>
-                                <span>{{ selectedShippingModeFilter || 'Todos' }}</span>
+                                <span>{{ shippingModeFilterSummary }}</span>
                                 <svg class="filter-btn__chev" :class="{ 'rotate-180': isShippingModeDropdownOpen }"
                                     xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -152,10 +192,25 @@
                             </button>
                             <div v-if="isShippingModeDropdownOpen" ref="shippingModeFilterDropdownRef"
                                 class="filter-dropdown">
+                                <div class="filter-dropdown__head">
+                                    <span>Selecione um ou mais</span>
+                                    <button v-if="selectedShippingModes.length" class="filter-dropdown__clear"
+                                        @click="selectedShippingModes = []">Limpar</button>
+                                </div>
                                 <ul>
-                                    <li @click="applyShippingModeFilter(null)">Todos os Modos</li>
+                                    <li class="filter-dropdown__all" :class="{ 'is-checked': !selectedShippingModes.length }"
+                                        @click="selectedShippingModes = []">
+                                        <span class="checkbox" :class="{ 'is-checked': !selectedShippingModes.length }">
+                                            <svg v-if="!selectedShippingModes.length" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                        </span>
+                                        Todos os Modos
+                                    </li>
                                     <li v-for="mode in availableShippingModes" :key="mode"
-                                        @click="applyShippingModeFilter(mode)">
+                                        :class="{ 'is-checked': selectedShippingModes.includes(mode) }"
+                                        @click="toggleInList(selectedShippingModes, mode)">
+                                        <span class="checkbox" :class="{ 'is-checked': selectedShippingModes.includes(mode) }">
+                                            <svg v-if="selectedShippingModes.includes(mode)" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                        </span>
                                         {{ mode }}
                                     </li>
                                 </ul>
@@ -174,30 +229,28 @@
                         </button>
                     </div>
 
+                    <!-- Chips do que está selecionado: com seleção múltipla o rótulo do
+                         botão não cabe tudo, então cada valor ativo aparece aqui e pode
+                         ser removido individualmente. -->
+                    <div v-if="activeFilterChips.length" class="active-chips">
+                        <button v-for="chip in activeFilterChips" :key="chip.key" class="active-chip"
+                            @click="chip.remove()">
+                            <img v-if="chip.logo" :src="chip.logo" alt="" class="active-chip__logo" />
+                            <span class="active-chip__group">{{ chip.group }}</span>
+                            <span class="active-chip__value">{{ chip.label }}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                        <button class="active-chip active-chip--clear" @click="clearFilters">Limpar tudo</button>
+                    </div>
+
                     <Transition @before-enter="advBeforeEnter" @enter="advEnter" @leave="advLeave">
                         <div v-if="showAdvancedFilters" class="advanced-filters">
                             <div class="filter-row">
-                                <div class="filter-group">
-                                    <label for="conta-ml-filter">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                                        Conta
-                                    </label>
-                                    <select id="conta-ml-filter" v-model="filters.accountId">
-                                        <option :value="null">Todas as Contas</option>
-                                        <optgroup label="Mercado Livre">
-                                            <option v-for="account in mlAccounts" :key="'ml-' + account.user_id"
-                                                :value="String(account.user_id)">
-                                                {{ account.nickname }}
-                                            </option>
-                                        </optgroup>
-                                        <optgroup label="Shopee">
-                                            <option v-for="account in shopeeAccounts" :key="'sp-' + account.shop_id"
-                                                :value="String(account.shop_id)">
-                                                {{ account.shop_name || account.shop_id }}
-                                            </option>
-                                        </optgroup>
-                                    </select>
-                                </div>
                                 <div class="filter-group date-range-group">
                                     <label for="sale-date-start">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
@@ -1003,7 +1056,9 @@ async function processSingleSale(sale) {
 
 const tableBodyRef = ref(null);
 const searchQuery = ref('');
-const selectedStatusFilter = ref(null);
+// Filtros rápidos são multi-seleção: lista vazia = "todos". O backend aceita os
+// valores em CSV (`= ANY(...)`), então não há mais um único valor por filtro.
+const selectedStatuses = ref([]);
 const isFilterDropdownOpen = ref(false);
 const filterDropdownRef = ref(null);
 const filterContainerRef = ref(null);
@@ -1015,25 +1070,35 @@ const isFetchingAccounts = ref(false);
 const showAdvancedFilters = ref(false);
 
 
-const selectedAccountFilterId = ref(null);
+const selectedAccountIds = ref([]);
 const isAccountDropdownOpen = ref(false);
 const accountFilterDropdownRef = ref(null);
 const accountFilterContainerRef = ref(null);
 
-const selectedShippingModeFilter = ref(null);
+const selectedShippingModes = ref([]);
 const isShippingModeDropdownOpen = ref(false);
 const shippingModeFilterContainerRef = ref(null);
 const shippingModeFilterDropdownRef = ref(null);
 
-// Filtro de canal (marketplace): null = todos.
-const selectedMarketplaceFilter = ref(null);
+// Filtro de canal (marketplace): lista vazia = todos.
+const selectedMarketplaces = ref([]);
 const isMarketplaceDropdownOpen = ref(false);
 const marketplaceFilterContainerRef = ref(null);
 const marketplaceFilterDropdownRef = ref(null);
 
+const marketplaceOptions = [
+    { value: 'ML', label: 'Mercado Livre', logo: '/img/ml-logo.svg' },
+    { value: 'Shopee', label: 'Shopee', logo: '/img/shopee-logo.svg' },
+];
+
+/** Marca/desmarca um valor numa das listas de filtro (usado pelos dropdowns). */
+function toggleInList(list, value) {
+    const i = list.indexOf(value);
+    if (i >= 0) list.splice(i, 1);
+    else list.push(value);
+}
+
 const filters = reactive({
-    accountId: null,
-    marketplace: null,
     saleDateStart: '',
     saleDateEnd: '',
     shippingLimitStart: '',
@@ -1064,14 +1129,22 @@ const allAccountOptions = computed(() => {
 });
 
 const selectedMarketplaceLabel = computed(() => {
-    if (selectedMarketplaceFilter.value === 'ML') return 'Mercado Livre';
-    if (selectedMarketplaceFilter.value === 'Shopee') return 'Shopee';
-    return 'Todos';
+    const list = selectedMarketplaces.value;
+    if (!list.length) return 'Todos';
+    if (list.length === 1) return marketplaceOptions.find(o => o.value === list[0])?.label ?? list[0];
+    return `${list.length} canais`;
 });
 
 const selectedMarketplaceLogo = computed(() =>
-    selectedMarketplaceFilter.value ? MK_LOGOS[selectedMarketplaceFilter.value] : null
+    selectedMarketplaces.value.length === 1 ? MK_LOGOS[selectedMarketplaces.value[0]] : null
 );
+
+const shippingModeFilterSummary = computed(() => {
+    const list = selectedShippingModes.value;
+    if (!list.length) return 'Todos';
+    if (list.length === 1) return list[0];
+    return `${list.length} modos`;
+});
 
 // --- INÍCIO DAS ALTERAÇÕES ---
 
@@ -1112,6 +1185,13 @@ const getStatusLabel = (statusValue) => {
     return option?.label || (String(statusValue).charAt(0).toUpperCase() + String(statusValue).slice(1).replace(/_/g, ' '));
 };
 
+const statusFilterSummary = computed(() => {
+    const list = selectedStatuses.value;
+    if (!list.length) return 'Todos';
+    if (list.length === 1) return getStatusLabel(list[0]);
+    return `${list.length} status`;
+});
+
 // --- FIM DAS ALTERAÇÕES ---
 
 function toLocalDateInputValue(date) {
@@ -1149,16 +1229,70 @@ const getSaleAccountId = (s) =>
 const normalizeId = (id) => (id === null || id === undefined ? null : String(id));
 
 const selectedAccountNickname = computed(() => {
-    const id = selectedAccountFilterId.value;
-    if (!id) return 'Todas';
-    const acc = allAccountOptions.value.find(a => String(a.value) === String(id));
-    return acc?.label ?? 'Conta';
+    const list = selectedAccountIds.value;
+    if (!list.length) return 'Todas';
+    if (list.length === 1) {
+        const acc = allAccountOptions.value.find(a => String(a.value) === String(list[0]));
+        return acc?.label ?? 'Conta';
+    }
+    return `${list.length} contas`;
 });
 
+/** Um chip por valor selecionado, com a ação de remover só aquele valor. */
+const activeFilterChips = computed(() => {
+    const chips = [];
+
+    selectedStatuses.value.forEach((v) => chips.push({
+        key: `st-${v}`, group: 'Status', label: getStatusLabel(v), logo: null,
+        remove: () => toggleInList(selectedStatuses.value, v),
+    }));
+
+    selectedMarketplaces.value.forEach((v) => {
+        const opt = marketplaceOptions.find(o => o.value === v);
+        chips.push({
+            key: `mk-${v}`, group: 'Canal', label: opt?.label ?? v, logo: opt?.logo ?? null,
+            remove: () => toggleInList(selectedMarketplaces.value, v),
+        });
+    });
+
+    selectedAccountIds.value.forEach((v) => {
+        const acc = allAccountOptions.value.find(a => String(a.value) === String(v));
+        chips.push({
+            key: `ac-${v}`, group: 'Conta', label: acc?.label ?? v, logo: acc?.logo ?? null,
+            remove: () => toggleInList(selectedAccountIds.value, v),
+        });
+    });
+
+    selectedShippingModes.value.forEach((v) => chips.push({
+        key: `sm-${v}`, group: 'Envio', label: v, logo: null,
+        remove: () => toggleInList(selectedShippingModes.value, v),
+    }));
+
+    if (searchQuery.value) {
+        chips.push({
+            key: 'search', group: 'Busca', label: searchQuery.value, logo: null,
+            remove: () => { searchQuery.value = ''; },
+        });
+    }
+
+    return chips;
+});
+
+// As opções vêm das vendas carregadas, mas a listagem é filtrada no servidor:
+// se derivássemos apenas da página atual, marcar um modo faria os outros
+// desaparecerem do dropdown. Por isso os modos já vistos são acumulados.
+const knownShippingModes = ref([]);
+watch(sales, (list) => {
+    const set = new Set(knownShippingModes.value);
+    (list || []).forEach((s) => { if (s.shipping_mode) set.add(s.shipping_mode); });
+    if (set.size !== knownShippingModes.value.length) {
+        knownShippingModes.value = [...set].sort();
+    }
+}, { immediate: true });
+
 const availableShippingModes = computed(() => {
-    if (!sales.value) return [];
-    const modes = sales.value.map(s => s.shipping_mode).filter(Boolean);
-    return [...new Set(modes)].sort();
+    const set = new Set([...knownShippingModes.value, ...selectedShippingModes.value]);
+    return [...set].sort();
 });
 
 const handleUnifiedSync = async () => {
@@ -1338,11 +1472,6 @@ watch(() => syncState.value.isSyncing, (newValue, oldValue) => {
     }
 });
 
-watch(selectedAccountFilterId, (v) => { filters.accountId = v ?? null; currentPage.value = 1; });
-watch(() => filters.accountId, (v) => { selectedAccountFilterId.value = v ?? null; });
-watch(selectedMarketplaceFilter, (v) => { filters.marketplace = v ?? null; currentPage.value = 1; });
-watch(() => filters.marketplace, (v) => { selectedMarketplaceFilter.value = v ?? null; });
-
 const triggerServerFetch = (resetPage = false) => {
     if (resetPage) currentPage.value = 1;
     
@@ -1351,11 +1480,12 @@ const triggerServerFetch = (resetPage = false) => {
         limit: pageSize.value,
     };
 
+    // Multi-seleção vai como CSV; o backend transforma em `= ANY($n)`.
     if (searchQuery.value) params.search = searchQuery.value;
-    if (selectedStatusFilter.value) params.shippingStatus = selectedStatusFilter.value;
-    if (filters.accountId) params.account = filters.accountId;
-    if (filters.marketplace) params.marketplace = filters.marketplace;
-    if (selectedShippingModeFilter.value) params.shippingMode = selectedShippingModeFilter.value;
+    if (selectedStatuses.value.length) params.shippingStatus = selectedStatuses.value.join(',');
+    if (selectedAccountIds.value.length) params.account = selectedAccountIds.value.join(',');
+    if (selectedMarketplaces.value.length) params.marketplace = selectedMarketplaces.value.join(',');
+    if (selectedShippingModes.value.length) params.shippingMode = selectedShippingModes.value.join(',');
     
     if (filters.saleDateStart) params.saleDateStart = toLocalDateInputValue(filters.saleDateStart);
     if (filters.saleDateEnd) params.saleDateEnd = toLocalDateInputValue(filters.saleDateEnd);
@@ -1373,7 +1503,7 @@ watch(searchQuery, () => {
     }, 400);
 });
 
-watch([selectedStatusFilter, selectedAccountFilterId, selectedMarketplaceFilter, selectedShippingModeFilter, filters], () => {
+watch([selectedStatuses, selectedAccountIds, selectedMarketplaces, selectedShippingModes, filters], () => {
     triggerServerFetch(true);
 }, { deep: true });
 
@@ -1423,20 +1553,12 @@ onUnmounted(() => {
 });
 
 function toggleAdvancedFilters() { showAdvancedFilters.value = !showAdvancedFilters.value; }
+// Os dropdowns de filtro ficam abertos ao marcar/desmarcar (seleção múltipla);
+// só um clique fora ou no próprio botão fecha.
 function toggleFilterDropdown() { isFilterDropdownOpen.value = !isFilterDropdownOpen.value; }
-function applyStatusFilter(status) { selectedStatusFilter.value = status; isFilterDropdownOpen.value = false; }
 function toggleAccountDropdown() { isAccountDropdownOpen.value = !isAccountDropdownOpen.value; }
 function toggleMarketplaceDropdown() { isMarketplaceDropdownOpen.value = !isMarketplaceDropdownOpen.value; }
-function applyMarketplaceFilter(mk) {
-    selectedMarketplaceFilter.value = mk ?? null;
-    isMarketplaceDropdownOpen.value = false;
-}
-function applyAccountFilter(id) { selectedAccountFilterId.value = id ?? null; isAccountDropdownOpen.value = false; }
 function toggleShippingModeDropdown() { isShippingModeDropdownOpen.value = !isShippingModeDropdownOpen.value; }
-function applyShippingModeFilter(mode) {
-    selectedShippingModeFilter.value = mode;
-    isShippingModeDropdownOpen.value = false;
-}
 function nextPage() { if (currentPage.value < totalPages.value) currentPage.value++; }
 function prevPage() { if (currentPage.value > 1) currentPage.value--; }
 
@@ -1515,23 +1637,21 @@ function setShippingLimitPeriod(period) {
 // Contagem de filtros avançados em uso, para o badge no botão que abre o painel.
 const activeAdvancedCount = computed(() => {
     let count = 0;
-    if (filters.accountId) count++;
     if (filters.saleDateStart || filters.saleDateEnd) count++;
     if (filters.shippingLimitStart || filters.shippingLimitEnd) count++;
     return count;
 });
 
 function clearFilters() {
-    filters.accountId = null;
     filters.saleDateStart = '';
     filters.saleDateEnd = '';
     filters.shippingLimitStart = '';
     filters.shippingLimitEnd = '';
     searchQuery.value = '';
-    selectedStatusFilter.value = null;
-    selectedAccountFilterId.value = null;
-    selectedMarketplaceFilter.value = null;
-    selectedShippingModeFilter.value = null;
+    selectedStatuses.value = [];
+    selectedAccountIds.value = [];
+    selectedMarketplaces.value = [];
+    selectedShippingModes.value = [];
     shippingLimitPeriodActive.value = null;
 }
 
@@ -1841,16 +1961,127 @@ function hideTooltip() {
 }
 
 .filter-dropdown li {
-    padding: 0.75rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
     font-size: 0.875rem;
     color: #374151;
     cursor: pointer;
     transition: background-color 0.2s;
+    user-select: none;
 }
 
 .filter-dropdown li:hover {
     background-color: #f3f4f6;
 }
+
+.filter-dropdown li.is-checked {
+    background-color: #eef2ff;
+    color: #3730a3;
+    font-weight: 600;
+}
+
+/* Cabeçalho do dropdown: lembra que a seleção é múltipla e oferece o atalho
+   para zerar aquele filtro específico. */
+.filter-dropdown__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #9ca3af;
+}
+
+.filter-dropdown__clear {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #4f46e5;
+    cursor: pointer;
+}
+.filter-dropdown__clear:hover { text-decoration: underline; }
+
+.filter-dropdown__all { border-bottom: 1px solid #f1f5f9; }
+
+.filter-dropdown .checkbox {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 4px;
+    background: #fff;
+    color: #fff;
+    transition: background-color 120ms, border-color 120ms;
+}
+
+.filter-dropdown .checkbox.is-checked {
+    background: #4f46e5;
+    border-color: #4f46e5;
+}
+
+/* Filtros ativos em formato de pílula. Cada um remove só o próprio valor. */
+.active-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.9rem;
+}
+
+.active-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid #c7d2fe;
+    border-radius: 9999px;
+    background: #eef2ff;
+    color: #3730a3;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 140ms, border-color 140ms;
+}
+.active-chip:hover { background: #e0e7ff; border-color: #a5b4fc; }
+
+.active-chip__group {
+    color: #6366f1;
+    font-weight: 500;
+    opacity: 0.85;
+}
+.active-chip__group::after { content: ':'; }
+
+.active-chip__value { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.active-chip__logo { width: 14px; height: 14px; object-fit: contain; }
+
+.active-chip--clear {
+    border-color: #e5e7eb;
+    background: #fff;
+    color: #6b7280;
+}
+.active-chip--clear:hover { background: #f9fafb; border-color: #d1d5db; }
+
+/* Botão de filtro rápido com algo selecionado ganha o mesmo realce do painel
+   avançado, para deixar claro que a tabela está filtrada. */
+.filter-btn.is-active {
+    border-color: #a5b4fc;
+    background-color: #eef2ff;
+    color: #3730a3;
+}
+.filter-btn.is-active .filter-btn__icon { color: #4f46e5; }
+.filter-btn.is-active .filter-btn-label { color: #6366f1; }
 
 .advanced-filters {
     margin-top: 1.5rem;

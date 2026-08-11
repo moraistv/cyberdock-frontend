@@ -27,7 +27,17 @@ async function safeJson(response) {
   }
 }
 
-export function useUserStorage(userId, onInitialLoad = null) {
+/**
+ * @param {import('vue').Ref<string|null>} userId
+ * @param {Function|null} onInitialLoad
+ * @param {{ withMovements?: boolean }} options
+ *   `withMovements: false` pula o histórico completo de movimentações no carregamento
+ *   inicial. Telas como o Dashboard não usam essa lista, e ela cresce sem limite —
+ *   buscá-la à toa atrasava a primeira renderização. Quem precisa (tela de estoque)
+ *   mantém o padrão, e `fetchAllMovements` continua disponível sob demanda.
+ */
+export function useUserStorage(userId, onInitialLoad = null, options = {}) {
+  const { withMovements = true } = options;
   const { token } = useAuth();
 
   const createNewUserState = () => ({
@@ -277,13 +287,14 @@ export function useUserStorage(userId, onInitialLoad = null) {
     state.error = null;
 
     try {
-      await Promise.all([
+      const jobs = [
         fetchSkus(currentUserId),
         fetchPackageTypes(currentUserId),
         servicesComposable.fetchClientServices(currentUserId),
         fetchBillingSummary(currentUserId),
-        fetchAllMovements(currentUserId),
-      ]);
+      ];
+      if (withMovements) jobs.push(fetchAllMovements(currentUserId));
+      await Promise.all(jobs);
     } catch (e) {
       state.error = e.message || 'Falha ao carregar dados do armazenamento.';
     } finally {
