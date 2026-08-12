@@ -291,7 +291,7 @@
                 <section class="sales-overview" aria-label="Resumo da listagem">
                     <article class="sales-overview__item">
                         <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="m5 15 4-5 4 3 6-8"/></svg></span>
-                        <div><strong>{{ totalSales.toLocaleString('pt-BR') }}</strong><span>vendas no filtro</span></div>
+                        <div><strong>{{ formattedTotalSales }}</strong><span>vendas no filtro</span></div>
                     </article>
                     <article class="sales-overview__item">
                         <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
@@ -299,7 +299,7 @@
                     </article>
                     <article class="sales-overview__item">
                         <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h6M7 16h4"/></svg></span>
-                        <div><strong>{{ currentPage }} / {{ totalPages }}</strong><span>página atual</span></div>
+                        <div><strong>{{ currentPage }} / {{ formattedTotalPages }}</strong><span>página atual</span></div>
                     </article>
                     <article class="sales-overview__item" :class="{ 'is-syncing': isUnifiedSyncing }">
                         <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
@@ -339,7 +339,7 @@
                     <div v-else>
                         <!-- Contador de resultados -->
                         <div class="sale-cards-counter">
-                            <span>Mostrando <strong>{{ sales.length }}</strong> de <strong>{{ totalSales }}</strong> vendas</span>
+                            <span>Mostrando <strong>{{ sales.length }}</strong> de <strong>{{ formattedTotalSales }}</strong> vendas</span>
                             <span v-if="isLoading" class="sale-cards-counter__loading">Atualizando...</span>
                         </div>
 
@@ -523,10 +523,10 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="pagination-controls" v-if="totalPages > 1">
+                        <div class="pagination-controls" v-if="currentPage > 1 || hasNextPage || totalPages > 1">
                             <button @click="prevPage" :disabled="currentPage === 1">Anterior</button>
-                            <span>Página {{ currentPage }} de {{ totalPages }}</span>
-                            <button @click="nextPage" :disabled="currentPage === totalPages">Próximo</button>
+                            <span>Página {{ currentPage }} de {{ formattedTotalPages }}</span>
+                            <button @click="nextPage" :disabled="!hasNextPage && currentPage >= totalPages">Próximo</button>
                         </div>
                     </div>
                 </div>
@@ -854,7 +854,16 @@ const {
     mlAccounts, fetchMercadoLivreAccounts,
     shopeeAccounts, fetchShopeeAccounts,
 } = useAuth();
-const { sales, isLoading, error, totalSales, currentPage, totalPages, pageSize, fetchSales } = useSales();
+const {
+    sales, isLoading, error, totalSales, totalIsExact, hasNextPage,
+    currentPage, totalPages, pageSize, fetchSales,
+} = useSales();
+const formattedTotalSales = computed(() =>
+    `${Number(totalSales.value || 0).toLocaleString('pt-BR')}${totalIsExact.value ? '' : '+'}`
+);
+const formattedTotalPages = computed(() =>
+    `${totalPages.value}${totalIsExact.value ? '' : '+'}`
+);
 const userUid = computed(() => user.value?.uid);
 const { allStatuses: customStatuses } = useStatusesForUser(userUid);
 const { syncState, liveAccounts, syncAccountsBatch } = useSyncManager();
@@ -1614,7 +1623,9 @@ function toggleFilterDropdown() { isFilterDropdownOpen.value = !isFilterDropdown
 function toggleAccountDropdown() { isAccountDropdownOpen.value = !isAccountDropdownOpen.value; }
 function toggleMarketplaceDropdown() { isMarketplaceDropdownOpen.value = !isMarketplaceDropdownOpen.value; }
 function toggleShippingModeDropdown() { isShippingModeDropdownOpen.value = !isShippingModeDropdownOpen.value; }
-function nextPage() { if (currentPage.value < totalPages.value) currentPage.value++; }
+function nextPage() {
+    if (hasNextPage.value || currentPage.value < totalPages.value) currentPage.value++;
+}
 function prevPage() { if (currentPage.value > 1) currentPage.value--; }
 
 async function showJsonModal(sale) {

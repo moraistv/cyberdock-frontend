@@ -42,13 +42,11 @@
             <div class="chip-row">
               <button class="chip" :class="{ 'is-active': !selectedMarketplaces.length }"
                       @click="selectedMarketplaces = []">Todos</button>
-              <button class="chip" :class="{ 'is-active': selectedMarketplaces.includes('ML') }"
-                      @click="toggleMarketplace('ML')">
-                <img src="/img/ml-logo.svg" alt="" class="chip__logo" /> Mercado Livre
-              </button>
-              <button class="chip" :class="{ 'is-active': selectedMarketplaces.includes('Shopee') }"
-                      @click="toggleMarketplace('Shopee')">
-                <img src="/img/shopee-logo.svg" alt="" class="chip__logo" /> Shopee
+              <button v-for="mk in marketplaceFacets" :key="mk.value"
+                      class="chip" :class="{ 'is-active': selectedMarketplaces.includes(mk.value) }"
+                      @click="toggleMarketplace(mk.value)">
+                <img :src="MK_LOGOS[mk.value] || MK_LOGOS.ML" alt="" class="chip__logo" /> {{ mk.label }}
+                <span class="chip__count">{{ mk.count }}</span>
               </button>
             </div>
           </div>
@@ -81,35 +79,81 @@
                       class="chip" :class="{ 'is-active': selectedAccounts.includes(acc.value) }"
                       @click="toggleAccount(acc.value)">
                 <img :src="acc.logo" alt="" class="chip__logo" /> {{ acc.label }}
+                <span class="chip__count">{{ acc.count }}</span>
               </button>
             </div>
           </div>
 
-          <div class="filter-block" v-if="knownStatuses.length">
+          <div class="filter-block" v-if="statusFacets.length">
             <span class="filter-label">
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
-              Status
+              Status de envio
             </span>
             <div class="chip-row">
               <button class="chip" :class="{ 'is-active': !selectedStatuses.length }"
                       @click="selectedStatuses = []">Todos</button>
-              <button v-for="st in knownStatuses" :key="st"
-                      class="chip" :class="{ 'is-active': selectedStatuses.includes(st) }"
-                      @click="toggleIn(selectedStatuses, st)">{{ st }}</button>
+              <button v-for="st in statusFacets" :key="st.value"
+                      class="chip" :class="{ 'is-active': selectedStatuses.includes(st.value) }"
+                      @click="toggleIn(selectedStatuses, st.value)">
+                {{ st.label }} <span class="chip__count">{{ st.count }}</span>
+              </button>
             </div>
           </div>
 
-          <div class="filter-block" v-if="knownModes.length">
+          <div class="filter-block" v-if="modeFacets.length">
             <span class="filter-label">
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
-              Envio
+              Modalidade de envio
             </span>
             <div class="chip-row">
               <button class="chip" :class="{ 'is-active': !selectedModes.length }"
                       @click="selectedModes = []">Todos</button>
-              <button v-for="m in knownModes" :key="m"
-                      class="chip" :class="{ 'is-active': selectedModes.includes(m) }"
-                      @click="toggleIn(selectedModes, m)">{{ m }}</button>
+              <button v-for="m in modeFacets" :key="m.value"
+                      class="chip" :class="{ 'is-active': selectedModes.includes(m.value) }"
+                      @click="toggleIn(selectedModes, m.value)">
+                {{ m.label }} <span class="chip__count">{{ m.count }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="operational-filter-grid">
+            <div class="filter-block">
+              <span class="filter-label">Fila operacional</span>
+              <div class="chip-row">
+                <button class="chip" :class="{ 'is-active': !selectedQueue }"
+                        @click="selectedQueue = ''">Todos</button>
+                <button v-for="option in queueOptions" :key="option.value"
+                        class="chip" :class="{ 'is-active': selectedQueue === option.value }"
+                        @click="selectedQueue = toggleSingle(selectedQueue, option.value)">
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+
+            <div class="filter-block">
+              <span class="filter-label">Processamento de estoque</span>
+              <div class="chip-row">
+                <button class="chip" :class="{ 'is-active': !selectedProcessed }"
+                        @click="selectedProcessed = ''">Todos</button>
+                <button v-for="option in processedOptions" :key="option.value"
+                        class="chip" :class="{ 'is-active': selectedProcessed === option.value }"
+                        @click="selectedProcessed = toggleSingle(selectedProcessed, option.value)">
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+
+            <div class="filter-block">
+              <span class="filter-label">Cadastro do SKU</span>
+              <div class="chip-row">
+                <button class="chip" :class="{ 'is-active': !selectedSkuMapped }"
+                        @click="selectedSkuMapped = ''">Todos</button>
+                <button v-for="option in skuMappedOptions" :key="option.value"
+                        class="chip" :class="{ 'is-active': selectedSkuMapped === option.value }"
+                        @click="selectedSkuMapped = toggleSingle(selectedSkuMapped, option.value)">
+                  {{ option.label }}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -358,6 +402,7 @@ import { gsap } from 'gsap'
 import { useAuth } from '@/composables/useAuth'
 import { useUserStorage } from '@/composables/useUserStorage'
 import { useDashboardStats } from '@/composables/useDashboardStats'
+import { useSalesFilterFacets } from '@/composables/useSalesFilterFacets'
 
 /* -------------------- Estado / dados -------------------- */
 const { user, isAuthReady, mlAccounts, shopeeAccounts } = useAuth()
@@ -375,10 +420,33 @@ const selectedMarketplaces = ref([])
 const selectedAccounts = ref([])
 const selectedStatuses = ref([])
 const selectedModes = ref([])
+// Combinações operacionais: uma opção por grupo, sempre com "Todos" (vazio).
+const selectedQueue = ref('')
+const selectedProcessed = ref('')
+const selectedSkuMapped = ref('')
+
+const queueOptions = [
+  { value: 'pending', label: 'A despachar' },
+  { value: 'valid', label: 'Não cancelados' },
+  { value: 'cancelled', label: 'Cancelados' },
+]
+const processedOptions = [
+  { value: 'yes', label: 'Estoque abatido' },
+  { value: 'no', label: 'Sem abatimento' },
+]
+const skuMappedOptions = [
+  { value: 'yes', label: 'SKU cadastrado' },
+  { value: 'no', label: 'SKU ausente' },
+]
 
 function toggleIn(list, value) {
   const i = list.indexOf(value)
   if (i === -1) list.push(value); else list.splice(i, 1)
+}
+
+/** Grupos de opção única alternam entre o valor e "Todos". */
+function toggleSingle(current, value) {
+  return current === value ? '' : value
 }
 
 const {
@@ -396,19 +464,16 @@ const byMarketplace = computed(() => stats.value.byMarketplace)
 const byShippingMode = computed(() => stats.value.byShippingMode)
 const topSkus = computed(() => stats.value.topSkus)
 
-// As opções de status e de modalidade saem das próprias agregações. Como a
-// consulta já vem filtrada, derivar só da resposta atual faria as opções
-// desaparecerem ao marcá-las — então os valores vistos são acumulados.
-const knownStatuses = ref([])
-const knownModes = ref([])
-watch(byStatus, (rows) => {
-  const set = new Set([...knownStatuses.value, ...(rows || []).map((r) => r.label).filter(Boolean)])
-  if (set.size !== knownStatuses.value.length) knownStatuses.value = [...set].sort()
-})
-watch(byShippingMode, (rows) => {
-  const set = new Set([...knownModes.value, ...(rows || []).map((r) => r.mode).filter(Boolean)])
-  if (set.size !== knownModes.value.length) knownModes.value = [...set].sort()
-})
+// As opções de filtro vêm do backend já cruzadas entre si: cada lista aplica
+// os outros filtros ativos e ignora apenas a própria. É o que faz as
+// modalidades do Mercado Livre desaparecerem quando só há conta Shopee
+// selecionada, em vez de oferecer uma combinação que retorna lista vazia.
+const { facets, fetchFacets, cancelFacets, pruneSelection } = useSalesFilterFacets()
+
+const marketplaceFacets = computed(() => facets.value.marketplaces)
+const accountFacets = computed(() => facets.value.accounts)
+const statusFacets = computed(() => facets.value.shippingStatuses)
+const modeFacets = computed(() => facets.value.shippingModes)
 
 // Variação contra o período anterior de mesma duração (vem do backend).
 const salesTrend = computed(() => {
@@ -466,18 +531,27 @@ const faturaTotalFmt = computed(() => {
   return Number(total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 })
 
-const allAccounts = computed(() => [
-  ...(mlAccounts.value || []).map((a) => ({
-    value: `ML:${a.user_id}`,
-    label: a.nickname || String(a.user_id),
-    logo: MK_LOGOS.ML,
-  })),
-  ...(shopeeAccounts.value || []).map((a) => ({
-    value: `Shopee:${a.shop_id}`,
-    label: a.shop_name || String(a.shop_id),
-    logo: MK_LOGOS.Shopee,
-  })),
-])
+// Contas conectadas servem de rótulo/logo; quem define quais aparecem é a
+// faceta, que só lista contas com venda no recorte atual.
+const accountLabels = computed(() => {
+  const map = new Map()
+  for (const account of mlAccounts.value || []) {
+    map.set(`ML:${account.user_id}`, account.nickname || String(account.user_id))
+  }
+  for (const account of shopeeAccounts.value || []) {
+    map.set(`Shopee:${account.shop_id}`, account.shop_name || String(account.shop_id))
+  }
+  return map
+})
+
+const allAccounts = computed(() =>
+  accountFacets.value.map((facet) => ({
+    value: facet.value,
+    label: accountLabels.value.get(facet.value) || facet.label || facet.value,
+    logo: MK_LOGOS[facet.marketplace] || MK_LOGOS.ML,
+    count: facet.count,
+  }))
+)
 
 /* -------------------- Período -> datas -------------------- */
 function toIso(d) {
@@ -518,7 +592,12 @@ const unidadesPorPedido = computed(() => {
   return ((totals.value.units || 0) / pedidos).toFixed(2).replace('.', ',')
 })
 const advancedFilterCount = computed(() =>
-  selectedAccounts.value.length + selectedStatuses.value.length + selectedModes.value.length
+  selectedAccounts.value.length +
+  selectedStatuses.value.length +
+  selectedModes.value.length +
+  (selectedQueue.value ? 1 : 0) +
+  (selectedProcessed.value ? 1 : 0) +
+  (selectedSkuMapped.value ? 1 : 0)
 )
 
 function toggleMarketplace(mk) {
@@ -538,7 +617,10 @@ const hasActiveFilters = computed(() =>
   selectedMarketplaces.value.length > 0 ||
   selectedAccounts.value.length > 0 ||
   selectedStatuses.value.length > 0 ||
-  selectedModes.value.length > 0
+  selectedModes.value.length > 0 ||
+  Boolean(selectedQueue.value) ||
+  Boolean(selectedProcessed.value) ||
+  Boolean(selectedSkuMapped.value)
 )
 
 function clearFilters() {
@@ -546,23 +628,53 @@ function clearFilters() {
   selectedAccounts.value = []
   selectedStatuses.value = []
   selectedModes.value = []
+  selectedQueue.value = ''
+  selectedProcessed.value = ''
+  selectedSkuMapped.value = ''
 }
 
-function reloadStats() {
+/** Filtros atuais no formato aceito pelo backend. */
+function currentFilterParams() {
   const { from, to } = dateRange.value
-  return fetchStats({
+  return {
     from,
     to,
     marketplace: selectedMarketplaces.value,
     account: selectedAccounts.value,
     shippingStatus: selectedStatuses.value,
     shippingMode: selectedModes.value,
-  })
+    queue: selectedQueue.value,
+    processed: selectedProcessed.value,
+    skuMapped: selectedSkuMapped.value,
+  }
+}
+
+function reloadStats() {
+  const params = currentFilterParams()
+  // Métricas e opções andam juntas: as opções precisam refletir o mesmo
+  // recorte que gerou os números na tela.
+  return Promise.all([fetchStats(params), fetchFacets(params)])
 }
 
 async function reload() {
   await Promise.all([reloadStats(), loadStorageData()])
 }
+
+// Se um valor selecionado deixa de existir nas opções (ex.: modalidade só do
+// ML depois de escolher uma loja Shopee), ele é descartado em vez de manter a
+// tela num filtro impossível. A comparação por tamanho impede laço infinito.
+watch(accountFacets, (options) => {
+  const kept = pruneSelection(selectedAccounts.value, options)
+  if (kept !== selectedAccounts.value) selectedAccounts.value = kept
+})
+watch(statusFacets, (options) => {
+  const kept = pruneSelection(selectedStatuses.value, options)
+  if (kept !== selectedStatuses.value) selectedStatuses.value = kept
+})
+watch(modeFacets, (options) => {
+  const kept = pruneSelection(selectedModes.value, options)
+  if (kept !== selectedModes.value) selectedModes.value = kept
+})
 
 /* -------------------- Helpers -------------------- */
 const calcVol = (p) => calcularVolumePorSku(p)
@@ -660,7 +772,10 @@ function runEnterAnimations() {
 // Agrupa mudanças rápidas de chips antes de consultar novamente o backend.
 let filtersDebounceTimer = null
 watch(
-  [period, selectedMarketplaces, selectedAccounts, selectedStatuses, selectedModes],
+  [
+    period, selectedMarketplaces, selectedAccounts, selectedStatuses, selectedModes,
+    selectedQueue, selectedProcessed, selectedSkuMapped,
+  ],
   () => {
     if (filtersDebounceTimer) clearTimeout(filtersDebounceTimer)
     filtersDebounceTimer = setTimeout(() => {
@@ -680,6 +795,7 @@ onMounted(async () => {
 onUnmounted(() => {
   if (filtersDebounceTimer) clearTimeout(filtersDebounceTimer)
   cancelStats()
+  cancelFacets()
   if (gsapCtx) gsapCtx.revert()
 })
 </script>
@@ -921,6 +1037,12 @@ onUnmounted(() => {
 .chip:hover { border-color: #93c5fd; background: #f8fbff; color: var(--dash-blue-dark); }
 .chip.is-active { border-color: #93c5fd; background: var(--dash-blue-soft); color: var(--dash-blue-dark); box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.05); }
 .chip__logo { width: 16px; height: 16px; }
+.chip__count {
+  min-width: 18px; padding: 1px 5px; border-radius: 999px;
+  background: #e2e8f0; color: #475569; font-size: 0.62rem; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.chip.is-active .chip__count { background: #bfdbfe; color: #1d4ed8; }
 .filters-range {
   display: inline-flex; align-items: center; gap: 0.4rem; margin-left: auto;
   padding-left: 0.9rem; border-left: 1px solid #e2e8f0; color: #475569;
@@ -949,6 +1071,11 @@ onUnmounted(() => {
 }
 .filters-advanced__body .filter-block { align-items: flex-start; flex-direction: column; min-width: 0; gap: 0.45rem; }
 .filters-advanced__body .chip-row { flex-wrap: wrap; }
+.operational-filter-grid {
+  grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem 1.25rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0;
+}
+.operational-filter-grid .filter-block { min-width: 0; }
 .filters-foot {
   grid-column: 1 / -1; padding-top: 0.7rem; border-top-color: #dbe3ef;
   color: var(--dash-muted); font-size: 0.72rem;
@@ -1015,7 +1142,7 @@ onUnmounted(() => {
   .dashboard-content { padding: 1rem; }
   .filters-primary { align-items: flex-start; flex-wrap: wrap; overflow: visible; }
   .filters-range { width: 100%; margin-left: 0; padding: 0.45rem 0 0; border-left: 0; border-top: 1px solid #eef2f7; }
-  .filters-advanced__body { grid-template-columns: 1fr; }
+  .filters-advanced__body, .operational-filter-grid { grid-template-columns: 1fr; }
   .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 680px) {

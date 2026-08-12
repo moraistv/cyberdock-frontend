@@ -4,16 +4,61 @@
     <div class="main-content">
       <TopbarComponent />
       <div class="content-area">
-        <div class="header">
-          <div>
+        <!-- ================= CABEÇALHO ================= -->
+        <header class="page-header">
+          <div class="page-header__text">
+            <span class="page-eyebrow">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+              Área do administrador
+            </span>
             <h1 class="title">Administrar Usuários</h1>
-            <p class="subtitle">Gerencie as permissões e os dados dos usuários do sistema.</p>
+            <p class="subtitle">Gerencie permissões, status de acesso e serviços contratados dos usuários do sistema.</p>
           </div>
           <div class="header-actions">
-             <!-- Botão para histórico geral -->
-             <button @click="setView('history')" class="btn btn-secondary">
+            <button @click="setView('history')" class="btn btn-secondary btn-with-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"></path><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path><path d="M12 7v5l4 2"></path></svg>
               Histórico de Serviços
             </button>
+          </div>
+        </header>
+
+        <!-- ================= FAIXA DE INDICADORES ================= -->
+        <div v-if="currentView === 'users'" class="stats-strip">
+          <div class="stat-tile">
+            <span class="stat-tile__icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </span>
+            <div class="stat-tile__body">
+              <strong>{{ userStats.total }}</strong>
+              <span>Usuários cadastrados</span>
+            </div>
+          </div>
+          <div class="stat-tile is-success">
+            <span class="stat-tile__icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </span>
+            <div class="stat-tile__body">
+              <strong>{{ userStats.active }}</strong>
+              <span>Com acesso ativo</span>
+            </div>
+          </div>
+          <div class="stat-tile is-muted">
+            <span class="stat-tile__icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+            </span>
+            <div class="stat-tile__body">
+              <strong>{{ userStats.inactive }}</strong>
+              <span>Acesso suspenso</span>
+            </div>
+          </div>
+          <div class="stat-tile">
+            <span class="stat-tile__icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>
+            </span>
+            <div class="stat-tile__body">
+              <strong>{{ userStats.masters }}</strong>
+              <span>Perfis master</span>
+            </div>
           </div>
         </div>
 
@@ -22,6 +67,7 @@
             <button @click="setView('users')" class="btn-back" title="Voltar para lista">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
+            <span class="user-avatar user-avatar--lg">{{ getUserInitials(selectedUser) }}</span>
             <div class="user-context-info">
               <span class="user-context-name">{{ selectedUser.name || selectedUser.mlNickname || selectedUser.email }}</span>
               <span class="user-context-email" v-if="selectedUser.name || selectedUser.mlNickname">{{ selectedUser.email }}</span>
@@ -58,50 +104,93 @@
         </div>
 
         <!-- Visão: Lista de Usuários e Cadastros Globais -->
-        <div v-if="currentView === 'users'">
+        <div v-if="currentView === 'users'" class="users-view">
           <!-- PAINEL DE CADASTROS GLOBAIS -->
           <div class="global-settings-panel">
-            <h3 class="panel-title">Cadastros Globais (Replicáveis)</h3>
+            <div class="panel-head">
+              <h3 class="panel-title">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6 1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.6.62 1.06 1.22 1.18l.29.06A2 2 0 0 1 21 14h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                Cadastros Globais
+              </h3>
+              <span class="panel-hint">Replicáveis para todos os clientes</span>
+            </div>
             <div class="panel-buttons">
               <button @click="openServiceCatalogueModal" class="btn-global">
-                <div class="btn-icon bg-indigo"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
+                <div class="btn-icon bg-blue"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
                 <div class="btn-info">
                   <span class="btn-title">Catálogo de Serviços</span>
                   <span class="btn-desc">Planos e limites para clientes</span>
                 </div>
+                <svg class="btn-global__arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
               </button>
               
               <button @click="openStatusManagerModal" class="btn-global">
-                <div class="btn-icon bg-emerald"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
+                <div class="btn-icon bg-blue-soft"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
                 <div class="btn-info">
                   <span class="btn-title">Status de Vendas</span>
                   <span class="btn-desc">Etiquetas globais para pedidos</span>
                 </div>
+                <svg class="btn-global__arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
               </button>
 
               <button @click="openPackageTypesModal" class="btn-global">
-                <div class="btn-icon bg-amber"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></div>
+                <div class="btn-icon bg-blue-soft"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg></div>
                 <div class="btn-info">
                   <span class="btn-title">Tipos de Pacote</span>
                   <span class="btn-desc">Custo de expedição e embalagens</span>
                 </div>
+                <svg class="btn-global__arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
               </button>
             </div>
           </div>
 
+          <!-- ================= BARRA DE FERRAMENTAS ================= -->
           <div class="table-controls">
             <div class="search-wrapper">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input type="text" v-model="userSearchQuery" placeholder="Buscar por nome ou email..." class="search-input" />
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" v-model="userSearchQuery" placeholder="Buscar por nome, apelido ou e-mail..." class="search-input" />
+              <button v-if="userSearchQuery" class="search-clear" title="Limpar busca" @click="userSearchQuery = ''">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
             </div>
+
             <div class="status-filter-wrapper">
-              <label class="filter-label">Status:</label>
-              <select v-model="userStatusFilter" class="status-filter-select">
-                <option value="all">Todos</option>
-                <option value="active">Ativos</option>
-                <option value="inactive">Inativos</option>
-              </select>
+              <span class="filter-label">Status</span>
+              <div class="chip-row">
+                <button
+                  type="button"
+                  class="chip"
+                  :class="{ 'is-active': userStatusFilter === 'all' }"
+                  @click="userStatusFilter = 'all'"
+                >
+                  Todos
+                  <span class="chip__count">{{ userStats.total }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="chip"
+                  :class="{ 'is-active': userStatusFilter === 'active' }"
+                  @click="userStatusFilter = 'active'"
+                >
+                  Ativos
+                  <span class="chip__count">{{ userStats.active }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="chip"
+                  :class="{ 'is-active': userStatusFilter === 'inactive' }"
+                  @click="userStatusFilter = 'inactive'"
+                >
+                  Inativos
+                  <span class="chip__count">{{ userStats.inactive }}</span>
+                </button>
+              </div>
             </div>
+
+            <span class="results-count">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+              {{ filteredUsers.length }} {{ filteredUsers.length === 1 ? 'resultado' : 'resultados' }}
+            </span>
           </div>
 
           <div class="table-container" ref="tableContainer">
@@ -110,42 +199,67 @@
                 <table class="users-table">
                   <thead>
                     <tr>
-                      <th>Usuário</th>
-                      <th>Nome</th>
+                      <th class="col-user">Usuário</th>
+                      <th>Status</th>
                       <th>Permissão</th>
                       <th>Serviços Contratados</th>
                       <th>Data de Criação</th>
-                      <th>Ações</th>
+                      <th class="col-actions">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-for="n in 8" :key="'sk-'+n" class="is-skeleton">
-                      <td><div class="sk sk-text" style="width: 60%"></div></td>
-                      <td><div class="sk sk-text" style="width: 50%"></div></td>
-                      <td><div class="sk sk-pill" style="width: 60px"></div></td>
-                      <td><div class="sk sk-pill" style="width: 80px"></div></td>
-                      <td><div class="sk sk-btn" style="width: 90px"></div></td>
-                      <td><div class="sk sk-text" style="width: 40%"></div></td>
-                      <td><div class="sk sk-pill" style="width: 72px"></div></td>
+                      <td>
+                        <div class="user-cell">
+                          <div class="sk sk-avatar"></div>
+                          <div class="sk-lines">
+                            <div class="sk sk-text" style="width: 130px"></div>
+                            <div class="sk sk-text sk-text--sm" style="width: 180px"></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td><div class="sk sk-pill" style="width: 68px"></div></td>
+                      <td><div class="sk sk-btn" style="width: 118px"></div></td>
+                      <td><div class="sk sk-btn" style="width: 104px"></div></td>
+                      <td><div class="sk sk-text" style="width: 76px"></div></td>
+                      <td><div class="sk sk-btn" style="width: 84px"></div></td>
                     </tr>
                   </tbody>
                 </table>
               </template>
 
-              <div v-else-if="usersError" class="feedback-state error-state"><p>{{ usersError }}</p></div>
-              <div v-else-if="filteredUsers.length === 0" class="feedback-state empty-state"><h3>Nenhum usuário encontrado</h3></div>
+              <div v-else-if="usersError" class="feedback-state error-state">
+                <span class="feedback-icon is-error">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                </span>
+                <h3>Não foi possível carregar os usuários</h3>
+                <p>{{ usersError }}</p>
+              </div>
+              <div v-else-if="filteredUsers.length === 0" class="feedback-state empty-state">
+                <span class="feedback-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </span>
+                <h3>Nenhum usuário encontrado</h3>
+                <p>Ajuste a busca ou troque o filtro de status para ver mais resultados.</p>
+                <button
+                  v-if="userSearchQuery || userStatusFilter !== 'all'"
+                  class="btn btn-secondary btn-sm"
+                  @click="userSearchQuery = ''; userStatusFilter = 'all'"
+                >
+                  Limpar filtros
+                </button>
+              </div>
               
               <div v-else>
                 <table class="users-table" aria-live="polite">
                   <thead>
                     <tr>
-                      <th>Usuário</th>
-                      <th>Nome</th>
+                      <th class="col-user">Usuário</th>
                       <th>Status</th>
                       <th>Permissão</th>
                       <th>Serviços Contratados</th>
                       <th>Data de Criação</th>
-                      <th>Ações</th>
+                      <th class="col-actions">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -155,27 +269,44 @@
                       class="row-anim"
                       :class="{ 'row-inactive': !user.active }"
                     >
-                      <td data-label="Usuário">{{ user.mlNickname || user.email }}</td>
-                      <td data-label="Nome">{{ user.name || '—' }}</td>
+                      <td data-label="Usuário">
+                        <div class="user-cell">
+                          <span class="user-avatar" :class="{ 'user-avatar--master': user.role === 'master' }">
+                            {{ getUserInitials(user) }}
+                          </span>
+                          <div class="user-cell__info">
+                            <span class="user-cell__name">{{ user.name || user.mlNickname || user.email }}</span>
+                            <span class="user-cell__email">{{ user.mlNickname && user.name ? user.mlNickname + ' · ' + user.email : user.email }}</span>
+                          </div>
+                        </div>
+                      </td>
                       <td data-label="Status">
                         <span :class="['status-pill', user.active ? 'pill-active' : 'pill-inactive']">
+                          <span class="status-dot"></span>
                           {{ user.active ? 'Ativo' : 'Inativo' }}
                         </span>
                       </td>
                       <td data-label="Permissão">
-                        <select
-                          class="role-select"
-                          :value="user.role"
-                          @change="handleRoleChange(user, $event.target.value)"
-                        >
-                          <option value="cliente">Cliente</option>
-                          <option value="master">Master</option>
-                        </select>
+                        <div class="role-control" :class="user.role === 'master' ? 'role-control--master' : 'role-control--client'">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                          <select
+                            class="role-select"
+                            :value="user.role"
+                            @change="handleRoleChange(user, $event.target.value)"
+                          >
+                            <option value="cliente">Cliente</option>
+                            <option value="master">Master</option>
+                          </select>
+                          <svg class="role-control__chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </div>
                       </td>
                       <td data-label="Serviços Contratados">
-                        <button @click="openContractModal(user)" class="btn btn-secondary btn-sm">Gerenciar</button>
+                        <button @click="openContractModal(user)" class="btn btn-ghost-blue btn-sm btn-with-icon">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                          Gerenciar
+                        </button>
                       </td>
-                      <td data-label="Data de Criação">{{ formatDate(user.createdAt) }}</td>
+                      <td data-label="Data de Criação" class="cell-date">{{ formatDate(user.createdAt) }}</td>
                       <td data-label="Ações" class="actions-cell">
                         <button
                           class="actions-button"
@@ -193,10 +324,22 @@
               </div>
             </div>
 
-            <div class="pagination-controls" v-if="totalPages > 1">
-              <button @click="prevPage" :disabled="currentPage === 1">Anterior</button>
-              <span>Página {{ currentPage }} de {{ totalPages }}</span>
-              <button @click="nextPage" :disabled="currentPage === totalPages">Próximo</button>
+            <div class="table-footer" v-if="!isLoadingUsers && !usersError && filteredUsers.length > 0">
+              <span class="table-footer__info">
+                Exibindo <strong>{{ resultRange.start }}</strong>–<strong>{{ resultRange.end }}</strong>
+                de <strong>{{ filteredUsers.length }}</strong> usuários
+              </span>
+              <div class="pagination-controls" v-if="totalPages > 1">
+                <button @click="prevPage" :disabled="currentPage === 1">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                  Anterior
+                </button>
+                <span class="page-indicator">Página {{ currentPage }} de {{ totalPages }}</span>
+                <button @click="nextPage" :disabled="currentPage === totalPages">
+                  Próximo
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -216,21 +359,39 @@
           :style="activeMenu.style"
           ref="actionsDropdown"
         >
-          <a @click="openEditNameModal(activeMenu.user)">Editar Nome</a>
-          <a @click="editUserSales(activeMenu.user)">Editar Vendas</a>
-          <a @click="editUserStorage(activeMenu.user)">Editar Armazenamento</a>
-          <a @click="editUserBilling(activeMenu.user)">Gerenciar Cobrança</a>
+          <span class="dropdown-heading">{{ activeMenu.user.name || activeMenu.user.mlNickname || activeMenu.user.email }}</span>
+          <a @click="openEditNameModal(activeMenu.user)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            Editar Nome
+          </a>
+          <a @click="editUserSales(activeMenu.user)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            Editar Vendas
+          </a>
+          <a @click="editUserStorage(activeMenu.user)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+            Editar Armazenamento
+          </a>
+          <a @click="editUserBilling(activeMenu.user)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+            Gerenciar Cobrança
+          </a>
           <div class="dropdown-divider"></div>
           <a v-if="activeMenu.user.active" @click="handleToggleActive(activeMenu.user)" class="action-suspend">
-            ⛔ Suspender Acesso
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+            Suspender Acesso
           </a>
           <a v-else @click="handleToggleActive(activeMenu.user)" class="action-activate">
-            ✅ Ativar Acesso
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            Ativar Acesso
           </a>
-          <a @click="openDeleteUserModal(activeMenu.user)" class="action-delete">Excluir Usuário</a>
+          <a @click="openDeleteUserModal(activeMenu.user)" class="action-delete">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            Excluir Usuário
+          </a>
         </div>
 
-        <!-- Modais (sem alterações) -->
+        <!-- Modais (lógica preservada) -->
         <UniversalModal title="Gerenciar Status de Venda (Global)" :is-open="isStatusManagerOpen" @close="closeStatusManagerModal">
           <div class="status-manager">
             <div class="status-creator">
@@ -380,16 +541,22 @@
           <div class="sync-results-content">
             <div v-if="syncResults.message" class="sync-message" :class="syncResults.type"><p>{{ syncResults.message }}</p></div>
             <div v-if="syncResults.summary" class="sync-summary">
-              <h4 class="modal-subtitle">📊 Resumo Geral</h4>
+              <h4 class="modal-subtitle">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                Resumo Geral
+              </h4>
               <div class="summary-stats">
-                <div class="stat-item"><span class="stat-label">• Total de usuários processados:</span><span class="stat-value">{{ syncResults.summary.totalUsers }}</span></div>
-                <div class="stat-item"><span class="stat-label">• Usuários sem contas ML:</span><span class="stat-value">{{ syncResults.summary.usersWithoutAccounts }}</span></div>
-                <div class="stat-item"><span class="stat-label">• Total de contas encontradas:</span><span class="stat-value">{{ syncResults.summary.totalAccountsFound }}</span></div>
-                <div class="stat-item success"><span class="stat-label">• Sincronizadas com sucesso:</span><span class="stat-value">{{ syncResults.summary.successCount }}</span></div>
-                <div class="stat-item error" v-if="syncResults.summary.errorCount > 0"><span class="stat-label">• Falharam:</span><span class="stat-value">{{ syncResults.summary.errorCount }}</span></div>
+                <div class="stat-item"><span class="stat-label">Total de usuários processados</span><span class="stat-value">{{ syncResults.summary.totalUsers }}</span></div>
+                <div class="stat-item"><span class="stat-label">Usuários sem contas ML</span><span class="stat-value">{{ syncResults.summary.usersWithoutAccounts }}</span></div>
+                <div class="stat-item"><span class="stat-label">Total de contas encontradas</span><span class="stat-value">{{ syncResults.summary.totalAccountsFound }}</span></div>
+                <div class="stat-item success"><span class="stat-label">Sincronizadas com sucesso</span><span class="stat-value">{{ syncResults.summary.successCount }}</span></div>
+                <div class="stat-item error" v-if="syncResults.summary.errorCount > 0"><span class="stat-label">Falharam</span><span class="stat-value">{{ syncResults.summary.errorCount }}</span></div>
               </div>
               <div v-if="syncResults.details && syncResults.details.length > 0" class="user-details">
-                <h4 class="modal-subtitle">👥 Detalhes por Usuário</h4>
+                <h4 class="modal-subtitle">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                  Detalhes por Usuário
+                </h4>
                 <div class="details-list">
                   <div v-for="detail in syncResults.details" :key="detail" class="detail-item">{{ detail }}</div>
                   <div v-if="syncResults.hasMoreUsers" class="detail-item more-users">... e mais {{ syncResults.remainingCount }} usuários</div>
@@ -501,6 +668,37 @@ const totalPages = computed(() => Math.ceil(filteredUsers.value.length / itemsPe
 const paginatedUsers = computed(() =>
   filteredUsers.value.slice((currentPage.value - 1) * itemsPerPage.value, currentPage.value * itemsPerPage.value)
 );
+
+// Indicadores derivados da lista já carregada (apenas apresentação)
+const userStats = computed(() => {
+  const list = users.value || [];
+  const active = list.filter(u => u.active !== false).length;
+  return {
+    total: list.length,
+    active,
+    inactive: list.length - active,
+    masters: list.filter(u => u.role === 'master').length,
+  };
+});
+
+// Intervalo exibido na paginação (apenas apresentação)
+const resultRange = computed(() => {
+  const total = filteredUsers.value.length;
+  if (total === 0) return { start: 0, end: 0 };
+  const start = (currentPage.value - 1) * itemsPerPage.value + 1;
+  return { start, end: Math.min(start + itemsPerPage.value - 1, total) };
+});
+
+// Iniciais para o avatar do usuário (nome, apelido ou e-mail)
+const getUserInitials = (user) => {
+  if (!user) return '?';
+  const source = (user.name || user.mlNickname || user.email || '').trim();
+  if (!source) return '?';
+  const parts = source.replace(/[._-]+/g, ' ').split(/[\s@]+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+};
 
 // Atualizando o breadcrumb para incluir a nova visão
 const breadcrumbTitle = computed(() => {
@@ -736,302 +934,499 @@ watch(() => syncState.value.isSyncing, (isSyncing, wasSyncing) => {
 </script>
 
 <style scoped>
+/* ===================== BASE / LAYOUT ===================== */
 .users-wrapper {
   display: flex;
-  height: 100vh;
+  min-height: 100vh;
   font-family: var(--font-sans);
-  background-color: #f7f8fa;
+  background-color: #f8fafc;
+  color: #0f172a;
 }
 
-.main-content { 
-  flex: 1; 
-  display: flex; 
-  flex-direction: column; 
-  /* Adicionado para conter o overflow dos filhos */
-  min-width: 0; 
-}
-
-.content-area { 
-  flex: 1; 
-  padding: 1.5rem; 
-  /* Adicionado para ser um container flex e conter o overflow */
+.main-content {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  /* Contém o overflow dos filhos */
   min-width: 0;
 }
 
-.header {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 1rem; flex-wrap: wrap; gap: .75rem;
+/* width + box-sizing juntos evitam scroll horizontal na página.
+   max-width/margin alinham a tela às demais (TabelaVendas/Armazenamento). */
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+  max-width: 1640px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 2.5rem;
+  box-sizing: border-box;
 }
-.header-actions { display: flex; gap: .75rem; flex-wrap: wrap; }
-.sync-btn { display: inline-flex; align-items: center; gap: 0.5rem; position: relative; }
-.new-sales-badge {
-  position: absolute; top: -8px; right: -8px; background: #ef4444; color: white;
-  border-radius: 50%; min-width: 20px; height: 20px; display: flex;
-  align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600;
-  border: 2px solid white; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); animation: pulse 2s infinite;
-}
-@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-.sync-spinner { animation: spin 1.5s linear infinite; }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.title { font-size: 1.65rem; font-weight: 700; color: #111827; margin: 0; }
-.subtitle { margin-top: .25rem; font-size: .9rem; color: #6b7280; }
-.breadcrumbs { display: flex; align-items: center; font-size: .9rem; margin-bottom: 1.25rem; }
-.breadcrumb-link { color: #6366f1; text-decoration: none; background: none; border: none; cursor: pointer; padding: 0; }
-.breadcrumb-separator { margin: 0 .5rem; color: #6b7280; }
-.breadcrumb-active { color: #374151; font-weight: 500; }
 
-/* User Context Panel - Navegação por abas dentro do usuário */
+button, input, select, table { font-family: var(--font-sans); }
+
+/* ===================== CABEÇALHO ===================== */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.page-header__text { min-width: 0; }
+.page-eyebrow {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.2rem 0.55rem; margin-bottom: 0.45rem;
+  border: 1px solid #bfdbfe; border-radius: 999px;
+  background: #eff6ff; color: #1d4ed8;
+  font-size: 0.68rem; font-weight: 750; letter-spacing: 0.02em; text-transform: uppercase;
+}
+.title {
+  margin: 0;
+  font-size: clamp(1.45rem, 2vw, 1.8rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  color: #0f172a;
+}
+.subtitle { margin: 0.2rem 0 0; font-size: 0.86rem; color: #64748b; }
+.header-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+
+/* ===================== FAIXA DE INDICADORES ===================== */
+.stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 0.9rem;
+}
+.stat-tile {
+  display: flex; align-items: center; gap: 0.7rem; min-width: 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #dbe3ef; border-radius: 10px; background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+}
+.stat-tile__icon {
+  display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto;
+  border-radius: 9px; background: #eff6ff; color: #2563eb;
+}
+.stat-tile.is-success .stat-tile__icon { background: #ecfdf5; color: #059669; }
+.stat-tile.is-muted .stat-tile__icon { background: #f1f5f9; color: #64748b; }
+.stat-tile__body { min-width: 0; display: flex; flex-direction: column; }
+.stat-tile__body strong {
+  color: #0f172a; font-size: 1.15rem; font-weight: 800;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15;
+}
+.stat-tile__body span {
+  margin-top: 0.08rem; overflow: hidden; color: #64748b;
+  font-size: 0.7rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ===================== BREADCRUMBS / CONTEXTO ===================== */
+.breadcrumbs { display: flex; align-items: center; font-size: .85rem; margin-bottom: 1rem; }
+.breadcrumb-link { color: #2563eb; font-weight: 600; text-decoration: none; background: none; border: none; cursor: pointer; padding: 0; }
+.breadcrumb-link:hover { color: #1d4ed8; text-decoration: underline; }
+.breadcrumb-separator { margin: 0 .5rem; color: #94a3b8; }
+.breadcrumb-active { color: #334155; font-weight: 600; }
+
 .user-context-panel {
   background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.75rem;
-  margin-bottom: 1.25rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  margin-bottom: 1rem;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 .user-context-header {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid #f3f4f6;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid #eef2f7;
 }
 .btn-back {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 0.5rem;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  cursor: pointer;
-  color: #6b7280;
-  transition: all 0.15s;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: 9px; border: 1px solid #dbe3ef; background: #f8fafc;
+  color: #64748b; cursor: pointer; transition: all 0.15s;
 }
-.btn-back:hover {
-  background: #f3f4f6;
-  color: #374151;
-  border-color: #d1d5db;
-}
-.user-context-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-.user-context-name {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #111827;
-}
-.user-context-email {
-  font-size: 0.8rem;
-  color: #9ca3af;
-}
-.user-tabs {
-  display: flex;
-  padding: 0 0.5rem;
-  gap: 0.25rem;
-  background: #fafbfc;
-}
+.btn-back:hover { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.user-context-info { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.user-context-name { font-size: 1rem; font-weight: 750; color: #0f172a; }
+.user-context-email { font-size: 0.78rem; color: #94a3b8; }
+.user-tabs { display: flex; padding: 0 0.4rem; gap: 0.2rem; background: #f8fafc; overflow-x: auto; }
 .user-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.7rem 1rem;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #6b7280;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.7rem 0.95rem;
+  font-size: 0.82rem; font-weight: 650; color: #64748b;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
 }
-.user-tab:hover {
-  color: #374151;
-  background: #f3f4f6;
-}
-.user-tab.active {
-  color: #6366f1;
-  border-bottom-color: #6366f1;
-  background: #eef2ff;
-}
-/* Painel Visual de Cadastros Globais */
+.user-tab:hover { color: #334155; background: #eef2f7; }
+.user-tab.active { color: #1d4ed8; border-bottom-color: #2563eb; background: #eff6ff; }
+
+/* ===================== CADASTROS GLOBAIS ===================== */
 .global-settings-panel {
-  background: #ffffff; border: 1px solid #e5e7eb; border-radius: 0.75rem;
-  padding: 1.25rem; margin-bottom: 1.5rem;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
+  background: #ffffff; border: 1px solid #dbe3ef; border-radius: 12px;
+  padding: 0.85rem; margin-bottom: 0.8rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.7rem;
 }
 .panel-title {
-  font-size: 0.95rem; font-weight: 600; color: #4b5563;
-  margin-top: 0; margin-bottom: 1rem; border-bottom: 1px solid #f3f4f6; padding-bottom: 0.6rem;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  margin: 0; color: #0f172a; font-size: 0.86rem; font-weight: 800;
+  letter-spacing: -0.01em; text-transform: uppercase;
 }
+.panel-title svg { color: #2563eb; flex: 0 0 auto; }
+.panel-hint { color: #94a3b8; font-size: 0.72rem; font-weight: 600; }
 .panel-buttons {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.65rem;
 }
 .btn-global {
-  display: flex; align-items: center; gap: 1rem; padding: 1rem;
-  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.6rem;
-  cursor: pointer; transition: all 0.2s; text-align: left;
+  display: flex; align-items: center; gap: 0.7rem; min-width: 0;
+  padding: 0.7rem 0.8rem; text-align: left;
+  background: #fff; border: 1px solid #dbe3ef; border-radius: 10px;
+  cursor: pointer; transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 .btn-global:hover {
-  background: #f3f4f6; border-color: #d1d5db; transform: translateY(-1px);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+  border-color: #93c5fd; background: #f8fbff; transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.08);
 }
+.btn-global:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2); }
 .btn-icon {
-  display: flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; border-radius: 0.5rem; flex-shrink: 0; color: white;
+  display: grid; place-items: center;
+  width: 38px; height: 38px; flex: 0 0 auto; border-radius: 10px;
 }
-.bg-indigo { background: #6366f1; }
-.bg-emerald { background: #10b981; }
-.bg-amber { background: #f59e0b; }
-.btn-icon svg { width: 22px; height: 22px; }
-.btn-info { display: flex; flex-direction: column; gap: 0.2rem; }
-.btn-title { font-weight: 600; font-size: 0.95rem; color: #111827; }
-.btn-desc { font-size: 0.8rem; color: #6b7280; line-height: 1.2; }
+.bg-blue { background: #2563eb; color: #fff; }
+.bg-blue-soft { background: #eff6ff; color: #2563eb; }
+.btn-icon svg { width: 19px; height: 19px; }
+.btn-info { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1; }
+.btn-title { color: #0f172a; font-size: 0.85rem; font-weight: 750; }
+.btn-desc {
+  overflow: hidden; color: #64748b; font-size: 0.72rem; line-height: 1.3;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.btn-global__arrow { color: #cbd5e1; flex: 0 0 auto; transition: color 0.15s, transform 0.15s; }
+.btn-global:hover .btn-global__arrow { color: #2563eb; transform: translateX(2px); }
 
-/* Existing Styles */
-.table-container { background-color: #ffffff; border: 1px solid #eef0f3; border-radius: .625rem; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); overflow: hidden; }
-.table-wrapper { max-width: 100%; overflow-x: auto; }
-.users-table { width: 100%; min-width: 800px; border-collapse: collapse; }
-.users-table th, .users-table td { padding: .9rem 1rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
-.users-table th { background-color: #fbfbfd; font-weight: 600; font-size: .72rem; text-transform: uppercase; color: #374151; }
-.users-table td { font-size: .92rem; color: #111827; }
-.users-table tbody tr:hover { background-color: #fafbff; }
-.table-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; }
-.search-wrapper { position: relative; flex-grow: 1; max-width: 420px; }
-.search-icon { position: absolute; left: .75rem; top: 50%; transform: translateY(-50%); width: 1rem; height: 1rem; color: #9ca3af; }
-.search-input { width: 100%; padding: .55rem 1rem .55rem 2.25rem; font-size: .9rem; border: 1px solid #e5e7eb; border-radius: .5rem; }
-.feedback-state { text-align: center; padding: 2.5rem 1rem; color: #6b7280; }
-.btn { font-size: 0.85rem; font-weight: 500; padding: 0.45rem 0.8rem; border-radius: 0.45rem; border: 1px solid transparent; cursor: pointer; transition: background-color 0.15s; }
-.btn-primary { background-color: #6366f1; color: #ffffff; }
-.btn-primary:hover { background-color: #4f46e5; }
-.btn-secondary { background-color: #f3f4f6; color: #374151; border-color: #e5e7eb; }
-.btn-secondary:hover { background-color: #e9ebef; }
-.btn-danger { background-color: #ef4444; color: #ffffff; }
-.btn-danger:hover { background-color: #dc2626; }
-.btn-action { background: none; border: none; padding: 0; cursor: pointer; }
-.btn-sm { padding: .32rem .6rem; font-size: .78rem; }
-.actions-button { background-color: #f9fafb; color: #374151; border: 1px solid #e5e7eb; padding: 0.45rem 0.8rem; border-radius: 0.45rem; cursor: pointer; }
-.actions-dropdown-floating { position: fixed; z-index: 1000; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: .5rem; box-shadow: 0 8px 24px rgba(16,24,40,.1); min-width: 180px; }
-.actions-dropdown-floating a { display: block; padding: .7rem .9rem; font-size: .9rem; color: #374151; text-decoration: none; cursor: pointer; }
-.actions-dropdown-floating a:hover { background-color: #f6f7fb; }
-.dropdown-divider { height: 1px; background-color: #e5e7eb; margin: 0.5rem 0; }
-.action-delete { color: #ef4444 !important; }
-.pagination-controls { display: flex; justify-content: center; align-items: center; gap: .75rem; margin-top: 1rem; padding: 1rem 0; }
-.pagination-controls button { padding: .5rem .9rem; border: 1px solid #e5e7eb; border-radius: .5rem; background-color: #ffffff; cursor: pointer; }
-.pagination-controls button:disabled { opacity: .5; cursor: not-allowed; }
-.form-group input, .form-group select, .role-select, .status-input { width: 100%; padding: .5rem .75rem; border: 1px solid #e5e7eb; border-radius: .5rem; }
-.modal-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
-.warning-text { margin-top: 1rem; padding: 0.75rem; background-color: #fffbeb; border-left: 4px solid #f59e0b; color: #b45309; }
-.is-skeleton td { border-bottom-color: #eef0f3; }
+/* ===================== BARRA DE FERRAMENTAS ===================== */
+.table-controls {
+  display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap;
+  padding: 0.6rem 0.7rem; margin-bottom: 0.7rem;
+  border: 1px solid #dbe3ef; border-radius: 12px; background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+.search-wrapper { position: relative; flex: 1 1 260px; min-width: 220px; max-width: 380px; }
+.search-icon {
+  position: absolute; left: .7rem; top: 50%; transform: translateY(-50%);
+  width: 1rem; height: 1rem; color: #94a3b8; pointer-events: none;
+}
+.search-input {
+  width: 100%; min-height: 38px; box-sizing: border-box;
+  padding: .5rem 2rem .5rem 2.1rem;
+  font-size: .85rem; color: #0f172a;
+  border: 1px solid #dbe3ef; border-radius: 8px; background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.search-input::placeholder { color: #94a3b8; }
+.search-input:focus { outline: none; border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+.search-clear {
+  position: absolute; right: .45rem; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 20px; height: 20px;
+  border: none; border-radius: 999px; background: #eef2f7; color: #64748b; cursor: pointer;
+}
+.search-clear:hover { background: #dbeafe; color: #1d4ed8; }
+
+.status-filter-wrapper { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.filter-label {
+  color: #64748b; font-size: 0.68rem; font-weight: 750;
+  letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap;
+}
+.chip-row { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.chip {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  min-height: 32px; padding: 0.32rem 0.62rem;
+  border: 1px solid #dbe3ef; border-radius: 8px; background: #fff;
+  color: #475569; font-size: 0.78rem; font-weight: 650; white-space: nowrap; cursor: pointer;
+  transition: border-color 140ms, background 140ms, color 140ms;
+}
+.chip:hover { border-color: #93c5fd; background: #f8fbff; color: #1d4ed8; }
+.chip.is-active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.chip__count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; padding: 0 0.25rem; border-radius: 999px;
+  background: #f1f5f9; color: #64748b;
+  font-size: 0.68rem; font-weight: 750; font-variant-numeric: tabular-nums;
+}
+.chip.is-active .chip__count { background: #2563eb; color: #fff; }
+
+.results-count {
+  display: inline-flex; align-items: center; gap: 0.35rem; margin-left: auto;
+  color: #64748b; font-size: 0.74rem; font-weight: 650; white-space: nowrap;
+}
+.results-count svg { color: #94a3b8; }
+
+/* ===================== TABELA ===================== */
+.table-container {
+  background-color: #ffffff; border: 1px solid #dbe3ef; border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05); overflow: hidden;
+}
+.table-wrapper { width: 100%; max-width: 100%; max-height: min(68vh, 760px); overflow: auto; }
+.users-table { width: 100%; min-width: 940px; border-collapse: separate; border-spacing: 0; }
+.users-table th, .users-table td {
+  padding: .7rem 1rem; text-align: left; border-bottom: 1px solid #eef2f7; vertical-align: middle;
+}
+.users-table th {
+  position: sticky; top: 0; z-index: 2;
+  background-color: #f8fafc; color: #64748b;
+  font-weight: 750; font-size: .68rem; letter-spacing: 0.05em; text-transform: uppercase;
+  border-bottom: 1px solid #dbe3ef; white-space: nowrap;
+}
+.users-table td { font-size: .85rem; color: #0f172a; }
+.users-table tbody tr:nth-child(even) { background-color: #fcfdff; }
+.users-table tbody tr:hover { background-color: #f8fbff; }
+.users-table tbody tr:last-child td { border-bottom: none; }
+.col-user { width: 34%; }
+.col-actions { width: 96px; text-align: right; }
+.actions-cell { text-align: right; }
+.cell-date { color: #64748b; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.user-cell { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.user-avatar {
+  display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto;
+  border-radius: 999px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8;
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase;
+}
+.user-avatar--master { border-color: #1d4ed8; background: #2563eb; color: #fff; }
+.user-avatar--lg { width: 40px; height: 40px; font-size: 0.82rem; }
+.user-cell__info { display: flex; flex-direction: column; min-width: 0; }
+.user-cell__name {
+  overflow: hidden; color: #0f172a; font-size: 0.86rem; font-weight: 700;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.user-cell__email {
+  overflow: hidden; color: #94a3b8; font-size: 0.73rem;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+
+.status-pill {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.22rem 0.55rem; border-radius: 999px;
+  font-size: 0.7rem; font-weight: 750; letter-spacing: 0.02em; text-transform: uppercase;
+}
+.status-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+.pill-active { background-color: #ecfdf5; color: #059669; }
+.pill-inactive { background-color: #f1f5f9; color: #64748b; }
+.row-inactive .user-cell__name { color: #475569; }
+.row-inactive .user-avatar { border-color: #e2e8f0; background: #f1f5f9; color: #94a3b8; }
+
+.role-control {
+  position: relative; display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0 0.5rem; min-height: 32px;
+  border: 1px solid #dbe3ef; border-radius: 8px; background: #fff;
+  transition: border-color 0.15s, background 0.15s;
+}
+.role-control:hover { border-color: #93c5fd; }
+.role-control svg { flex: 0 0 auto; }
+.role-control--client { color: #475569; }
+.role-control--master { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
+.role-select {
+  appearance: none; -webkit-appearance: none;
+  padding: 0 1.1rem 0 0; border: none; background: transparent;
+  color: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer;
+}
+.role-select:focus { outline: none; }
+.role-control__chevron {
+  position: absolute; right: 0.45rem; top: 50%; transform: translateY(-50%);
+  color: #94a3b8; pointer-events: none;
+}
+
+.actions-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px; padding: 0.3rem 0.7rem;
+  background-color: #fff; color: #475569;
+  border: 1px solid #dbe3ef; border-radius: 8px;
+  font-size: 0.78rem; font-weight: 700; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.actions-button:hover { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+
+/* ===================== ESTADOS ===================== */
+.feedback-state {
+  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+  padding: 3rem 1rem; text-align: center; color: #64748b;
+}
+.feedback-state h3 { margin: 0; color: #0f172a; font-size: 0.98rem; font-weight: 750; }
+.feedback-state p { margin: 0; font-size: 0.82rem; }
+.feedback-state .btn { margin-top: 0.6rem; }
+.feedback-icon {
+  display: grid; place-items: center; width: 46px; height: 46px; margin-bottom: 0.3rem;
+  border-radius: 999px; background: #eff6ff; color: #2563eb;
+}
+.feedback-icon.is-error { background: #fef2f2; color: #dc2626; }
+
+.is-skeleton td { border-bottom-color: #eef2f7; }
+.is-skeleton:hover { background: transparent !important; }
+.sk-lines { display: flex; flex-direction: column; gap: 6px; }
 .sk { position: relative; overflow: hidden; display: inline-block; height: 12px; border-radius: 6px; background: #eef1f5; }
 .sk::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.6) 50%, rgba(255,255,255,0) 100%); animation: sk-shimmer 1.2s infinite; }
 .sk-text { height: 12px; }
-.sk-pill { height: 28px; border-radius: 999px; }
-.sk-btn { height: 28px; border-radius: .5rem; }
+.sk-text--sm { height: 9px; }
+.sk-avatar { width: 34px; height: 34px; border-radius: 999px; flex: 0 0 auto; }
+.sk-pill { height: 24px; border-radius: 999px; }
+.sk-btn { height: 30px; border-radius: 8px; }
 @keyframes sk-shimmer { 100% { transform: translateX(100%); } }
-/* Outros estilos de modais e etc. (sem alterações) */
+
+/* ===================== RODAPÉ / PAGINAÇÃO ===================== */
+.table-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.8rem; flex-wrap: wrap;
+  padding: 0.7rem 1rem; border-top: 1px solid #eef2f7; background: #fff;
+}
+.table-footer__info { color: #64748b; font-size: 0.76rem; }
+.table-footer__info strong { color: #0f172a; font-weight: 750; font-variant-numeric: tabular-nums; }
+.pagination-controls { display: flex; align-items: center; gap: .45rem; }
+.pagination-controls button {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  min-height: 32px; padding: .35rem .7rem;
+  border: 1px solid #dbe3ef; border-radius: 8px; background-color: #ffffff;
+  color: #475569; font-size: 0.78rem; font-weight: 700; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.pagination-controls button:hover:not(:disabled) { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.pagination-controls button:disabled { opacity: .45; cursor: not-allowed; }
+.page-indicator {
+  padding: 0 0.4rem; color: #64748b; font-size: 0.76rem; font-weight: 650;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+/* ===================== BOTÕES ===================== */
+.btn {
+  font-size: 0.82rem; font-weight: 700; padding: 0.45rem 0.8rem; min-height: 38px;
+  border-radius: 9px; border: 1px solid transparent; cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.btn-with-icon { display: inline-flex; align-items: center; gap: 0.4rem; }
+.btn-primary { background-color: #2563eb; color: #ffffff; border-color: #2563eb; box-shadow: 0 6px 16px rgba(37, 99, 235, 0.18); }
+.btn-primary:hover { background-color: #1d4ed8; border-color: #1d4ed8; }
+.btn-secondary { background-color: #ffffff; color: #475569; border-color: #dbe3ef; }
+.btn-secondary:hover { border-color: #93c5fd; background-color: #eff6ff; color: #1d4ed8; }
+.btn-ghost-blue { background-color: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.btn-ghost-blue:hover { background-color: #dbeafe; border-color: #93c5fd; }
+.btn-danger { background-color: #ef4444; color: #ffffff; border-color: #ef4444; }
+.btn-danger:hover { background-color: #dc2626; border-color: #dc2626; }
+.btn-action { background: none; border: none; padding: 0; cursor: pointer; color: #64748b; }
+.btn-action.delete { color: #dc2626; }
+.btn-action.save { color: #059669; }
+.btn-sm { min-height: 30px; padding: .28rem .6rem; font-size: .76rem; }
+.btn-full-width { width: 100%; }
+
+/* ===================== DROPDOWN DE AÇÕES ===================== */
+.actions-dropdown-floating {
+  position: fixed; z-index: 1000; min-width: 214px; padding: 0.3rem;
+  background-color: #ffffff; border: 1px solid #dbe3ef; border-radius: 10px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, .14);
+}
+.dropdown-heading {
+  display: block; padding: .4rem .55rem .5rem; overflow: hidden;
+  color: #94a3b8; font-size: .68rem; font-weight: 750;
+  letter-spacing: 0.04em; text-transform: uppercase; text-overflow: ellipsis; white-space: nowrap;
+}
+.actions-dropdown-floating a {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: .5rem .55rem; border-radius: 7px;
+  color: #334155; font-size: .82rem; font-weight: 600; text-decoration: none; cursor: pointer;
+}
+.actions-dropdown-floating a svg { color: #94a3b8; flex: 0 0 auto; }
+.actions-dropdown-floating a:hover { background-color: #eff6ff; color: #1d4ed8; }
+.actions-dropdown-floating a:hover svg { color: #2563eb; }
+.dropdown-divider { height: 1px; background-color: #eef2f7; margin: 0.3rem 0; }
+.action-delete, .action-suspend { color: #dc2626 !important; }
+.action-delete svg, .action-suspend svg { color: #f87171 !important; }
+.action-delete:hover, .action-suspend:hover { background-color: #fef2f2 !important; color: #b91c1c !important; }
+.action-activate { color: #059669 !important; }
+.action-activate svg { color: #34d399 !important; }
+.action-activate:hover { background-color: #ecfdf5 !important; color: #047857 !important; }
+
+/* ===================== MODAIS ===================== */
+.form-group input, .form-group select, .status-input {
+  width: 100%; box-sizing: border-box; padding: .5rem .75rem;
+  border: 1px solid #dbe3ef; border-radius: 8px; font-size: 0.85rem;
+}
+.form-group input:focus, .form-group select:focus, .status-input:focus {
+  outline: none; border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+.modal-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
+.warning-text { margin-top: 1rem; padding: 0.75rem; background-color: #fffbeb; border-left: 4px solid #f59e0b; color: #b45309; border-radius: 0 6px 6px 0; }
 .plan-manager-content, .status-manager, .contract-modal-content { padding: .5rem 0; }
-.table-wrapper-modal { max-height: 320px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: .5rem; }
+.table-wrapper-modal { max-height: 320px; overflow: auto; border: 1px solid #dbe3ef; border-radius: 8px; }
 .services-table-modal { width: 100%; min-width: 600px; border-collapse: collapse; }
-.services-table-modal th, .services-table-modal td { padding: .75rem; text-align: left; border-bottom: 1px solid #e5e7eb; }
-.services-table-modal th { background-color: #fbfbfd; font-weight: 600; font-size: .75rem; text-transform: uppercase; }
-.feedback-cell { text-align: center; color: #6b7280; }
+.services-table-modal th, .services-table-modal td { padding: .7rem; text-align: left; border-bottom: 1px solid #eef2f7; }
+.services-table-modal th { background-color: #f8fafc; color: #64748b; font-weight: 750; font-size: .7rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.service-name { font-weight: 650; color: #0f172a; }
+.service-description { color: #94a3b8; font-size: 0.76rem; }
+.feedback-cell { text-align: center; color: #64748b; }
 .form-group { margin-bottom: 1rem; }
-.form-group label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .25rem; }
-.add-service-form { border-top: 1px solid #e5e7eb; padding-top: 1rem; }
+.form-group label { display: block; font-size: .8rem; font-weight: 700; color: #334155; margin-bottom: .25rem; }
+.add-service-form { border-top: 1px solid #eef2f7; padding-top: 1rem; }
+.add-btn { width: 100%; }
 .status-creator { display: flex; gap: .5rem; margin-bottom: 1rem; }
-.modal-subtitle { font-size: 1rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: .75rem; border-bottom: 1px solid #e5e7eb; padding-bottom: .5rem; }
+.modal-subtitle {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: .92rem; font-weight: 750; color: #0f172a;
+  margin-top: 1.25rem; margin-bottom: .75rem;
+  border-bottom: 1px solid #eef2f7; padding-bottom: .5rem;
+}
+.modal-subtitle svg { color: #2563eb; flex: 0 0 auto; }
 .status-list { list-style: none; padding: 0; max-height: 250px; overflow-y: auto; }
-.status-item { display: flex; justify-content: space-between; align-items: center; padding: .6rem .25rem; border-bottom: 1px solid #f3f4f6; }
+.status-item { display: flex; justify-content: space-between; align-items: center; padding: .55rem .25rem; border-bottom: 1px solid #f1f5f9; }
 .status-display-mode, .status-edit-mode { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 0.5rem; }
 .status-actions { display: flex; gap: 0.5rem; }
-.status-input-edit { flex-grow: 1; padding: .4rem .6rem; border: 1px solid #cbd5e1; border-radius: .5rem; }
-.error-text { color: #ef4444; font-size: .85rem; margin-bottom: .75rem; }
+.status-input-edit { flex-grow: 1; padding: .4rem .6rem; border: 1px solid #dbe3ef; border-radius: 8px; }
+.error-text { color: #dc2626; font-size: .82rem; margin-bottom: .75rem; }
 .sync-results-content { max-height: 500px; overflow-y: auto; }
-.sync-message { padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.9rem; }
+.sync-message { padding: 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.86rem; }
 .sync-message.warning { background-color: #fffbeb; border-left: 4px solid #f59e0b; color: #b45309; }
 .sync-message.error { background-color: #fef2f2; border-left: 4px solid #ef4444; color: #dc2626; }
-.sync-message.success { background-color: #f0fdf4; border-left: 4px solid #22c55e; color: #16a34a; }
+.sync-message.success { background-color: #ecfdf5; border-left: 4px solid #10b981; color: #047857; }
 .sync-summary { margin-bottom: 1rem; }
-.summary-stats { background-color: #f9fafb; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem; }
-.stat-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid #e5e7eb; }
+.summary-stats { background-color: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px; padding: 0.85rem; margin-bottom: 1.5rem; }
+.stat-item { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.45rem 0; border-bottom: 1px solid #eef2f7; font-size: 0.82rem; }
 .stat-item:last-child { border-bottom: none; }
-.stat-value { font-weight: 600; }
+.stat-label { color: #64748b; }
+.stat-value { font-weight: 750; color: #0f172a; font-variant-numeric: tabular-nums; }
+.stat-item.success .stat-value { color: #059669; }
+.stat-item.error .stat-value { color: #dc2626; }
 .user-details { margin-top: 1.5rem; }
-.details-list { background-color: #f9fafb; border-radius: 0.5rem; padding: 1rem; max-height: 200px; overflow-y: auto; }
-.detail-item { padding: 0.4rem 0; font-size: 0.85rem; border-bottom: 1px solid #e5e7eb; font-family: 'Monaco', monospace; }
+.details-list { background-color: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px; padding: 0.85rem; max-height: 200px; overflow-y: auto; }
+.detail-item { padding: 0.4rem 0; font-size: 0.8rem; border-bottom: 1px solid #eef2f7; font-family: 'Monaco', monospace; }
+.detail-item:last-child { border-bottom: none; }
+.more-users { color: #94a3b8; }
 
-/* Status Filter and Pills */
-.status-filter-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-left: 1rem;
+/* ===================== RESPONSIVO ===================== */
+@media (max-width: 1280px) {
+  .stats-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .panel-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-.filter-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #4b5563;
-  white-space: nowrap;
-}
-.status-filter-select {
-  padding: 0.45rem 2rem 0.45rem 0.75rem;
-  font-size: 0.85rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  background-color: #ffffff;
-  color: #374151;
-  cursor: pointer;
-  outline: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236B7280'%3%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  background-size: 1.25rem;
-  min-width: 120px;
-}
-.status-pill {
-  display: inline-flex;
-  padding: 0.25rem 0.6rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-.pill-active {
-  background-color: #dcfce7;
-  color: #15803d;
-}
-.pill-inactive {
-  background-color: #f1f5f9;
-  color: #475569;
-}
-.row-inactive {
-  opacity: 0.75;
-}
-.action-suspend {
-  color: #dc2626 !important;
-}
-.action-activate {
-  color: #16a34a !important;
-}
-
-@media (max-width: 768px) {
-  .status-filter-wrapper {
-    margin-left: 0;
-    margin-top: 0.5rem;
-    width: 100%;
-  }
-  .status-filter-select {
-    flex-grow: 1;
-  }
+@media (max-width: 760px) {
+  .content-area { padding: 1rem; }
+  .page-header { align-items: stretch; flex-direction: column; }
+  .header-actions, .header-actions .btn { width: 100%; justify-content: center; }
+  .stats-strip { grid-template-columns: 1fr; }
+  .panel-buttons { grid-template-columns: 1fr; }
+  .table-controls { align-items: stretch; flex-direction: column; }
+  .search-wrapper { max-width: none; }
+  .status-filter-wrapper { align-items: flex-start; flex-direction: column; gap: 0.35rem; }
+  .chip-row { width: 100%; }
+  .chip { flex: 1 1 auto; justify-content: center; }
+  .results-count { margin-left: 0; }
+  .table-footer { align-items: stretch; flex-direction: column; text-align: center; }
+  .pagination-controls { justify-content: center; }
+  .table-wrapper { max-height: none; }
+  .users-table th { position: static; }
 }
 </style>
-
