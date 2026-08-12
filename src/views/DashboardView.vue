@@ -11,8 +11,8 @@
             <h1 class="toolbar-title">Dashboard</h1>
             <p class="toolbar-desc">Visão geral das vendas, armazenagem e faturamento do período selecionado.</p>
           </div>
-          <button class="btn-refresh" @click="reload" :disabled="statsLoading" title="Atualizar métricas">
-            <svg :class="{ 'is-spinning': statsLoading }" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline points="21 3 21 9 15 9" /></svg>
+          <button class="btn-refresh" @click="reload" :disabled="statsLoading || storageLoading" title="Atualizar vendas, armazenamento e cobrança">
+            <svg :class="{ 'is-spinning': statsLoading || storageLoading }" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline points="21 3 21 9 15 9" /></svg>
             Atualizar
           </button>
         </div>
@@ -124,7 +124,18 @@
           </details>
         </div>
 
-        <!-- Cards Topo -->
+        <div v-if="statsError" class="data-error" role="alert">
+          Não foi possível carregar os indicadores de pedidos. Tente atualizar novamente.
+        </div>
+
+        <div class="section-heading">
+          <div>
+            <h2>Indicadores do período</h2>
+            <p>Todos os números abaixo respeitam o período e os filtros selecionados.</p>
+          </div>
+        </div>
+
+        <!-- Cards do período -->
         <div class="grid grid-4" ref="cardsRow">
           <div class="card card--kpi card--featured" :class="{ skeleton: statsLoading }">
             <div class="card-icon">
@@ -132,9 +143,9 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19l16 0" /><path d="M4 15l4 -6l4 2l4 -5l4 4" /></svg>
               </span>
             </div>
-            <div class="card-title">Vendas no Período</div>
+            <div class="card-title">Pedidos no período</div>
             <div class="card-value">
-              {{ totals.sales }} <span class="unit">vendas</span>
+              {{ totals.orders }} <span class="unit">pedidos</span>
               <span v-if="salesTrend" class="trend" :class="salesTrend.tone">
                 <svg v-if="salesTrend.dir === 'up'" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15" /></svg>
                 <svg v-else-if="salesTrend.dir === 'down'" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
@@ -144,7 +155,7 @@
             </div>
             <div class="card-foot">{{ totals.units }} unidade(s) · {{ totals.distinct_skus }} SKU(s)</div>
             <div v-if="salesTrend" class="card-foot muted">
-              Período anterior: {{ stats.previousTotals.sales }} venda(s)
+              Período anterior: {{ stats.previousTotals.orders }} pedido(s)
             </div>
           </div>
 
@@ -155,57 +166,42 @@
               </span>
             </div>
             <div class="card-title">A Despachar</div>
-            <div class="card-value">{{ totals.pending }} <span class="unit">pendentes</span></div>
+            <div class="card-value">{{ totals.pending_orders }} <span class="unit">pedidos</span></div>
             <router-link to="/tabela-vendas" class="link-like">Ver na tabela de vendas</router-link>
           </div>
 
-          <div class="card" :class="{ skeleton: storageLoading }">
-            <div class="card-icon">
-              <span class="icon icon--sky">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /></svg>
-              </span>
-            </div>
-            <div class="card-title">Armazenamento</div>
-            <div class="card-value">{{ volumeConsumidoFmt }} <span class="unit">m³</span></div>
-            <div class="card-foot muted">
-              Contratado: {{ volumeContratadoFmt }} m³
-              <span v-if="ocupacaoPct !== null"> · {{ ocupacaoPct }}% usado</span>
-            </div>
-            <div v-if="ocupacaoPct !== null" class="mini-bar">
-              <span class="mini-bar__fill" :class="ocupacaoTone" :style="{ width: Math.min(ocupacaoPct, 100) + '%' }"></span>
-            </div>
-          </div>
-
-          <div class="card" :class="{ skeleton: storageLoading }">
+          <div class="card" :class="{ skeleton: statsLoading }">
             <div class="card-icon">
               <span class="icon icon--emerald">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
               </span>
             </div>
-            <div class="card-title">Fatura Atual</div>
-            <div class="card-value card-value--sm">{{ faturaTotalFmt }}</div>
-            <router-link to="/resumo-cobranca" class="link-like">Ver resumo de cobrança</router-link>
+            <div class="card-title">Pedidos válidos</div>
+            <div class="card-value">{{ totals.valid_orders }} <span class="unit">pedidos</span></div>
+            <div class="card-foot muted">Exclui pedidos cancelados no período</div>
+          </div>
+
+          <div class="card" :class="{ skeleton: statsLoading }">
+            <div class="card-icon">
+              <span class="icon icon--rose">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
+              </span>
+            </div>
+            <div class="card-title">Pedidos cancelados</div>
+            <div class="card-value">{{ totals.cancelled_orders }} <span class="unit">pedidos</span></div>
+            <div class="card-foot muted">Cancelamentos identificados no período</div>
           </div>
         </div>
 
-        <!-- Cards secundários -->
-        <div class="grid grid-5" ref="miniRow">
+        <!-- Indicadores derivados do mesmo período -->
+        <div class="grid grid-3" ref="miniRow">
           <div class="card card--mini" :class="{ skeleton: statsLoading }">
             <span class="icon icon--emerald sm">
               <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
             </span>
             <div>
-              <div class="card-value card-value--sm">{{ totals.processed }}</div>
+              <div class="card-value card-value--sm">{{ totals.processed_orders }}</div>
               <div class="card-title plain">Processadas (estoque abatido)</div>
-            </div>
-          </div>
-          <div class="card card--mini" :class="{ skeleton: statsLoading }">
-            <span class="icon icon--rose sm">
-              <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
-            </span>
-            <div>
-              <div class="card-value card-value--sm">{{ totals.cancelled }}</div>
-              <div class="card-title plain">Canceladas no período</div>
             </div>
           </div>
           <div class="card card--mini" :class="{ skeleton: statsLoading }">
@@ -214,16 +210,7 @@
             </span>
             <div>
               <div class="card-value card-value--sm">{{ mediaDiaria }}</div>
-              <div class="card-title plain">Média de vendas por dia</div>
-            </div>
-          </div>
-          <div class="card card--mini card--derived" :class="{ skeleton: statsLoading }">
-            <span class="icon icon--blue sm">
-              <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-4.8-7.33"/><path d="M20 4v6h-6"/><path d="m9 12 2 2 4-5"/></svg>
-            </span>
-            <div>
-              <div class="card-value card-value--sm">{{ taxaProcessada }}</div>
-              <div class="card-title plain">Taxa processada</div>
+              <div class="card-title plain">Média de pedidos por dia</div>
             </div>
           </div>
           <div class="card card--mini card--derived" :class="{ skeleton: statsLoading }">
@@ -237,16 +224,57 @@
           </div>
         </div>
 
-        <!-- Gráficos -->
+        <div class="section-heading section-heading--snapshot">
+          <div>
+            <h2>Situação atual</h2>
+            <p>Snapshots de armazenamento e cobrança; estes valores não seguem os filtros do período.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-2 current-grid">
+          <div class="card" :class="{ skeleton: storageLoading }">
+            <div class="card-icon">
+              <span class="icon icon--sky">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /></svg>
+              </span>
+            </div>
+            <div class="card-title">Armazenamento atual</div>
+            <div class="card-value" :class="{ 'card-value--unavailable': storageUnavailable }">
+              {{ volumeConsumidoFmt }} <span v-if="!storageUnavailable" class="unit">m³</span>
+            </div>
+            <div v-if="!storageUnavailable" class="card-foot muted">
+              Contratado: {{ volumeContratadoFmt }} m³
+              <span v-if="ocupacaoPct !== null"> · {{ ocupacaoPct }}% usado</span>
+            </div>
+            <div v-else class="card-foot is-error">Não foi possível consultar o armazenamento.</div>
+            <div v-if="!storageUnavailable && ocupacaoPct !== null" class="mini-bar">
+              <span class="mini-bar__fill" :class="ocupacaoTone" :style="{ width: Math.min(ocupacaoPct, 100) + '%' }"></span>
+            </div>
+          </div>
+
+          <div class="card" :class="{ skeleton: storageLoading }">
+            <div class="card-icon">
+              <span class="icon icon--emerald">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+              </span>
+            </div>
+            <div class="card-title">Fatura atual</div>
+            <div class="card-value card-value--sm" :class="{ 'card-value--unavailable': billingUnavailable }">{{ faturaTotalFmt }}</div>
+            <div v-if="billingUnavailable" class="card-foot is-error">Não foi possível consultar a cobrança.</div>
+            <router-link v-else to="/resumo-cobranca" class="link-like">Ver resumo de cobrança</router-link>
+          </div>
+        </div>
+
+        <!-- Gráficos do período -->
         <div class="grid grid-2" ref="chartsRow">
           <div class="card chart-card" :class="{ skeleton: statsLoading }">
-            <div class="card-title plain">Vendas por Dia</div>
+            <div class="card-title plain">Pedidos por dia</div>
             <VueApexCharts v-if="byDay.length" type="area" height="260" :options="dailyChartOptions" :series="dailySeries" />
             <p v-else class="chart-empty">Sem vendas no período selecionado.</p>
           </div>
 
           <div class="card chart-card" :class="{ skeleton: statsLoading }">
-            <div class="card-title plain">Vendas por Status de Expedição</div>
+            <div class="card-title plain">Pedidos por status de expedição</div>
             <VueApexCharts v-if="byStatus.length" type="bar" height="260" :options="statusChartOptions" :series="statusSeries" />
             <p v-else class="chart-empty">Sem vendas no período selecionado.</p>
           </div>
@@ -311,7 +339,8 @@
               <div class="num">{{ (calcVol(p)).toFixed(2) }}</div>
             </div>
 
-            <div v-if="!skus.length && !storageLoading" class="empty">Nenhum produto cadastrado.</div>
+            <div v-if="storageUnavailable && !storageLoading" class="empty">Dados de estoque indisponíveis no momento.</div>
+            <div v-else-if="!skus.length && !storageLoading" class="empty">Nenhum produto cadastrado.</div>
           </div>
         </div>
       </div> <!-- /dashboard-content -->
@@ -352,7 +381,13 @@ function toggleIn(list, value) {
   if (i === -1) list.push(value); else list.splice(i, 1)
 }
 
-const { stats, isLoading: statsLoading, fetchStats, cancelStats } = useDashboardStats()
+const {
+  stats,
+  isLoading: statsLoading,
+  error: statsError,
+  fetchStats,
+  cancelStats,
+} = useDashboardStats()
 
 const totals = computed(() => stats.value.totals)
 const byStatus = computed(() => stats.value.byStatus)
@@ -379,8 +414,8 @@ watch(byShippingMode, (rows) => {
 const salesTrend = computed(() => {
   const prev = stats.value.previousTotals
   if (!prev) return null
-  const before = prev.sales || 0
-  const now = totals.value.sales || 0
+  const before = prev.orders || 0
+  const now = totals.value.orders || 0
   if (!before && !now) return null
   if (!before) return { dir: 'up', tone: 'is-up', label: 'novo' }
   const pct = ((now - before) / before) * 100
@@ -398,13 +433,21 @@ const {
   volumeContratado,
   billingSummary,
   isLoading: storageLoadingRaw,
+  error: storageError,
+  loadStorageData,
   calcularVolumePorSku
 } = useUserStorage(userId, null, { withMovements: false, withPackageTypes: false })
 
 const storageLoading = computed(() => storageLoadingRaw.value || billingSummary.value.isLoading)
+const storageUnavailable = computed(() => Boolean(storageError.value))
+const billingUnavailable = computed(() => Boolean(billingSummary.value?.error))
 
-const volumeConsumidoFmt = computed(() => (volumeConsumido.value || 0).toFixed(2))
-const volumeContratadoFmt = computed(() => (volumeContratado.value || 0).toFixed(2))
+const volumeConsumidoFmt = computed(() =>
+  storageUnavailable.value ? 'Indisponível' : (volumeConsumido.value || 0).toFixed(2)
+)
+const volumeContratadoFmt = computed(() =>
+  storageUnavailable.value ? 'Indisponível' : (volumeContratado.value || 0).toFixed(2)
+)
 const ocupacaoPct = computed(() => {
   const contratado = volumeContratado.value || 0
   if (!contratado) return null
@@ -417,18 +460,20 @@ const ocupacaoTone = computed(() => {
   return 'is-ok'
 })
 const faturaTotalFmt = computed(() => {
-  const total = billingSummary.value?.data?.totalCost || 0
-  return total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  if (billingUnavailable.value) return 'Indisponível'
+  const total = billingSummary.value?.data?.totalCost
+  if (total === null || total === undefined) return '—'
+  return Number(total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 })
 
 const allAccounts = computed(() => [
   ...(mlAccounts.value || []).map((a) => ({
-    value: String(a.user_id),
+    value: `ML:${a.user_id}`,
     label: a.nickname || String(a.user_id),
     logo: MK_LOGOS.ML,
   })),
   ...(shopeeAccounts.value || []).map((a) => ({
-    value: String(a.shop_id),
+    value: `Shopee:${a.shop_id}`,
     label: a.shop_name || String(a.shop_id),
     logo: MK_LOGOS.Shopee,
   })),
@@ -464,18 +509,13 @@ const diasNoPeriodo = computed(() => {
   return Math.max(1, Math.round(ms / 86400000) + 1)
 })
 const mediaDiaria = computed(() => {
-  const media = (totals.value.sales || 0) / diasNoPeriodo.value
+  const media = (totals.value.orders || 0) / diasNoPeriodo.value
   return media >= 10 ? Math.round(media) : media.toFixed(1).replace('.', ',')
 })
-const taxaProcessada = computed(() => {
-  const vendas = totals.value.sales || 0
-  if (!vendas) return '0%'
-  return `${((totals.value.processed || 0) / vendas * 100).toFixed(1).replace('.', ',')}%`
-})
 const unidadesPorPedido = computed(() => {
-  const vendas = totals.value.sales || 0
-  if (!vendas) return '0,00'
-  return ((totals.value.units || 0) / vendas).toFixed(2).replace('.', ',')
+  const pedidos = totals.value.orders || 0
+  if (!pedidos) return '0,00'
+  return ((totals.value.units || 0) / pedidos).toFixed(2).replace('.', ',')
 })
 const advancedFilterCount = computed(() =>
   selectedAccounts.value.length + selectedStatuses.value.length + selectedModes.value.length
@@ -508,9 +548,9 @@ function clearFilters() {
   selectedModes.value = []
 }
 
-function reload() {
+function reloadStats() {
   const { from, to } = dateRange.value
-  fetchStats({
+  return fetchStats({
     from,
     to,
     marketplace: selectedMarketplaces.value,
@@ -518,6 +558,10 @@ function reload() {
     shippingStatus: selectedStatuses.value,
     shippingMode: selectedModes.value,
   })
+}
+
+async function reload() {
+  await Promise.all([reloadStats(), loadStorageData()])
 }
 
 /* -------------------- Helpers -------------------- */
@@ -537,7 +581,7 @@ const BASE_CHART = {
 }
 
 /* -------------------- Gráficos -------------------- */
-const dailySeries = computed(() => [{ name: 'Vendas', data: byDay.value.map((d) => d.value) }])
+const dailySeries = computed(() => [{ name: 'Pedidos', data: byDay.value.map((d) => d.value) }])
 const dailyChartOptions = computed(() => ({
   ...BASE_CHART,
   chart: { ...BASE_CHART.chart, type: 'area' },
@@ -552,7 +596,7 @@ const dailyChartOptions = computed(() => ({
   yaxis: { labels: { formatter: (v) => Math.trunc(v) } },
 }))
 
-const statusSeries = computed(() => [{ name: 'Vendas', data: byStatus.value.map((d) => d.value) }])
+const statusSeries = computed(() => [{ name: 'Pedidos', data: byStatus.value.map((d) => d.value) }])
 const statusChartOptions = computed(() => ({
   ...BASE_CHART,
   chart: { ...BASE_CHART.chart, type: 'bar' },
@@ -577,7 +621,7 @@ const marketplaceChartOptions = computed(() => ({
   plotOptions: { pie: { donut: { size: '62%' } } },
 }))
 
-const shippingSeries = computed(() => [{ name: 'Vendas', data: byShippingMode.value.map((d) => d.value) }])
+const shippingSeries = computed(() => [{ name: 'Pedidos', data: byShippingMode.value.map((d) => d.value) }])
 const shippingChartOptions = computed(() => ({
   ...BASE_CHART,
   chart: { ...BASE_CHART.chart, type: 'bar' },
@@ -621,7 +665,7 @@ watch(
     if (filtersDebounceTimer) clearTimeout(filtersDebounceTimer)
     filtersDebounceTimer = setTimeout(() => {
       filtersDebounceTimer = null
-      reload()
+      reloadStats()
     }, 220)
   },
   { deep: true }
@@ -716,6 +760,22 @@ onUnmounted(() => {
 .trend.is-up { background: #ecfdf5; color: #047857; }
 .trend.is-down { background: #fef2f2; color: #b91c1c; }
 .trend.is-flat { background: #f3f4f6; color: #6b7280; }
+
+.section-heading {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 1rem; margin: 0 0 0.8rem;
+}
+.section-heading--snapshot { margin-top: 0.35rem; }
+.section-heading h2 { margin: 0; font-size: 1rem; font-weight: 750; color: #0f172a; }
+.section-heading p { margin: 0.2rem 0 0; font-size: 0.78rem; color: #64748b; }
+.data-error {
+  margin: 0 0 1rem; padding: 0.75rem 0.9rem; border: 1px solid #fecaca;
+  border-radius: 0.65rem; background: #fef2f2; color: #b91c1c;
+  font-size: 0.82rem; font-weight: 600;
+}
+.card-value--unavailable { font-size: 1.05rem !important; letter-spacing: 0 !important; color: #b91c1c !important; }
+.card-foot.is-error { color: #b91c1c; }
+.current-grid .card { min-height: 150px; }
 
 /* Grid + cards */
 .grid { display: grid; gap: 1rem; margin-bottom: 1.5rem; }

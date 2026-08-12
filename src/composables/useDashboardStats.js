@@ -10,7 +10,20 @@ import { ref } from 'vue';
 import { useApi } from './useApi';
 
 const EMPTY = {
-  totals: { sales: 0, units: 0, pending: 0, processed: 0, cancelled: 0, distinct_skus: 0 },
+  totals: {
+    orders: 0,
+    sales: 0,
+    units: 0,
+    pending_orders: 0,
+    pending: 0,
+    valid_orders: 0,
+    cancelled_orders: 0,
+    cancelled: 0,
+    processed_orders: 0,
+    processed: 0,
+    processed_lines: 0,
+    distinct_skus: 0,
+  },
   previousTotals: null,
   byStatus: [],
   byDay: [],
@@ -53,7 +66,14 @@ export function useDashboardStats() {
         signal: activeController.signal,
       });
       if (myRequest !== requestId) return;
-      stats.value = { ...EMPTY, ...data };
+      stats.value = {
+        ...EMPTY,
+        ...data,
+        totals: { ...EMPTY.totals, ...(data?.totals || {}) },
+        previousTotals: data?.previousTotals
+          ? { ...EMPTY.totals, ...data.previousTotals }
+          : null,
+      };
     } catch (err) {
       if (err?.name === 'AbortError' || myRequest !== requestId) return;
       error.value = err.message || 'Não foi possível carregar as métricas.';

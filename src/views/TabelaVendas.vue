@@ -23,12 +23,12 @@
                         </div>
                     </div>
                                     <div class="header-buttons">
-                    <button @click="handleUnifiedSync" :disabled="syncState.isSyncing || isFetchingAccounts"
+                    <button @click="handleUnifiedSync" :disabled="isUnifiedSyncing || isFetchingAccounts"
                         class="btn-sync-sales"
-                        :class="{ 'is-busy': syncState.isSyncing || isFetchingAccounts }"
-                        title="Buscar vendas novas nas contas conectadas">
+                        :class="{ 'is-busy': isUnifiedSyncing || isFetchingAccounts }"
+                        title="Buscar vendas novas no Mercado Livre e na Shopee">
                         <svg class="btn-sync-sales__icon"
-                            :class="{ 'is-spinning': syncState.isSyncing || isFetchingAccounts }"
+                            :class="{ 'is-spinning': isUnifiedSyncing || isFetchingAccounts }"
                             xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                             fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
                             stroke-linejoin="round">
@@ -36,12 +36,11 @@
                             <polyline points="21 3 21 9 15 9" />
                         </svg>
                         <span v-if="isFetchingAccounts">Buscando contas...</span>
-                        <span v-else-if="syncState.isSyncing">Sincronizando...</span>
+                        <span v-else-if="isUnifiedSyncing">Sincronizando...</span>
                         <span v-else>Sincronizar vendas</span>
 
-                        <!-- Badge com contador de novas vendas -->
-                        <span v-if="syncState.newSalesCount > 0" class="new-sales-badge">
-                            {{ syncState.newSalesCount }}
+                        <span v-if="unifiedNewSalesCount > 0" class="new-sales-badge">
+                            {{ unifiedNewSalesCount }}
                         </span>
                     </button>
                 </div>
@@ -302,9 +301,9 @@
                         <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h6M7 16h4"/></svg></span>
                         <div><strong>{{ currentPage }} / {{ totalPages }}</strong><span>página atual</span></div>
                     </article>
-                    <article class="sales-overview__item" :class="{ 'is-syncing': syncState.isSyncing }">
+                    <article class="sales-overview__item" :class="{ 'is-syncing': isUnifiedSyncing }">
                         <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
-                        <div><strong>{{ syncState.isSyncing ? 'Em andamento' : 'Atualizado' }}</strong><span>estado da sincronização</span></div>
+                        <div><strong>{{ isUnifiedSyncing ? 'Em andamento' : 'Atualizado' }}</strong><span>estado da sincronização</span></div>
                     </article>
                 </section>
 
@@ -614,14 +613,14 @@
                 <!-- Detalhes por conta -->
                 <div v-if="syncResults.accounts.length > 0" class="sr-accounts">
                     <h4 class="sr-subtitle">Detalhes por conta</h4>
-                    <div class="sr-account" v-for="account in syncResults.accounts" :key="account.userId" :class="account.status">
+                    <div class="sr-account" v-for="account in syncResults.accounts" :key="`${account.marketplace}-${account.userId}`" :class="account.status">
                         <span class="sr-account-status" :class="account.status">
                             <svg v-if="account.status === 'success'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                             <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                         </span>
                         <div class="sr-account-info">
                             <span class="sr-account-name">{{ account.nickname }}</span>
-                            <span class="sr-account-id">ID {{ account.userId }}<span v-if="account.durationMs" class="sr-account-time"> · {{ formatDuration(account.durationMs) }}</span></span>
+                            <span class="sr-account-id">{{ account.marketplace === 'Shopee' ? 'Shopee' : 'Mercado Livre' }} · ID {{ account.userId }}<span v-if="account.durationMs" class="sr-account-time"> · {{ formatDuration(account.durationMs) }}</span></span>
                         </div>
                         <div class="sr-account-badges" v-if="account.status === 'success'">
                             <span class="sr-badge is-new" v-if="account.newSalesCount > 0">{{ account.newSalesCount }} nova{{ account.newSalesCount > 1 ? 's' : '' }}</span>
@@ -643,10 +642,10 @@
         </UniversalModal>
 
         <!-- Painel de progresso ao vivo (por conta, em tempo real) -->
-        <SyncLiveModal :open="isSyncLiveOpen" :accounts="liveAccounts" title="Sincronizando vendas..." />
+        <SyncLiveModal :open="isSyncLiveOpen" :accounts="unifiedLiveAccounts" title="Sincronizando vendas..." />
 
-        <ToastNotification :is-visible="syncState.isVisible" :title="syncState.title"
-            :description="syncState.description" :progress="syncState.progress" :type="syncState.type" />
+        <ToastNotification :is-visible="activeSyncState.isVisible" :title="activeSyncState.title"
+            :description="activeSyncState.description" :progress="activeSyncState.progress" :type="activeSyncState.type" />
     </div>
 </template>
 
@@ -664,6 +663,7 @@ import { useAuth } from '@/composables/useAuth';
 import { useSales } from '@/composables/useSales';
 import { useStatusesForUser } from '@/composables/useStatusesForUser';
 import { useSyncManager } from '@/composables/useSyncManager';
+import { useShopeeSyncManager } from '@/composables/useShopeeSyncManager';
 import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
 import { useApi } from '@/composables/useApi';
@@ -858,6 +858,24 @@ const { sales, isLoading, error, totalSales, currentPage, totalPages, pageSize, 
 const userUid = computed(() => user.value?.uid);
 const { allStatuses: customStatuses } = useStatusesForUser(userUid);
 const { syncState, liveAccounts, syncAccountsBatch } = useSyncManager();
+const {
+    syncState: shopeeSyncState,
+    liveAccounts: shopeeLiveAccounts,
+    syncAccountsBatch: syncShopeeAccountsBatch,
+} = useShopeeSyncManager();
+const isUnifiedSyncing = computed(() => syncState.value.isSyncing || shopeeSyncState.value.isSyncing);
+const unifiedNewSalesCount = computed(() =>
+    (syncState.value.newSalesCount || 0) + (shopeeSyncState.value.newSalesCount || 0)
+);
+const unifiedLiveAccounts = computed(() => [
+    ...(liveAccounts.value || []).map(account => ({ ...account, marketplace: 'ML' })),
+    ...(shopeeLiveAccounts.value || []).map(account => ({ ...account, marketplace: 'Shopee' })),
+]);
+const activeSyncState = computed(() =>
+    shopeeSyncState.value.isSyncing || shopeeSyncState.value.isVisible
+        ? shopeeSyncState.value
+        : syncState.value
+);
 const isSyncLiveOpen = ref(false);
 const syncTimeframe = ref('3');
 const { systemStatuses } = useSystemStatus();
@@ -1054,8 +1072,8 @@ async function processSingleSale(sale) {
         const isShopee = saleMarketplace(sale) === 'Shopee';
         const endpoint = isShopee ? '/shopee/process' : '/sales/process';
         const item = isShopee
-            ? { orderSn: sale.id, sku: sale.sku, uid: sale.uid, quantity: sale.quantity }
-            : { id: sale.id, sku: sale.sku, uid: sale.uid, quantity: sale.quantity };
+            ? { orderSn: sale.id, sku: sale.sku, uid: sale.uid }
+            : { id: sale.id, sku: sale.sku, uid: sale.uid };
 
         const result = await api.post(endpoint, { salesToProcess: [item] });
 
@@ -1133,14 +1151,14 @@ const allAccountOptions = computed(() => {
     const ml = (mlAccounts.value || []).map((a) => ({
         key: `ml-${a.user_id}`,
         id: a.user_id,
-        value: String(a.user_id),
+        value: `ML:${a.user_id}`,
         label: a.nickname || String(a.user_id),
         logo: MK_LOGOS.ML,
     }));
     const shopee = (shopeeAccounts.value || []).map((a) => ({
         key: `sp-${a.shop_id}`,
         id: a.shop_id,
-        value: String(a.shop_id),
+        value: `Shopee:${a.shop_id}`,
         label: a.shop_name || String(a.shop_id),
         logo: MK_LOGOS.Shopee,
     }));
@@ -1373,70 +1391,104 @@ watch(isSyncResultsModalOpen, (open) => {
 
 const handleSync = async () => {
     isFetchingAccounts.value = true;
-    let successCount = 0;
-    let errorCount = 0;
-    let totalAccounts = 0;
-    const accountResults = [];
+    const startedAt = Date.now();
 
     try {
-        const accounts = await fetchMercadoLivreAccounts();
-        if (accounts?.error) throw new Error(accounts.error);
+        // Descobre os dois canais em paralelo. Ausência de contas em um canal
+        // não bloqueia o outro; só paramos quando nenhum dos dois está conectado.
+        const [mlAccountsResult, shopeeAccountsResult] = await Promise.all([
+            fetchMercadoLivreAccounts(),
+            fetchShopeeAccounts(),
+        ]);
+        if (mlAccountsResult?.error) throw new Error(mlAccountsResult.error);
+        if (shopeeAccountsResult?.error) throw new Error(shopeeAccountsResult.error);
 
-        if (!accounts || accounts.length === 0) {
+        const mlToSync = Array.isArray(mlAccountsResult) ? mlAccountsResult : [];
+        const shopeeToSync = Array.isArray(shopeeAccountsResult) ? shopeeAccountsResult : [];
+        const totalAccounts = mlToSync.length + shopeeToSync.length;
+
+        if (totalAccounts === 0) {
             syncResults.value = {
                 title: 'Atenção',
                 type: 'warning',
                 accounts: [],
-                summary: {
-                    total: 0,
-                    successful: 0,
-                    failed: 0
-                },
-                message: 'Nenhuma conta do Mercado Livre conectada para sincronizar.'
+                summary: { total: 0, successful: 0, failed: 0 },
+                message: 'Nenhuma conta do Mercado Livre ou loja Shopee está conectada para sincronizar.',
             };
             isSyncResultsModalOpen.value = true;
             return;
         }
 
-        totalAccounts = accounts.length;
-
-        // Abre o painel de progresso ao vivo enquanto sincroniza.
         isSyncLiveOpen.value = true;
+        const emptyBatch = {
+            results: [],
+            summary: { total: 0, successful: 0, failed: 0 },
+            totalNewSales: 0,
+            totalUpdated: 0,
+            totalSkipped: 0,
+            totalDurationMs: 0,
+        };
 
-        // Sincroniza as contas em paralelo controlado (rate protegido no backend),
-        // sem esperas artificiais e sem recarregar a tabela a cada conta.
-        const batch = await syncAccountsBatch(
-            accounts.map(account => ({
-                mlAccountId: account.user_id,
-                accountNickname: account.nickname,
-                clientUid: null,
-                daysToSync: null
+        // Os canais têm limitadores independentes no backend; os batches podem
+        // rodar juntos sem criar uma recarga da tabela por conta.
+        const [mlBatch, shopeeBatch] = await Promise.all([
+            mlToSync.length
+                ? syncAccountsBatch(
+                    mlToSync.map(account => ({
+                        mlAccountId: account.user_id,
+                        accountNickname: account.nickname || String(account.user_id),
+                        clientUid: null,
+                        daysToSync: null,
+                    })),
+                    { concurrency: 3 }
+                )
+                : Promise.resolve(emptyBatch),
+            shopeeToSync.length
+                ? syncShopeeAccountsBatch(
+                    shopeeToSync.map(account => ({
+                        shopId: account.shop_id,
+                        accountNickname: account.shop_name || String(account.shop_id),
+                        clientUid: null,
+                        force: false,
+                    })),
+                    { concurrency: 2 }
+                )
+                : Promise.resolve(emptyBatch),
+        ]);
+
+        const accountResults = [
+            ...mlBatch.results.map(result => ({
+                marketplace: 'ML',
+                nickname: result.accountNickname,
+                userId: result.mlAccountId,
+                status: result.status,
+                newSalesCount: result.newSalesCount || 0,
+                updatedCount: result.updatedCount || 0,
+                skippedCount: result.skippedCount || 0,
+                durationMs: result.durationMs || 0,
+                message: result.status === 'error' ? (result.message || 'Erro desconhecido') : '',
             })),
-            { concurrency: 3 }
-        );
+            ...shopeeBatch.results.map(result => ({
+                marketplace: 'Shopee',
+                nickname: result.accountNickname,
+                userId: result.shopId,
+                status: result.status,
+                newSalesCount: result.newSalesCount || 0,
+                updatedCount: result.updatedCount || 0,
+                skippedCount: result.skippedCount || 0,
+                durationMs: result.durationMs || 0,
+                message: result.status === 'error' ? (result.message || 'Erro desconhecido') : '',
+            })),
+        ];
 
-        successCount = batch.summary.successful;
-        errorCount = batch.summary.failed;
-        for (const r of batch.results) {
-            accountResults.push({
-                nickname: r.accountNickname,
-                userId: r.mlAccountId,
-                status: r.status,
-                newSalesCount: r.newSalesCount || 0,
-                updatedCount: r.updatedCount || 0,
-                skippedCount: r.skippedCount || 0,
-                durationMs: r.durationMs || 0,
-                message: r.status === 'error' ? (r.message || 'Erro desconhecido') : ''
-            });
-        }
+        const successCount = mlBatch.summary.successful + shopeeBatch.summary.successful;
+        const errorCount = mlBatch.summary.failed + shopeeBatch.summary.failed;
+        const totalNewSales = mlBatch.totalNewSales + shopeeBatch.totalNewSales;
+        const totalUpdated = mlBatch.totalUpdated + shopeeBatch.totalUpdated;
+        const totalSkipped = mlBatch.totalSkipped + shopeeBatch.totalSkipped;
 
-        // Fecha o painel ao vivo antes de mostrar o resumo.
-        isSyncLiveOpen.value = false;
-
-        // Recarrega uma única vez e preserva exatamente os filtros/página atuais.
+        // Uma única consulta atualiza a fila completa depois dos dois canais.
         await triggerServerFetch(false);
-        const totalNewSales = batch.totalNewSales;
-
         syncResults.value = {
             title: errorCount > 0 ? 'Sincronização finalizada com problemas' : 'Sincronização finalizada',
             type: errorCount > 0 ? 'warning' : 'success',
@@ -1444,42 +1496,30 @@ const handleSync = async () => {
             summary: {
                 total: totalAccounts,
                 successful: successCount,
-                failed: errorCount
+                failed: errorCount,
             },
-            totalNewSales: totalNewSales,
-            totalUpdated: batch.totalUpdated,
-            totalSkipped: batch.totalSkipped,
-            totalDurationMs: batch.totalDurationMs
+            totalNewSales,
+            totalUpdated,
+            totalSkipped,
+            totalDurationMs: Date.now() - startedAt,
         };
 
-        // O modal só interrompe o usuário quando há algo para conferir: falha
-        // em alguma conta, ou vendas novas/atualizadas. No caso comum ("nada
-        // mudou"), o toast que o useSyncManager já exibe ao finalizar é
-        // suficiente — abrir um modal cheio a cada clique era só ruído, e
-        // exigia um fechamento manual sem motivo.
-        const hasNovidade = errorCount > 0 || totalNewSales > 0 || (batch.totalUpdated || 0) > 0;
-        if (hasNovidade) {
+        if (errorCount > 0 || totalNewSales > 0 || totalUpdated > 0) {
             isSyncResultsModalOpen.value = true;
         }
-
-    } catch (err) {
-        console.error("Falha geral ao buscar contas ou sincronizar:", err);
+    } catch (error) {
+        console.error('Falha geral ao buscar contas ou sincronizar:', error);
         syncResults.value = {
-            title: 'Erro Geral',
+            title: 'Erro geral',
             type: 'error',
             accounts: [],
-            summary: {
-                total: 0,
-                successful: 0,
-                failed: 0
-            },
-            message: err.message
+            summary: { total: 0, successful: 0, failed: 0 },
+            message: error.message,
         };
         isSyncResultsModalOpen.value = true;
     } finally {
         isSyncLiveOpen.value = false;
         isFetchingAccounts.value = false;
-        syncState.value.isForced = false;
     }
 };
 
