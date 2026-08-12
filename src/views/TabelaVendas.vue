@@ -289,6 +289,25 @@
                     </Transition>
                 </div>
 
+                <section class="sales-overview" aria-label="Resumo da listagem">
+                    <article class="sales-overview__item">
+                        <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="m5 15 4-5 4 3 6-8"/></svg></span>
+                        <div><strong>{{ totalSales.toLocaleString('pt-BR') }}</strong><span>vendas no filtro</span></div>
+                    </article>
+                    <article class="sales-overview__item">
+                        <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                        <div><strong>{{ allAccountOptions.length }}</strong><span>contas conectadas</span></div>
+                    </article>
+                    <article class="sales-overview__item">
+                        <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h6M7 16h4"/></svg></span>
+                        <div><strong>{{ currentPage }} / {{ totalPages }}</strong><span>página atual</span></div>
+                    </article>
+                    <article class="sales-overview__item" :class="{ 'is-syncing': syncState.isSyncing }">
+                        <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                        <div><strong>{{ syncState.isSyncing ? 'Em andamento' : 'Atualizado' }}</strong><span>estado da sincronização</span></div>
+                    </article>
+                </section>
+
                 <div class="sales-table-container">
                     <!--
                         Skeleton no lugar de um texto "A carregar...": dá a
@@ -457,7 +476,7 @@
                                     <!-- Direita: Data / Status / Ações -->
                                     <div class="sale-card__aside">
                                         <div class="sale-card__date-block">
-                                             <span v-if="String(sale.shipping_mode).toLowerCase().includes('full')" class="sale-card__date-value" style="color: #6366f1; font-weight: 700;" title="Envio FULL">
+                                             <span v-if="String(sale.shipping_mode).toLowerCase().includes('full')" class="sale-card__date-value" style="color: #2563eb; font-weight: 700;" title="Envio FULL">
                                                 LIMITE ENVIO: FULL
                                              </span>
                                              <span v-else class="sale-card__date-value" :class="{'sale-card__date-value--late': isLate(sale.raw_api_data?.sla_data?.expected_date || sale.shipping_limit_date)}" title="Prazo de Expedição">
@@ -497,7 +516,7 @@
                                                 ZPL
                                             </button>
 
-                                            <button v-if="userRole === 'master'" @click="showJsonModal(sale)" class="btn-label" title="Ver JSON da API" style="background: rgba(99,102,241,0.15); color: #818cf8;">
+                                            <button v-if="userRole === 'master'" @click="showJsonModal(sale)" class="btn-label" title="Ver JSON da API" style="background: rgba(37,99,235,0.15); color: #2563eb;">
                                                 JSON
                                             </button>
                                         </div>
@@ -1414,8 +1433,8 @@ const handleSync = async () => {
         // Fecha o painel ao vivo antes de mostrar o resumo.
         isSyncLiveOpen.value = false;
 
-        // Recarrega a tabela uma única vez, ao final de tudo.
-        await fetchSales();
+        // Recarrega uma única vez e preserva exatamente os filtros/página atuais.
+        await triggerServerFetch(false);
         const totalNewSales = batch.totalNewSales;
 
         syncResults.value = {
@@ -1466,50 +1485,45 @@ const handleSync = async () => {
 
 
 
-watch(() => syncState.value.isSyncing, (newValue, oldValue) => {
-    if (oldValue === true && newValue === false && syncState.value.type !== 'error') {
-        fetchSales();
-    }
-});
-
 const triggerServerFetch = (resetPage = false) => {
-    if (resetPage) currentPage.value = 1;
-    
+    // Se a página realmente mudar, o watcher de currentPage será o único
+    // responsável pelo request. Quando já estamos na página 1, busca agora.
+    if (resetPage && currentPage.value !== 1) {
+        currentPage.value = 1;
+        return Promise.resolve();
+    }
+
     const params = {
         page: currentPage.value,
         limit: pageSize.value,
     };
 
-    // Multi-seleção vai como CSV; o backend transforma em `= ANY($n)`.
     if (searchQuery.value) params.search = searchQuery.value;
     if (selectedStatuses.value.length) params.shippingStatus = selectedStatuses.value.join(',');
     if (selectedAccountIds.value.length) params.account = selectedAccountIds.value.join(',');
     if (selectedMarketplaces.value.length) params.marketplace = selectedMarketplaces.value.join(',');
     if (selectedShippingModes.value.length) params.shippingMode = selectedShippingModes.value.join(',');
-    
     if (filters.saleDateStart) params.saleDateStart = toLocalDateInputValue(filters.saleDateStart);
     if (filters.saleDateEnd) params.saleDateEnd = toLocalDateInputValue(filters.saleDateEnd);
     if (filters.shippingLimitStart) params.shippingLimitStart = toLocalDateInputValue(filters.shippingLimitStart);
     if (filters.shippingLimitEnd) params.shippingLimitEnd = toLocalDateInputValue(filters.shippingLimitEnd);
-    
-    fetchSales(params);
+
+    return fetchSales(params);
 };
 
-let searchTimeout;
-watch(searchQuery, () => {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        triggerServerFetch(true);
-    }, 400);
-});
+// Um único debounce cobre busca, chips e datas. O Vue agrupa mutações do mesmo
+// clique e o AbortController de useSales cancela qualquer resposta superada.
+let filtersFetchTimeout;
+watch(
+    [searchQuery, selectedStatuses, selectedAccountIds, selectedMarketplaces, selectedShippingModes, filters],
+    () => {
+        clearTimeout(filtersFetchTimeout);
+        filtersFetchTimeout = setTimeout(() => triggerServerFetch(true), 280);
+    },
+    { deep: true }
+);
 
-watch([selectedStatuses, selectedAccountIds, selectedMarketplaces, selectedShippingModes, filters], () => {
-    triggerServerFetch(true);
-}, { deep: true });
-
-watch(currentPage, () => {
-    triggerServerFetch(false);
-});
+watch(currentPage, () => triggerServerFetch(false));
 
 function closeDropdownOnClickOutside(event) {
     const target = event.target;
@@ -1549,6 +1563,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+    clearTimeout(filtersFetchTimeout);
     document.removeEventListener('click', closeDropdownOnClickOutside);
 });
 
@@ -1753,12 +1768,12 @@ function hideTooltip() {
 }
 
 .btn-primary {
-    background-color: #4f46e5;
+    background-color: #2563eb;
     color: #fff;
 }
 
 .btn-primary:hover:not(:disabled) {
-    background-color: #4338ca;
+    background-color: #1d4ed8;
 }
 
 .btn-secondary {
@@ -1796,9 +1811,9 @@ function hideTooltip() {
     gap: 0.5rem;
     height: 40px;
     padding: 0 1.1rem;
-    border: 1px solid #4f46e5;
+    border: 1px solid #2563eb;
     border-radius: 0.6rem;
-    background-color: #4f46e5;
+    background-color: #2563eb;
     color: #fff;
     font-size: 0.875rem;
     font-weight: 600;
@@ -1807,13 +1822,13 @@ function hideTooltip() {
     transition: background-color 140ms, border-color 140ms, box-shadow 140ms, opacity 140ms;
 }
 .btn-sync-sales:hover:not(:disabled) {
-    background-color: #4338ca;
-    border-color: #4338ca;
-    box-shadow: 0 4px 12px -4px rgba(79, 70, 229, 0.45);
+    background-color: #1d4ed8;
+    border-color: #1d4ed8;
+    box-shadow: 0 4px 12px -4px rgba(37, 99, 235, 0.45);
 }
 .btn-sync-sales:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
 }
 .btn-sync-sales:disabled { cursor: not-allowed; opacity: 0.75; }
 .btn-sync-sales__icon { flex-shrink: 0; }
@@ -1895,8 +1910,8 @@ function hideTooltip() {
     cursor: pointer;
     transition: border-color 140ms, box-shadow 140ms, background-color 140ms;
 }
-.filter-btn:hover { border-color: #a5b4fc; background-color: #f8fafc; }
-.filter-btn:focus-visible { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
+.filter-btn:hover { border-color: #dbeafe; background-color: #f8fafc; }
+.filter-btn:focus-visible { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
 
 .filter-btn-label {
     color: #6b7280;
@@ -1918,18 +1933,18 @@ function hideTooltip() {
     height: 18px;
     padding: 0 4px;
     border-radius: 9999px;
-    background: #4f46e5;
+    background: #2563eb;
     color: #fff;
     font-size: 0.68rem;
     font-weight: 700;
     line-height: 1;
 }
 .advanced-filter-toggle.is-active {
-    border-color: #a5b4fc;
-    background-color: #eef2ff;
-    color: #4338ca;
+    border-color: #dbeafe;
+    background-color: #eff6ff;
+    color: #1d4ed8;
 }
-.advanced-filter-toggle.is-active .filter-btn__icon { color: #4f46e5; }
+.advanced-filter-toggle.is-active .filter-btn__icon { color: #2563eb; }
 
 .filter-btn svg {
     transition: transform 0.3s ease;
@@ -1977,8 +1992,8 @@ function hideTooltip() {
 }
 
 .filter-dropdown li.is-checked {
-    background-color: #eef2ff;
-    color: #3730a3;
+    background-color: #eff6ff;
+    color: #1d4ed8;
     font-weight: 600;
 }
 
@@ -2005,7 +2020,7 @@ function hideTooltip() {
     font: inherit;
     text-transform: none;
     letter-spacing: 0;
-    color: #4f46e5;
+    color: #2563eb;
     cursor: pointer;
 }
 .filter-dropdown__clear:hover { text-decoration: underline; }
@@ -2026,8 +2041,8 @@ function hideTooltip() {
 }
 
 .filter-dropdown .checkbox.is-checked {
-    background: #4f46e5;
-    border-color: #4f46e5;
+    background: #2563eb;
+    border-color: #2563eb;
 }
 
 /* Filtros ativos em formato de pílula. Cada um remove só o próprio valor. */
@@ -2044,19 +2059,19 @@ function hideTooltip() {
     align-items: center;
     gap: 0.4rem;
     padding: 0.3rem 0.6rem;
-    border: 1px solid #c7d2fe;
+    border: 1px solid #dbeafe;
     border-radius: 9999px;
-    background: #eef2ff;
-    color: #3730a3;
+    background: #eff6ff;
+    color: #1d4ed8;
     font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
     transition: background-color 140ms, border-color 140ms;
 }
-.active-chip:hover { background: #e0e7ff; border-color: #a5b4fc; }
+.active-chip:hover { background: #dbeafe; border-color: #dbeafe; }
 
 .active-chip__group {
-    color: #6366f1;
+    color: #2563eb;
     font-weight: 500;
     opacity: 0.85;
 }
@@ -2076,12 +2091,12 @@ function hideTooltip() {
 /* Botão de filtro rápido com algo selecionado ganha o mesmo realce do painel
    avançado, para deixar claro que a tabela está filtrada. */
 .filter-btn.is-active {
-    border-color: #a5b4fc;
-    background-color: #eef2ff;
-    color: #3730a3;
+    border-color: #dbeafe;
+    background-color: #eff6ff;
+    color: #1d4ed8;
 }
-.filter-btn.is-active .filter-btn__icon { color: #4f46e5; }
-.filter-btn.is-active .filter-btn-label { color: #6366f1; }
+.filter-btn.is-active .filter-btn__icon { color: #2563eb; }
+.filter-btn.is-active .filter-btn-label { color: #2563eb; }
 
 .advanced-filters {
     margin-top: 1.5rem;
@@ -2147,11 +2162,11 @@ function hideTooltip() {
 
 .period-buttons button:hover {
     background-color: #f3f4f6;
-    border-color: #a5b4fc;
+    border-color: #dbeafe;
 }
 .period-buttons button.is-active {
-    background-color: #4f46e5;
-    border-color: #4f46e5;
+    background-color: #2563eb;
+    border-color: #2563eb;
     color: #fff;
 }
 
@@ -2167,7 +2182,7 @@ function hideTooltip() {
     gap: 0.4rem;
     font-size: 0.875rem;
     font-weight: 500;
-    color: #4f46e5;
+    color: #2563eb;
     background: transparent;
     border: none;
     cursor: pointer;
@@ -2262,7 +2277,7 @@ function hideTooltip() {
 }
 
 .status-badge-purple {
-    background-color: #8b5cf6;
+    background-color: #2563eb;
 }
 
 .status-badge-green {
@@ -2278,7 +2293,7 @@ function hideTooltip() {
 }
 
 .status-badge-indigo {
-    background-color: #6366f1;
+    background-color: #2563eb;
 }
 
 .status-badge-red {
@@ -2929,7 +2944,7 @@ function hideTooltip() {
     transition: color 0.2s;
 }
 .sale-card__product-link:hover {
-    color: #818cf8;
+    color: #2563eb;
     text-decoration: underline;
 }
 
@@ -3008,7 +3023,7 @@ function hideTooltip() {
     width: 16px;
     height: 16px;
     cursor: pointer;
-    accent-color: #6366f1;
+    accent-color: #2563eb;
 }
 
 .sale-card__account-tag {
@@ -3075,8 +3090,8 @@ function hideTooltip() {
     height: 38px;
     border-radius: 10px;
     flex-shrink: 0;
-    background: #eef2ff;
-    color: #4f46e5;
+    background: #eff6ff;
+    color: #2563eb;
 }
 .sr-card-icon svg { width: 20px; height: 20px; }
 .sr-card-icon.is-new     { background: #ecfdf5; color: #059669; }
@@ -3157,4 +3172,56 @@ function hideTooltip() {
 .sr-card-icon.is-time { background: #fef3c7; color: #d97706; }
 .sr-card-value-sm { font-size: 19px; }
 .sr-account-time { color: #cbd5e1; font-weight: 500; }
+
+/* Consolidação visual azul da página */
+.dashboard-wrapper { background: #f8fafc; color: #0f172a; }
+.dashboard-content { width: 100%; max-width: 1640px; margin: 0 auto; padding: 1.25rem 1.5rem 2.5rem; box-sizing: border-box; }
+.header { align-items: center; margin-bottom: 1rem; }
+.dashboard-title { margin: 0; font-size: clamp(1.5rem, 2vw, 1.85rem); font-weight: 800; letter-spacing: -0.035em; }
+.dashboard-subtitle { margin: 0.2rem 0 0; color: #64748b; }
+.mk-legend { margin-top: 0.35rem; }
+.btn-sync-sales { height: 44px; padding: 0 1rem; border-color: #2563eb; border-radius: 10px; background: #2563eb; font-family: var(--font-sans); font-weight: 750; box-shadow: 0 8px 20px rgba(37, 99, 235, 0.2); }
+.btn-sync-sales:hover:not(:disabled) { border-color: #1d4ed8; background: #1d4ed8; box-shadow: 0 10px 24px rgba(37, 99, 235, 0.27); transform: translateY(-1px); }
+.btn-sync-sales:focus-visible { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22); }
+.filters-panel { padding: 0.8rem; margin-bottom: 0.8rem; border: 1px solid #dbe3ef; border-radius: 12px; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04); }
+.quick-filters { gap: 0.55rem; }
+.search-input, .filter-btn { min-height: 38px; border-color: #dbe3ef; border-radius: 8px; font-family: var(--font-sans); }
+.filter-btn { padding: 0.5rem 0.7rem; }
+.filter-btn:hover, .filter-btn:focus-visible { border-color: #93c5fd; }
+.filter-btn.is-active, .advanced-filter-toggle.is-active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.filter-btn.is-active .filter-btn__icon, .advanced-filter-toggle.is-active .filter-btn__icon { color: #2563eb; }
+.filter-btn.is-active .filter-btn-label { color: #2563eb; }
+.filter-btn__count, .filter-dropdown .checkbox.is-checked { background: #2563eb; border-color: #2563eb; }
+.filter-dropdown li.is-checked { background: #eff6ff; color: #1d4ed8; }
+.filter-dropdown__clear { color: #2563eb; }
+.active-chip { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
+.active-chip:hover { border-color: #93c5fd; background: #dbeafe; }
+.active-chip__group { color: #2563eb; }
+.sales-overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.7rem; margin-bottom: 0.8rem; }
+.sales-overview__item { display: flex; align-items: center; gap: 0.7rem; min-width: 0; padding: 0.75rem 0.85rem; border: 1px solid #dbe3ef; border-radius: 10px; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035); }
+.sales-overview__icon { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; border-radius: 9px; background: #eff6ff; color: #2563eb; }
+.sales-overview__item div { min-width: 0; }
+.sales-overview__item strong, .sales-overview__item span { display: block; }
+.sales-overview__item strong { color: #0f172a; font-size: 1rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.sales-overview__item div > span { margin-top: 0.08rem; overflow: hidden; color: #64748b; font-size: 0.68rem; text-overflow: ellipsis; white-space: nowrap; }
+.sales-overview__item.is-syncing .sales-overview__icon { animation: pulse-fade 1.2s ease-in-out infinite; }
+.sales-table-container { border: 1px solid #dbe3ef; border-radius: 12px; background: #fff; padding: 0.85rem; }
+.sale-card { border-color: #e2e8f0; border-radius: 10px; box-shadow: none; }
+.sale-card:hover { border-color: #93c5fd; box-shadow: 0 6px 18px rgba(37, 99, 235, 0.08); }
+.sale-card__product-link:hover { color: #2563eb; }
+.sale-card__checkbox { accent-color: #2563eb; }
+.status-badge-purple, .status-badge-indigo { background-color: #2563eb; }
+.pagination-controls button:hover:not(:disabled) { border-color: #93c5fd; color: #1d4ed8; background: #eff6ff; }
+.sr-card-icon { background: #eff6ff; color: #2563eb; }
+@media (max-width: 1050px) { .sales-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) {
+    .dashboard-content { padding: 1rem; }
+    .header { align-items: stretch; flex-direction: column; }
+    .header-buttons, .btn-sync-sales { width: 100%; justify-content: center; }
+    .sales-overview { grid-template-columns: 1fr 1fr; }
+    .filters-panel, .sales-table-container { padding: 0.65rem; }
+    .quick-filters > .filter-container { flex: 1 1 calc(50% - 0.4rem); }
+    .filter-btn { width: 100%; justify-content: space-between; }
+}
+@media (max-width: 480px) { .sales-overview { grid-template-columns: 1fr; } }
 </style>

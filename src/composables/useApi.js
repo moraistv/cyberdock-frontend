@@ -60,8 +60,11 @@ export function useApi() {
       err.url = url;
       throw err;
     } catch (fetchError) {
-      // Mantém o log só do erro: é o que realmente importa para diagnóstico.
-      console.error(`[useApi] ${options.method || 'GET'} ${endpoint} falhou:`, fetchError.message);
+      // Cancelamentos são parte normal de filtros rápidos e navegação entre
+      // rotas; não poluem o console nem representam falha para o usuário.
+      if (fetchError?.name !== 'AbortError') {
+        console.error(`[useApi] ${options.method || 'GET'} ${endpoint} falhou:`, fetchError.message);
+      }
       throw fetchError;
     }
   };

@@ -17,6 +17,9 @@ const shopeeAccounts = ref([]);
 // vez — na prática, o mesmo boot de autenticação repetido 5+ vezes por
 // navegação, sobrecarregando o log e a rede sem necessidade.
 let authBootStarted = false;
+let authWatcherStarted = false;
+let mlAccountsRequest = null;
+let shopeeAccountsRequest = null;
 
 export function useAuth() {
     const router = useRouter();
@@ -80,8 +83,8 @@ export function useAuth() {
 
         setUserSession(data.token);
         await refreshUserData();
-        // ✅ carrega contas após login
-        await fetchMercadoLivreAccounts();
+        // As duas listas são compartilhadas por toda a aplicação.
+        await Promise.all([fetchMercadoLivreAccounts(true), fetchShopeeAccounts(true)]);
 
         if (router) await router.push('/dashboard');
     };
@@ -104,49 +107,63 @@ export function useAuth() {
     };
 
     // ✅ Agora popula mlAccounts.value
-    async function fetchMercadoLivreAccounts() {
+    async function fetchMercadoLivreAccounts(force = false) {
         const uid = loggedInUser.value?.uid;
         if (!uid) {
             mlAccounts.value = [];
             return [];
         }
-        try {
-            const response = await fetch(`${API_BASE_URL}/ml/contas/${uid}`, {
-                headers: { 'Authorization': `Bearer ${token.value}` } // ok mesmo sem exigir no backend
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data?.error || 'Erro ao buscar contas Mercado Livre');
+        if (!force && mlAccounts.value.length) return mlAccounts.value;
+        if (mlAccountsRequest) return mlAccountsRequest;
 
-            mlAccounts.value = Array.isArray(data) ? data : [];
-            return mlAccounts.value;
-        } catch (err) {
-            console.error("Erro em fetchMercadoLivreAccounts:", err);
-            mlAccounts.value = [];
-            return { error: err.message };
-        }
+        mlAccountsRequest = (async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/ml/contas/${uid}`, {
+                    headers: { 'Authorization': `Bearer ${token.value}` }
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data?.error || 'Erro ao buscar contas Mercado Livre');
+                mlAccounts.value = Array.isArray(data) ? data : [];
+                return mlAccounts.value;
+            } catch (err) {
+                console.error('Erro em fetchMercadoLivreAccounts:', err);
+                mlAccounts.value = [];
+                return { error: err.message };
+            } finally {
+                mlAccountsRequest = null;
+            }
+        })();
+        return mlAccountsRequest;
     }
 
     // ✅ Popula shopeeAccounts.value
-    async function fetchShopeeAccounts() {
+    async function fetchShopeeAccounts(force = false) {
         const uid = loggedInUser.value?.uid;
         if (!uid) {
             shopeeAccounts.value = [];
             return [];
         }
-        try {
-            const response = await fetch(`${API_BASE_URL}/shopee/contas/${uid}`, {
-                headers: { 'Authorization': `Bearer ${token.value}` }
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data?.error || 'Erro ao buscar lojas Shopee');
+        if (!force && shopeeAccounts.value.length) return shopeeAccounts.value;
+        if (shopeeAccountsRequest) return shopeeAccountsRequest;
 
-            shopeeAccounts.value = Array.isArray(data) ? data : [];
-            return shopeeAccounts.value;
-        } catch (err) {
-            console.error("Erro em fetchShopeeAccounts:", err);
-            shopeeAccounts.value = [];
-            return { error: err.message };
-        }
+        shopeeAccountsRequest = (async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/shopee/contas/${uid}`, {
+                    headers: { 'Authorization': `Bearer ${token.value}` }
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data?.error || 'Erro ao buscar lojas Shopee');
+                shopeeAccounts.value = Array.isArray(data) ? data : [];
+                return shopeeAccounts.value;
+            } catch (err) {
+                console.error('Erro em fetchShopeeAccounts:', err);
+                shopeeAccounts.value = [];
+                return { error: err.message };
+            } finally {
+                shopeeAccountsRequest = null;
+            }
+        })();
+        return shopeeAccountsRequest;
     }
 
     // onMounted é registrado uma vez PARA CADA componente que chama useAuth()
@@ -172,23 +189,23 @@ export function useAuth() {
 
         // ✅ tenta carregar contas assim que possível
         if (loggedInUser.value?.uid) {
-            await fetchMercadoLivreAccounts();
-            await fetchShopeeAccounts();
+            await Promise.all([fetchMercadoLivreAccounts(), fetchShopeeAccounts()]);
         }
     });
 
-    // ✅ ao mudar o usuário (login/logout/troca), refaz a lista de contas.
-    // watch() acumularia um listener por componente também, mas aqui o custo
-    // é apenas a checagem do uid — mantido simples e sem guarda extra.
-    watch(() => loggedInUser.value?.uid, async (uid) => {
-        if (uid) {
-            await fetchMercadoLivreAccounts();
-            await fetchShopeeAccounts();
-        } else {
-            mlAccounts.value = [];
-            shopeeAccounts.value = [];
-        }
-    });
+    // Registra um único watcher global, mesmo que Sidebar, Topbar e view usem
+    // o composable simultaneamente. Requests em andamento também são deduplicados.
+    if (!authWatcherStarted) {
+        authWatcherStarted = true;
+        watch(() => loggedInUser.value?.uid, async (uid, previousUid) => {
+            if (uid && uid !== previousUid && isAuthReady.value) {
+                await Promise.all([fetchMercadoLivreAccounts(), fetchShopeeAccounts()]);
+            } else if (!uid) {
+                mlAccounts.value = [];
+                shopeeAccounts.value = [];
+            }
+        });
+    }
 
     const userRole = computed(() => loggedInUser.value?.role || 'usuario');
     const user = loggedInUser;

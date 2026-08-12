@@ -66,7 +66,7 @@
                         </div>
                         <div class="stat-card">
                             <h3 class="card-title">Vendas Expedidas</h3>
-                            <p class="metric-value">{{ expeditedSalesCount }}</p>
+                            <p class="metric-value">{{ expeditedSalesCountLabel }}</p>
                             <p class="card-description-small">Total de vendas com status "Despachado".</p>
                         </div>
                         <div class="stat-card package-summary-card">
@@ -139,7 +139,25 @@
                         </table>
                     </div>
 
-                    <StockMovementsTable :movements="allMovements" :is-loading="isLoadingMovements" @delete="handleDeleteMovement" />
+                    <section class="movements-section">
+                        <div v-if="!movementsLoaded" class="movements-prompt">
+                            <span class="movements-prompt__icon" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/><path d="M12 7v5l3 2"/></svg>
+                            </span>
+                            <div><strong>Histórico de movimentações</strong><p>Carregue as movimentações somente quando precisar consultá-las.</p></div>
+                            <button class="btn-load-movements" :disabled="isLoadingMovements" @click="loadMovementPage(1)">
+                                {{ isLoadingMovements ? 'Carregando...' : 'Carregar histórico' }}
+                            </button>
+                        </div>
+                        <template v-else>
+                            <StockMovementsTable :movements="allMovements" :is-loading="isLoadingMovements" @delete="handleDeleteMovement" />
+                            <div v-if="movementPagination.totalPages > 1" class="movement-pagination">
+                                <button :disabled="isLoadingMovements || movementPagination.page <= 1" @click="loadMovementPage(movementPagination.page - 1)">Anterior</button>
+                                <span>Página {{ movementPagination.page }} de {{ movementPagination.totalPages }} · {{ movementPagination.total }} registros</span>
+                                <button :disabled="isLoadingMovements || movementPagination.page >= movementPagination.totalPages" @click="loadMovementPage(movementPagination.page + 1)">Próxima</button>
+                            </div>
+                        </template>
+                    </section>
                 </div>
             </div>
         </div>
@@ -182,16 +200,14 @@
                         Gerenciar Kits
                     </button>
                     
-                    <button @click="testKitParents" class="btn" style="background: #f59e0b; color: white;">
-                        🔍 Testar Kit Parents
-                    </button>
                 </div>
                 
                 <!-- Hierarquia de Kits e SKUs -->
                 <div class="hierarchy-section">
                     <div class="hierarchy-header-row">
                         <h3 class="section-title">
-                            🏗️ Hierarquia de Kits e SKUs
+                            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 4.5-8 4.5-8-4.5L12 3Z"/><path d="m4 12 8 4.5 8-4.5M4 16.5 12 21l8-4.5"/></svg>
+                            Hierarquia de Kits e SKUs
                             <span class="item-count">({{ hierarchyItems.length }} grupos)</span>
                         </h3>
                         <div class="stock-filter-group">
@@ -305,7 +321,7 @@
                                         <td class="hierarchy-col">
                                             <div class="child-sku-item">
                                                 <div class="hierarchy-line"></div>
-                                                <span class="hierarchy-icon child-icon">📄</span>
+                                                <span class="hierarchy-icon child-icon"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg></span>
                                                 <span class="sku-code child-code">{{ child.sku }}</span>
                                             </div>
                                         </td>
@@ -345,7 +361,7 @@
                                     <tr v-if="item.type === 'orphan'" class="orphan-sku-row">
                                         <td class="hierarchy-col">
                                             <div class="orphan-sku-item">
-                                                <span class="hierarchy-icon">📄</span>
+                                                <span class="hierarchy-icon"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg></span>
                                                 <span class="sku-code orphan-code">{{ item.sku }}</span>
                                             </div>
                                         </td>
@@ -447,7 +463,7 @@ import AdjustStockModal from '../components/StorageComponents/AdjustStockModal.v
 import KitManagementModal from '../components/StorageComponents/KitManagementModal.vue';
 import { useAuth } from '@/composables/useAuth';
 import { useUserStorage } from '@/composables/useUserStorage';
-import { useSalesForUser } from '@/composables/useSalesForUser';
+import { useApi } from '@/composables/useApi';
 import { useKitParent } from '@/composables/useKitParent';
 import { useKitManagement } from '@/composables/useKitManagement';
 
@@ -459,33 +475,10 @@ const props = defineProps({
   }
 });
 
-const { user, isAuthReady } = useAuth();
+const { user } = useAuth();
 
-// Computed userId: se prop fornecida, usa ela; senão, usa o usuário logado
-const userId = computed(() => {
-  console.log('🔍 [ArmazenamentoView] Computando userId...');
-  console.log('🔍 [ArmazenamentoView] isAuthReady:', isAuthReady.value);
-  console.log('🔍 [ArmazenamentoView] props.userId:', props.userId);
-  console.log('🔍 [ArmazenamentoView] user.value?.uid:', user.value?.uid);
-  
-  // Se uma prop userId foi fornecida (para masters acessarem outros usuários), usa ela
-  if (props.userId) {
-    console.log('✅ [ArmazenamentoView] Usando userId da prop:', props.userId);
-    return props.userId;
-  }
-  
-  // Senão, usa o userId do usuário logado
-  const uid = user.value?.uid;
-  if (!uid) {
-    console.warn('⚠️ [ArmazenamentoView] userId não disponível');
-  }
-  return uid;
-});
-
-// Debug: observar userId
-watch(userId, () => {
-  // console.log('🎯 ArmazenamentoView - userId alterado');
-}, { immediate: true });
+// O próprio usuário vê seu estoque; masters podem informar userId por prop.
+const userId = computed(() => props.userId || user.value?.uid || null);
 
 const { 
     skus, 
@@ -497,6 +490,9 @@ const {
     volumeContratado,
     allMovements,
     isLoadingMovements,
+    movementsLoaded,
+    movementPagination,
+    fetchAllMovements,
     packageTypes,
     addSku,
     updateSku,
@@ -504,27 +500,40 @@ const {
     adjustStock,
     deleteMovement,
     loadStorageData
-} = useUserStorage(userId);
+} = useUserStorage(userId, null, { withMovements: false });
 
 const {
     activeKitParents,
     loadActiveKitParents
 } = useKitParent(userId);
 
-// Debug: observar mudanças em activeKitParents
-watch(activeKitParents, (newValue) => {
-    console.log('🔥 ArmazenamentoView - activeKitParents alterou:', newValue);
-    console.log('🔥 ArmazenamentoView - Quantidade de kits:', newValue?.length || 0);
-}, { immediate: true, deep: true });
-
 const {
     activeKits,
     availableChildSkus,
     loadAvailableChildSkus,
     loadActiveKits
-} = useKitManagement(userId);
+} = useKitManagement(userId, { sourceSkus: skus });
 
-const { sales } = useSalesForUser(userId);
+const { get } = useApi();
+const expeditedSalesCount = ref(0);
+
+watch(userId, async (uid) => {
+    if (!uid) {
+        expeditedSalesCount.value = 0;
+        return;
+    }
+    try {
+        const stats = await get(`/sales/user/${uid}/stats`);
+        expeditedSalesCount.value = Number(stats?.expedited_count || 0);
+    } catch {
+        expeditedSalesCount.value = 0;
+    }
+}, { immediate: true });
+
+const loadMovementPage = async (page = 1) => {
+    if (!userId.value) return;
+    await fetchAllMovements(userId.value, page, movementPagination.value.limit || 25);
+};
 
 // Modal states
 const isStorageModalOpen = ref(false);
@@ -538,19 +547,11 @@ const stockFilter = ref('all'); // 'all', 'with', 'without'
 
 // Kit Management Modal Methods
 const openKitManagementModal = async () => {
-    console.log('🔍 [ArmazenamentoView] Abrindo modal de gestão de kits...');
-    console.log('🔍 [ArmazenamentoView] userId atual:', userId.value);
-    console.log('🔍 [ArmazenamentoView] isKitManagementModalOpen antes:', isKitManagementModalOpen.value);
-    
     isKitManagementModalOpen.value = true;
-    console.log('🔍 [ArmazenamentoView] isKitManagementModalOpen após:', isKitManagementModalOpen.value);
-    
-    // Carregar SKUs disponíveis quando abrir o modal
     try {
         await loadAvailableChildSkus();
-        console.log('✅ [ArmazenamentoView] SKUs carregados com sucesso');
     } catch (error) {
-        console.error('❌ [ArmazenamentoView] Erro ao carregar SKUs:', error);
+        console.error('Erro ao carregar SKUs disponíveis:', error);
     }
 };
 
@@ -581,10 +582,7 @@ const handleKitDeleted = async () => {
 
 // Storage Modal Methods
 const openStorageModal = async () => {
-    console.log('📋 [ArmazenamentoView] Abrindo modal de storage');
-    // Carregar Kit Parents antes de abrir o modal
     await loadActiveKitParents();
-    console.log('📋 [ArmazenamentoView] Kit Parents carregados para storage modal:', activeKitParents.value);
     isStorageModalOpen.value = true;
 };
 
@@ -594,10 +592,7 @@ const closeStorageModal = () => {
 
 // SKU Modal Methods
 const openSkuModal = async () => {
-    console.log('📝 [ArmazenamentoView] Abrindo modal SKU');
-    // Forçar carregamento dos Kit Parents antes de abrir o modal
     await loadActiveKitParents();
-    console.log('📝 [ArmazenamentoView] activeKitParents após carregamento:', activeKitParents.value);
     isEditingSku.value = false;
     currentSku.value = null;
     isSkuModalOpen.value = true;
@@ -637,36 +632,6 @@ const handleSkuSave = async (skuData) => {
 // Package selection (placeholder)
 const openPackageSelect = (data) => {
     console.log('Package select:', data);
-};
-
-// Função de teste para diagnosticar Kit Parents
-const testKitParents = async () => {
-    console.log('🔍 [TESTE] Iniciando diagnóstico de Kit Parents');
-    console.log('🔍 [TESTE] userId atual:', userId.value);
-    console.log('🔍 [TESTE] activeKitParents.value antes do carregamento:', activeKitParents.value);
-    
-    try {
-        // Forçar carregamento
-        await loadActiveKitParents();
-        
-        console.log('✅ [TESTE] Carregamento concluído');
-        console.log('✅ [TESTE] activeKitParents.value após carregamento:', activeKitParents.value);
-        console.log('✅ [TESTE] Quantidade de Kit Parents:', activeKitParents.value?.length || 0);
-        
-        if (activeKitParents.value && activeKitParents.value.length > 0) {
-            console.log('✅ [TESTE] Kit Parents encontrados:');
-            activeKitParents.value.forEach((kit, index) => {
-                console.log(`  ${index + 1}. ID: ${kit.id}, Nome: ${kit.nome}, Descrição: ${kit.descricao}`);
-            });
-            showToast(`✅ ${activeKitParents.value.length} Kit Parent(s) encontrado(s)!`, 'success');
-        } else {
-            console.log('⚠️ [TESTE] Nenhum Kit Parent encontrado');
-            showToast('⚠️ Nenhum Kit Parent encontrado. Crie um primeiro.', 'warning');
-        }
-    } catch (error) {
-        console.error('❌ [TESTE] Erro ao carregar Kit Parents:', error);
-        showToast(`❌ Erro: ${error.message}`, 'error');
-    }
 };
 
 // Delete SKU function
@@ -795,11 +760,9 @@ const showToast = (message, type = 'info') => {
     }));
 };
 
-const expeditedSalesCount = computed(() => {
-    if (!sales.value) return 0;
-    // Filtra pelo status 'custom_06_despachado'
-    return sales.value.filter(s => s.shipping_status === 'custom_06_despachado').length;
-});
+const expeditedSalesCountLabel = computed(() =>
+    expeditedSalesCount.value.toLocaleString('pt-BR')
+);
 
 const quantityByPackageType = computed(() => {
   if (!skus.value || skus.value.length === 0) {
@@ -982,12 +945,12 @@ const allItemsForDisplay = computed(() => {
 }
 
 .btn-accent {
-    background-color: #7c3aed;
+    background-color: #2563eb;
     color: white;
 }
 
 .btn-accent:hover {
-    background-color: #6d28d9;
+    background-color: #1d4ed8;
 }
 
 .kit-parents-section {
@@ -1091,10 +1054,10 @@ const allItemsForDisplay = computed(() => {
 }
 
 .kits-section {
-    background-color: #faf5ff;
+    background-color: #eff6ff;
     padding: 1.5rem;
     border-radius: 0.75rem;
-    border: 1px solid #e5e7eb;
+    border: 1px solid #bfdbfe;
     margin-bottom: 1.5rem;
 }
 
@@ -1123,12 +1086,12 @@ const allItemsForDisplay = computed(() => {
 
 /* Kit Pai Styles */
 .kit-parent-row {
-    background: linear-gradient(135deg, #fef7ff 0%, #faf5ff 100%);
-    border-bottom: 2px solid #e879f9;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border-bottom: 2px solid #60a5fa;
 }
 
 .kit-parent-row:hover {
-    background: linear-gradient(135deg, #fdf4ff 0%, #f3e8ff 100%);
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
 }
 
 .kit-parent-item {
@@ -1140,7 +1103,7 @@ const allItemsForDisplay = computed(() => {
 }
 
 .kit-parent-code {
-    color: #7c3aed;
+    color: #1d4ed8;
     font-weight: 700;
     font-size: 1rem;
 }
@@ -1195,7 +1158,7 @@ const allItemsForDisplay = computed(() => {
     top: 0;
     bottom: 0;
     width: 2px;
-    background: linear-gradient(to bottom, #e879f9 0%, #c084fc 50%, #d1d5db 100%);
+    background: linear-gradient(to bottom, #60a5fa 0%, #2563eb 50%, #d1d5db 100%);
 }
 
 .hierarchy-line::before {
@@ -1205,7 +1168,7 @@ const allItemsForDisplay = computed(() => {
     right: -8px;
     width: 16px;
     height: 2px;
-    background: #c084fc;
+    background: #2563eb;
     transform: translateY(-50%);
 }
 
@@ -1288,11 +1251,11 @@ const allItemsForDisplay = computed(() => {
 }
 
 .kit-row {
-    background-color: #fefbff !important;
+    background-color: #eff6ff !important;
 }
 
 .kit-row:hover {
-    background-color: #f3e8ff !important;
+    background-color: #dbeafe !important;
 }
 
 .sku-row:hover {
@@ -1317,8 +1280,8 @@ const allItemsForDisplay = computed(() => {
 }
 
 .kit-parent-badge {
-    background-color: #ede9fe;
-    color: #7c3aed;
+    background-color: #dbeafe;
+    color: #1d4ed8;
     padding: 0.25rem 0.75rem;
     border-radius: 9999px;
     font-size: 0.75rem;
@@ -1384,21 +1347,65 @@ const allItemsForDisplay = computed(() => {
 
 /* Kit row highlighting */
 .kit-row {
-    background-color: #faf5ff !important;
+    background-color: #eff6ff !important;
 }
 
 .kit-row:hover {
-    background-color: #f3e8ff !important;
+    background-color: #dbeafe !important;
 }
 
 .kit-row td {
     position: relative;
 }
 
-.kit-row td:first-child::before {
-    content: '📦';
-    position: absolute;
-    left: 5px;
-    font-size: 12px;
+/* Redesign azul e carregamento progressivo */
+.dashboard-wrapper { background: #f8fafc; color: #0f172a; }
+.main-content { min-width: 0; }
+.dashboard-content { width: 100%; max-width: 1640px; margin: 0 auto; padding: 1.25rem 1.75rem 2.5rem; box-sizing: border-box; }
+.header { align-items: center; margin-bottom: 1rem; }
+.dashboard-title { margin: 0; font-size: clamp(1.45rem, 2vw, 1.8rem); font-weight: 800; letter-spacing: -0.035em; }
+.dashboard-subtitle { margin: 0.2rem 0 0; color: #64748b; }
+.btn { min-height: 40px; border-radius: 9px; font-family: var(--font-sans); font-weight: 700; }
+.stats-cards-grid-small { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.8rem; margin-bottom: 1rem; }
+.stat-card { position: relative; min-width: 0; min-height: 142px; padding: 1rem; overflow: hidden; border-color: #dbe3ef; border-radius: 12px; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.025); }
+.stat-card::before { content: ''; position: absolute; top: 0; right: 0; width: 48px; height: 3px; border-radius: 0 0 0 3px; background: #2563eb; }
+.card-title { color: #64748b; font-size: 0.76rem; font-weight: 700; }
+.metric-value { margin: 0.15rem 0; font-size: clamp(1.55rem, 2vw, 2rem); font-weight: 800; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.progress-bar-container { margin-top: 0.75rem; background: #dbeafe; }
+.progress-bar { background: linear-gradient(90deg, #1d4ed8, #3b82f6); }
+.package-list { gap: 0.55rem; }
+.package-item { padding: 0.35rem 0.5rem; border-radius: 7px; background: #eff6ff; color: #475569; }
+.package-quantity { color: #1d4ed8; }
+.table-container { overflow-x: auto; border: 1px solid #dbe3ef; border-radius: 12px; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05); }
+.table-header-row { min-width: 680px; padding: 0.85rem 1rem; }
+.table-title { color: #0f172a; font-size: 1rem; font-weight: 800; }
+.sku-table { min-width: 760px; }
+.sku-table th, .sku-table td { padding: 0.78rem 1rem; }
+.sku-table thead th { color: #64748b; background: #f8fafc; }
+.sku-table tbody tr:hover { background: #f8fbff; }
+.stock-filter-group { background: #eff6ff; border-color: #dbeafe; }
+.filter-btn.active { color: #1d4ed8; box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12); }
+.section-title svg { color: #2563eb; flex: 0 0 auto; }
+.movements-section { margin-top: 1rem; }
+.movements-section :deep(.movements-table-wrapper) { margin-top: 0; border: 1px solid #dbe3ef; border-radius: 12px; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05); overflow-x: auto; }
+.movements-prompt { display: flex; align-items: center; gap: 0.85rem; padding: 1rem; border: 1px solid #bfdbfe; border-radius: 12px; background: #fff; }
+.movements-prompt__icon { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 10px; background: #eff6ff; color: #2563eb; }
+.movements-prompt div { min-width: 0; flex: 1; }
+.movements-prompt strong { color: #0f172a; font-size: 0.9rem; }
+.movements-prompt p { margin: 0.15rem 0 0; color: #64748b; font-size: 0.76rem; }
+.btn-load-movements, .movement-pagination button { min-height: 36px; padding: 0 0.8rem; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; color: #1d4ed8; font-family: var(--font-sans); font-weight: 700; cursor: pointer; }
+.btn-load-movements:hover:not(:disabled), .movement-pagination button:hover:not(:disabled) { border-color: #2563eb; background: #dbeafe; }
+.btn-load-movements:disabled, .movement-pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+.movement-pagination { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 1rem; border: 1px solid #dbe3ef; border-top: 0; border-radius: 0 0 12px 12px; background: #fff; color: #64748b; font-size: 0.75rem; }
+@media (max-width: 1280px) { .stats-cards-grid-small { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+    .dashboard-content { padding: 1rem; }
+    .header { align-items: stretch; flex-direction: column; gap: 0.8rem; }
+    .header-actions, .header-actions .btn { width: 100%; justify-content: center; }
+    .stats-cards-grid-small { grid-template-columns: 1fr; }
+    .stat-card { min-height: 120px; }
+    .movements-prompt { align-items: flex-start; flex-wrap: wrap; }
+    .btn-load-movements { width: 100%; }
+    .movement-pagination { align-items: stretch; flex-direction: column; text-align: center; }
 }
 </style>

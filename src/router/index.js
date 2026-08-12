@@ -1,18 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import PaginaInicial from '../views/PaginaInicial.vue';
-import AuthComponent from '../views/AuthComponent.vue';
-import DashboardView from '../views/DashboardView.vue';
-import ContasView from '../views/ContasView.vue';
-import TabelaVendas from '../views/TabelaVendas.vue';
-import SeparacaoItensView from '../views/SeparacaoItensView.vue';
-import ArmazenamentoView from '../views/ArmazenamentoView.vue';
-import KitParentView from '../views/KitParentView.vue';
-import ResumoCobranca from '../views/ResumoCobranca.vue';
-import AdminView from '../views/AdminView.vue';
-import ManageUsersView from '../views/ManageUsersView.vue';
-import MasterResumoCobranca from '../views/MasterResumoCobranca.vue';
-import ServiceHistory from '../views/ServiceHistory.vue';
-import ShopeeCallbackView from '../views/ShopeeCallbackView.vue';
+const PaginaInicial = () => import('../views/PaginaInicial.vue');
+const AuthComponent = () => import('../views/AuthComponent.vue');
+const DashboardView = () => import('../views/DashboardView.vue');
+const ContasView = () => import('../views/ContasView.vue');
+const TabelaVendas = () => import('../views/TabelaVendas.vue');
+const SeparacaoItensView = () => import('../views/SeparacaoItensView.vue');
+const ArmazenamentoView = () => import('../views/ArmazenamentoView.vue');
+const KitParentView = () => import('../views/KitParentView.vue');
+const ResumoCobranca = () => import('../views/ResumoCobranca.vue');
+const AdminView = () => import('../views/AdminView.vue');
+const ManageUsersView = () => import('../views/ManageUsersView.vue');
+const MasterResumoCobranca = () => import('../views/MasterResumoCobranca.vue');
+const ServiceHistory = () => import('../views/ServiceHistory.vue');
+const ShopeeCallbackView = () => import('../views/ShopeeCallbackView.vue');
 
 const routes = [
   {

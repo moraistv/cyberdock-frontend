@@ -224,7 +224,7 @@ export default defineComponent({
 }
 
 .total-cost { color: #16a34a; }
-.exped-cost { color: #4f46e5; }
+.exped-cost { color: #2563eb; }
 .monthly-cost { color: #28a745; }
 
 .monthly-storage {
@@ -238,7 +238,7 @@ export default defineComponent({
 
 .progress-bar-container {
   width: 100%;
-  background-color: #eef2ff;
+  background-color: #eff6ff;
   border-radius: 9999px;
   height: 8px;
   overflow: hidden;

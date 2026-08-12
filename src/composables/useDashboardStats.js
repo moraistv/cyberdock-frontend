@@ -25,10 +25,8 @@ export function useDashboardStats() {
   const error = ref(null);
   const api = useApi();
 
-  // Filtros mudam rápido (o usuário clica em vários chips seguidos): a resposta
-  // que chegar de uma busca já superada é descartada, para os cards não
-  // piscarem números de um filtro antigo.
   let requestId = 0;
+  let activeController = null;
 
   /**
    * @param {object} params { from, to, marketplace, account, shippingStatus, shippingMode }
@@ -36,6 +34,8 @@ export function useDashboardStats() {
    */
   const fetchStats = async (params = {}) => {
     const myRequest = ++requestId;
+    if (activeController) activeController.abort();
+    activeController = new AbortController();
     isLoading.value = true;
     error.value = null;
     try {
@@ -49,17 +49,29 @@ export function useDashboardStats() {
       if (params.shippingStatus?.length) qs.set('shippingStatus', asCsv(params.shippingStatus));
       if (params.shippingMode?.length) qs.set('shippingMode', asCsv(params.shippingMode));
 
-      const data = await api.get(`/sales/dashboard-stats?${qs.toString()}`);
+      const data = await api.get(`/sales/dashboard-stats?${qs.toString()}`, {
+        signal: activeController.signal,
+      });
       if (myRequest !== requestId) return;
       stats.value = { ...EMPTY, ...data };
     } catch (err) {
-      if (myRequest !== requestId) return;
+      if (err?.name === 'AbortError' || myRequest !== requestId) return;
       error.value = err.message || 'Não foi possível carregar as métricas.';
       stats.value = { ...EMPTY };
     } finally {
-      if (myRequest === requestId) isLoading.value = false;
+      if (myRequest === requestId) {
+        activeController = null;
+        isLoading.value = false;
+      }
     }
   };
 
-  return { stats, isLoading, error, fetchStats };
+  const cancelStats = () => {
+    requestId++;
+    if (activeController) activeController.abort();
+    activeController = null;
+    isLoading.value = false;
+  };
+
+  return { stats, isLoading, error, fetchStats, cancelStats };
 }

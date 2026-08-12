@@ -1,10 +1,9 @@
 import { ref, computed, watch } from 'vue';
 import { useApi } from './useApi';
-import { useUserStorage } from './useUserStorage'; // Importa o composable principal
 
-export function useKitManagement(userId) {
+export function useKitManagement(userId, options = {}) {
   const { get, post, put, delete: del } = useApi();
-  const userStorage = useUserStorage(userId); // Instancia o storage principal para sincronização
+  const sourceSkus = options.sourceSkus || null;
 
   // Estados
   const kits = ref([]);
@@ -15,11 +14,18 @@ export function useKitManagement(userId) {
   const isLoadingChildSkus = ref(false);
   const error = ref(null);
 
-  // Função para forçar a atualização do estado global
-  const syncWithGlobalState = () => {
-    if (userStorage && typeof userStorage.loadStorageData === 'function') {
-      userStorage.loadStorageData();
-    }
+  // A view proprietária invalida o cache de armazenamento após mutações.
+  // Este composable não instancia useUserStorage para não duplicar a carga.
+
+  const applyKitRows = (rows = []) => {
+    kits.value = rows.filter(sku => sku.is_kit);
+    activeKits.value = kits.value
+      .filter(kit => kit.ativo)
+      .map(kit => ({
+        ...kit,
+        available_quantity: calculateKitAvailableQuantity(kit),
+        kit_components: kit.kit_components || []
+      }));
   };
 
   // Carregar todos os kits (ativos e inativos) de um usuário
@@ -32,7 +38,7 @@ export function useKitManagement(userId) {
     try {
       const response = await get(`/storage/user/${userId.value}/skus`);
       if (response.error) throw new Error(response.error);
-      kits.value = (response || []).filter(sku => sku.is_kit);
+      applyKitRows(response || []);
     } catch (err) {
       error.value = err.message || 'Erro ao carregar kits';
       console.error('Erro ao carregar kits:', err);
@@ -44,24 +50,13 @@ export function useKitManagement(userId) {
 
   // Carregar apenas kits ativos para exibição na gestão de SKUs
   const loadActiveKits = async () => {
-    if (!userId.value) return;
-    
     isLoadingActiveKits.value = true;
-    
     try {
-      const response = await get(`/storage/user/${userId.value}/skus`);
-      if (response.error) throw new Error(response.error);
-      
-      const activeKitsData = (response || []).filter(sku => sku.is_kit && sku.ativo);
-      
-      activeKits.value = activeKitsData.map(kit => ({
-        ...kit,
-        available_quantity: calculateKitAvailableQuantity(kit),
-        kit_components: kit.kit_components || []
-      }));
-    } catch (err) {
-      console.error('Erro ao carregar kits ativos:', err);
-      activeKits.value = [];
+      if (sourceSkus?.value) {
+        applyKitRows(sourceSkus.value);
+      } else {
+        await loadKits();
+      }
     } finally {
       isLoadingActiveKits.value = false;
     }
@@ -142,14 +137,8 @@ export function useKitManagement(userId) {
 
       console.log('✅ [useKitManagement] Kit criado com sucesso');
 
-      // Recarregar dados
+      // Uma única leitura atualiza listas completa e ativa.
       await loadKits();
-      if (payload.ativo) await loadActiveKits();
-      
-      // Sincronizar com estado global
-      if (userStorage && typeof userStorage.loadStorageData === 'function') {
-        userStorage.loadStorageData();
-      }
 
       return response;
     } catch (err) {
@@ -175,9 +164,6 @@ export function useKitManagement(userId) {
       if (response.error) throw new Error(response.error);
 
       await loadKits();
-      await loadActiveKits();
-      
-      syncWithGlobalState(); // SINCRONIZA COM O ESTADO GLOBAL
 
       return response;
     } catch (err) {
@@ -212,9 +198,6 @@ export function useKitManagement(userId) {
       if (response.error) throw new Error(response.error);
 
       await loadKits();
-      await loadActiveKits();
-
-      syncWithGlobalState(); // SINCRONIZA COM O ESTADO GLOBAL
 
       return response;
     } catch (err) {
@@ -224,12 +207,15 @@ export function useKitManagement(userId) {
     }
   };
 
-  watch(userId, (newUserId) => {
-    if (newUserId) {
-      loadKits();
-      loadActiveKits();
-    }
-  }, { immediate: true });
+  if (sourceSkus) {
+    watch([userId, sourceSkus], ([newUserId, rows]) => {
+      if (newUserId) applyKitRows(rows || []);
+    }, { immediate: true, deep: true });
+  } else {
+    watch(userId, (newUserId) => {
+      if (newUserId) loadKits();
+    }, { immediate: true });
+  }
 
   // ✅ Renomeado para evitar o warning do ESLint
   const statsRef = computed(() => ({

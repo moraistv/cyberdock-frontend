@@ -19,7 +19,8 @@
 
         <!-- Filtros -->
         <div class="filters">
-          <div class="filter-block">
+          <div class="filters-primary">
+          <div class="filter-block filter-block--period">
             <span class="filter-label">
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
               Período
@@ -52,6 +53,22 @@
             </div>
           </div>
 
+          <div class="filters-range" aria-label="Intervalo efetivo">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v3M16 2v3M3 9h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z" /></svg>
+            {{ dateRange.from }} — {{ dateRange.to }}
+          </div>
+          </div>
+
+          <details class="filters-advanced">
+            <summary>
+              <span class="advanced-title">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg>
+                Filtros avançados
+                <span v-if="advancedFilterCount" class="filter-count">{{ advancedFilterCount }}</span>
+              </span>
+              <svg class="advanced-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+            </summary>
+            <div class="filters-advanced__body">
           <div class="filter-block" v-if="allAccounts.length">
             <span class="filter-label">
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
@@ -97,19 +114,21 @@
           </div>
 
           <div v-if="hasActiveFilters" class="filters-foot">
-            <span class="filters-range">{{ dateRange.from }} → {{ dateRange.to }}</span>
+            <span>{{ advancedFilterCount ? `${advancedFilterCount} filtro(s) avançado(s) ativo(s)` : 'Canal personalizado ativo' }}</span>
             <button class="chip chip--clear" @click="clearFilters">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               Limpar filtros
             </button>
           </div>
+            </div>
+          </details>
         </div>
 
         <!-- Cards Topo -->
         <div class="grid grid-4" ref="cardsRow">
-          <div class="card" :class="{ skeleton: statsLoading }">
+          <div class="card card--kpi card--featured" :class="{ skeleton: statsLoading }">
             <div class="card-icon">
-              <span class="icon icon--indigo">
+              <span class="icon icon--blue">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19l16 0" /><path d="M4 15l4 -6l4 2l4 -5l4 4" /></svg>
               </span>
             </div>
@@ -170,7 +189,7 @@
         </div>
 
         <!-- Cards secundários -->
-        <div class="grid grid-3" ref="miniRow">
+        <div class="grid grid-5" ref="miniRow">
           <div class="card card--mini" :class="{ skeleton: statsLoading }">
             <span class="icon icon--emerald sm">
               <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
@@ -190,12 +209,30 @@
             </div>
           </div>
           <div class="card card--mini" :class="{ skeleton: statsLoading }">
-            <span class="icon icon--indigo sm">
+            <span class="icon icon--blue sm">
               <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10" /><line x1="18" y1="20" x2="18" y2="4" /><line x1="6" y1="20" x2="6" y2="16" /></svg>
             </span>
             <div>
               <div class="card-value card-value--sm">{{ mediaDiaria }}</div>
               <div class="card-title plain">Média de vendas por dia</div>
+            </div>
+          </div>
+          <div class="card card--mini card--derived" :class="{ skeleton: statsLoading }">
+            <span class="icon icon--blue sm">
+              <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-4.8-7.33"/><path d="M20 4v6h-6"/><path d="m9 12 2 2 4-5"/></svg>
+            </span>
+            <div>
+              <div class="card-value card-value--sm">{{ taxaProcessada }}</div>
+              <div class="card-title plain">Taxa processada</div>
+            </div>
+          </div>
+          <div class="card card--mini card--derived" :class="{ skeleton: statsLoading }">
+            <span class="icon icon--blue sm">
+              <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7 12 3l8 4-8 4-8-4Z"/><path d="m4 12 8 4 8-4M4 17l8 4 8-4"/></svg>
+            </span>
+            <div>
+              <div class="card-value card-value--sm">{{ unidadesPorPedido }}</div>
+              <div class="card-title plain">Unidades por pedido</div>
             </div>
           </div>
         </div>
@@ -315,7 +352,7 @@ function toggleIn(list, value) {
   if (i === -1) list.push(value); else list.splice(i, 1)
 }
 
-const { stats, isLoading: statsLoading, fetchStats } = useDashboardStats()
+const { stats, isLoading: statsLoading, fetchStats, cancelStats } = useDashboardStats()
 
 const totals = computed(() => stats.value.totals)
 const byStatus = computed(() => stats.value.byStatus)
@@ -362,7 +399,7 @@ const {
   billingSummary,
   isLoading: storageLoadingRaw,
   calcularVolumePorSku
-} = useUserStorage(userId, null, { withMovements: false })
+} = useUserStorage(userId, null, { withMovements: false, withPackageTypes: false })
 
 const storageLoading = computed(() => storageLoadingRaw.value || billingSummary.value.isLoading)
 
@@ -430,6 +467,19 @@ const mediaDiaria = computed(() => {
   const media = (totals.value.sales || 0) / diasNoPeriodo.value
   return media >= 10 ? Math.round(media) : media.toFixed(1).replace('.', ',')
 })
+const taxaProcessada = computed(() => {
+  const vendas = totals.value.sales || 0
+  if (!vendas) return '0%'
+  return `${((totals.value.processed || 0) / vendas * 100).toFixed(1).replace('.', ',')}%`
+})
+const unidadesPorPedido = computed(() => {
+  const vendas = totals.value.sales || 0
+  if (!vendas) return '0,00'
+  return ((totals.value.units || 0) / vendas).toFixed(2).replace('.', ',')
+})
+const advancedFilterCount = computed(() =>
+  selectedAccounts.value.length + selectedStatuses.value.length + selectedModes.value.length
+)
 
 function toggleMarketplace(mk) {
   const list = [...selectedMarketplaces.value]
@@ -480,10 +530,10 @@ function dayLabel(iso) {
 }
 
 const BASE_CHART = {
-  chart: { toolbar: { show: false }, fontFamily: 'Google Sans Flex, Google Sans, system-ui, sans-serif' },
+  chart: { toolbar: { show: false }, fontFamily: 'inherit', foreColor: '#64748b' },
   tooltip: { theme: 'light' },
   dataLabels: { enabled: false },
-  grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+  grid: { borderColor: '#e2e8f0', strokeDashArray: 4 },
 }
 
 /* -------------------- Gráficos -------------------- */
@@ -491,7 +541,7 @@ const dailySeries = computed(() => [{ name: 'Vendas', data: byDay.value.map((d) 
 const dailyChartOptions = computed(() => ({
   ...BASE_CHART,
   chart: { ...BASE_CHART.chart, type: 'area' },
-  colors: ['#4f46e5'],
+  colors: ['#2563eb'],
   stroke: { curve: 'smooth', width: 2.5 },
   fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] } },
   xaxis: {
@@ -506,7 +556,7 @@ const statusSeries = computed(() => [{ name: 'Vendas', data: byStatus.value.map(
 const statusChartOptions = computed(() => ({
   ...BASE_CHART,
   chart: { ...BASE_CHART.chart, type: 'bar' },
-  colors: ['#6366f1'],
+  colors: ['#1d4ed8'],
   plotOptions: { bar: { borderRadius: 6, columnWidth: '48%', distributed: false } },
   xaxis: {
     categories: byStatus.value.map((d) => d.label),
@@ -531,7 +581,7 @@ const shippingSeries = computed(() => [{ name: 'Vendas', data: byShippingMode.va
 const shippingChartOptions = computed(() => ({
   ...BASE_CHART,
   chart: { ...BASE_CHART.chart, type: 'bar' },
-  colors: ['#0ea5e9'],
+  colors: ['#2563eb'],
   plotOptions: { bar: { borderRadius: 6, horizontal: true, barHeight: '55%' } },
   xaxis: { categories: byShippingMode.value.map((d) => d.mode), labels: { formatter: (v) => Math.trunc(v) } },
 }))
@@ -563,10 +613,17 @@ function runEnterAnimations() {
 }
 
 /* -------------------- Ciclo de vida -------------------- */
-// Recarrega ao mudar qualquer filtro.
+// Agrupa mudanças rápidas de chips antes de consultar novamente o backend.
+let filtersDebounceTimer = null
 watch(
   [period, selectedMarketplaces, selectedAccounts, selectedStatuses, selectedModes],
-  () => reload(),
+  () => {
+    if (filtersDebounceTimer) clearTimeout(filtersDebounceTimer)
+    filtersDebounceTimer = setTimeout(() => {
+      filtersDebounceTimer = null
+      reload()
+    }, 220)
+  },
   { deep: true }
 )
 
@@ -577,6 +634,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  if (filtersDebounceTimer) clearTimeout(filtersDebounceTimer)
+  cancelStats()
   if (gsapCtx) gsapCtx.revert()
 })
 </script>
@@ -631,8 +690,8 @@ onUnmounted(() => {
   font-size: 0.8rem; font-weight: 600; cursor: pointer;
   transition: border-color 140ms, background 140ms, color 140ms;
 }
-.chip:hover { border-color: #a5b4fc; background: #f8fafc; }
-.chip.is-active { border-color: #4f46e5; background: #eef2ff; color: #4338ca; }
+.chip:hover { border-color: #93c5fd; background: #f8fafc; }
+.chip.is-active { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
 .chip__logo { width: 15px; height: 15px; object-fit: contain; border-radius: 3px; }
 
 .chip--clear { color: #6b7280; }
@@ -675,7 +734,7 @@ onUnmounted(() => {
   border-radius: 10px; background: #f3f4f6; color: #4b5563;
 }
 .icon.sm { width: 34px; height: 34px; flex-shrink: 0; }
-.icon--indigo { background: #eef2ff; color: #4f46e5; }
+.icon--blue { background: #eff6ff; color: #2563eb; }
 .icon--amber { background: #fffbeb; color: #b45309; }
 .icon--sky { background: #f0f9ff; color: #0284c7; }
 .icon--emerald { background: #ecfdf5; color: #059669; }
@@ -694,7 +753,7 @@ onUnmounted(() => {
 .card-foot.muted { color: #9ca3af; }
 .link-like {
   display: inline-block; margin-top: 0.5rem; padding: 0;
-  background: none; border: none; color: #4f46e5;
+  background: none; border: none; color: #2563eb;
   font-size: 0.78rem; font-weight: 600; cursor: pointer; text-decoration: none;
 }
 .link-like:hover { text-decoration: underline; }
@@ -748,5 +807,162 @@ onUnmounted(() => {
   .dashboard-content { padding: 1.25rem 1rem 2rem; }
   .thead, .trow { grid-template-columns: 1fr 1.6fr 1fr; }
   .thead > :nth-child(n+4), .trow > :nth-child(n+4) { display: none; }
+}
+
+/* Redesign denso — identidade visual azul */
+.dashboard-wrapper {
+  --dash-blue: #2563eb;
+  --dash-blue-dark: #1d4ed8;
+  --dash-blue-soft: #eff6ff;
+  --dash-border: #dbe3ef;
+  --dash-muted: #64748b;
+  background: #f8fafc;
+  font-family: var(--font-sans);
+}
+.dashboard-wrapper button,
+.dashboard-wrapper summary { font-family: var(--font-sans); }
+.dashboard-content { width: 100%; padding: 1.25rem 1.5rem 2rem; }
+.toolbar { align-items: center; margin-bottom: 1rem; }
+.toolbar-title { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.035em; color: #0f172a; }
+.toolbar-desc { margin: 0.2rem 0 0; color: var(--dash-muted); }
+.btn-refresh {
+  height: 36px; border-color: #bfdbfe; border-radius: 8px;
+  color: var(--dash-blue-dark); background: #fff;
+}
+.btn-refresh:hover:not(:disabled) { border-color: var(--dash-blue); background: var(--dash-blue-soft); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08); }
+
+.filters {
+  display: block; padding: 0; margin-bottom: 1rem; overflow: hidden;
+  border: 1px solid var(--dash-border); border-radius: 12px; background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+.filters-primary {
+  display: flex; align-items: center; gap: 1rem; min-width: 0;
+  padding: 0.7rem 0.85rem; overflow-x: auto; scrollbar-width: thin;
+}
+.filter-block { display: flex; align-items: center; flex-wrap: nowrap; gap: 0.55rem; min-width: max-content; }
+.filter-label {
+  min-width: 0; color: #475569; font-size: 0.68rem; font-weight: 800;
+  letter-spacing: 0.055em; white-space: nowrap;
+}
+.filter-label svg { color: var(--dash-blue); }
+.chip-row { flex-wrap: nowrap; gap: 0.3rem; }
+.chip {
+  min-height: 30px; padding: 0.32rem 0.62rem; border-color: #dbe3ef;
+  border-radius: 7px; color: #475569; font-size: 0.75rem; white-space: nowrap;
+}
+.chip:hover { border-color: #93c5fd; background: #f8fbff; color: var(--dash-blue-dark); }
+.chip.is-active { border-color: #93c5fd; background: var(--dash-blue-soft); color: var(--dash-blue-dark); box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.05); }
+.chip__logo { width: 16px; height: 16px; }
+.filters-range {
+  display: inline-flex; align-items: center; gap: 0.4rem; margin-left: auto;
+  padding-left: 0.9rem; border-left: 1px solid #e2e8f0; color: #475569;
+  font-size: 0.72rem; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.filters-range svg { color: var(--dash-blue); }
+.filters-advanced { border-top: 1px solid #e2e8f0; }
+.filters-advanced > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  min-height: 36px; padding: 0 0.85rem; color: #475569; cursor: pointer;
+  font-size: 0.75rem; font-weight: 700; list-style: none; user-select: none;
+}
+.filters-advanced > summary::-webkit-details-marker { display: none; }
+.filters-advanced > summary:hover { background: #f8fbff; color: var(--dash-blue-dark); }
+.advanced-title { display: inline-flex; align-items: center; gap: 0.45rem; }
+.advanced-title > svg { color: var(--dash-blue); }
+.filter-count {
+  display: grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px;
+  border-radius: 999px; background: var(--dash-blue); color: #fff; font-size: 0.65rem;
+}
+.advanced-chevron { transition: transform 180ms ease; }
+.filters-advanced[open] .advanced-chevron { transform: rotate(180deg); }
+.filters-advanced__body {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem 1.25rem;
+  padding: 0.8rem 0.85rem; border-top: 1px solid #eef2f7; background: #fbfdff;
+}
+.filters-advanced__body .filter-block { align-items: flex-start; flex-direction: column; min-width: 0; gap: 0.45rem; }
+.filters-advanced__body .chip-row { flex-wrap: wrap; }
+.filters-foot {
+  grid-column: 1 / -1; padding-top: 0.7rem; border-top-color: #dbe3ef;
+  color: var(--dash-muted); font-size: 0.72rem;
+}
+.chip--clear { color: #b91c1c; }
+.chip--clear:hover { border-color: #fca5a5; color: #b91c1c; background: #fef2f2; }
+
+.grid { gap: 0.8rem; margin-bottom: 0.9rem; }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.card {
+  border-color: var(--dash-border); border-radius: 12px; padding: 1rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.045), 0 8px 24px rgba(15, 23, 42, 0.025);
+}
+.grid-4 > .card { position: relative; min-height: 168px; padding: 1.05rem; }
+.card--featured { border-color: #bfdbfe; background: linear-gradient(145deg, #fff 35%, var(--dash-blue-soft)); }
+.card--featured::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 3px;
+  border-radius: 12px 0 0 12px; background: var(--dash-blue);
+}
+.card-icon { margin-bottom: 0.65rem; }
+.icon { width: 36px; height: 36px; border-radius: 9px; }
+.icon--blue, .icon--sky { color: var(--dash-blue); background: var(--dash-blue-soft); }
+.card-title { color: var(--dash-muted); font-size: 0.74rem; font-weight: 700; letter-spacing: 0.01em; }
+.grid-4 .card-value {
+  margin-top: 0.3rem; color: #0f172a; font-size: clamp(1.65rem, 2.25vw, 2.2rem);
+  font-weight: 800; letter-spacing: -0.04em;
+}
+.grid-4 .card-value--sm { font-size: clamp(1.35rem, 1.8vw, 1.8rem); }
+.unit { font-size: 0.72rem; letter-spacing: 0; color: #94a3b8; }
+.card-foot { color: #64748b; }
+.card-foot.muted { color: #94a3b8; }
+.link-like { color: var(--dash-blue-dark); font-weight: 700; }
+.trend { letter-spacing: 0; }
+
+.card--mini { min-width: 0; min-height: 76px; padding: 0.8rem; gap: 0.7rem; }
+.card--mini .icon { width: 32px; height: 32px; }
+.card--mini .card-value--sm { margin-top: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.025em; }
+.card--mini .card-title.plain { margin-top: 0.12rem; font-size: 0.7rem; line-height: 1.25; }
+.card--derived { border-color: #bfdbfe; background: #fbfdff; }
+
+.chart-card { min-height: 320px; padding: 1rem 1rem 0.65rem; }
+.card-title.plain { margin-bottom: 0.65rem; color: #0f172a; font-size: 0.88rem; font-weight: 800; }
+.chart-card .card-title.plain { display: flex; align-items: center; gap: 0.45rem; }
+.chart-card .card-title.plain::before { content: ''; width: 3px; height: 14px; border-radius: 3px; background: var(--dash-blue); }
+.chart-card :deep(.apexcharts-canvas),
+.chart-card :deep(.apexcharts-text) { font-family: var(--font-sans) !important; }
+
+.table { overflow-x: auto; color: #334155; }
+.thead, .trow { min-width: 720px; }
+.table--top .thead, .table--top .trow { min-width: 560px; }
+.thead { color: #64748b; border-bottom-color: #cbd5e1; }
+.trow { border-bottom-color: #eef2f7; }
+.trow:hover { background: #f8fbff; }
+.strong { color: var(--dash-blue-dark); }
+.mono { color: #334155; }
+
+@media (max-width: 1280px) {
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid-4 > .card { min-height: 150px; }
+}
+@media (max-width: 900px) {
+  .dashboard-content { padding: 1rem; }
+  .filters-primary { align-items: flex-start; flex-wrap: wrap; overflow: visible; }
+  .filters-range { width: 100%; margin-left: 0; padding: 0.45rem 0 0; border-left: 0; border-top: 1px solid #eef2f7; }
+  .filters-advanced__body { grid-template-columns: 1fr; }
+  .grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .toolbar { align-items: flex-start; }
+  .toolbar-text { width: calc(100% - 110px); }
+  .toolbar-title { font-size: 1.5rem; }
+  .toolbar-desc { font-size: 0.78rem; line-height: 1.35; }
+  .filter-block--period, .filters-primary > .filter-block { width: 100%; align-items: flex-start; flex-direction: column; }
+  .filters-primary .chip-row { width: 100%; overflow-x: auto; padding-bottom: 2px; }
+  .grid-4, .grid-5, .grid-2 { grid-template-columns: 1fr; }
+  .grid-4 > .card { min-height: 0; }
+  .chart-card { min-height: 300px; }
+  .thead, .trow { grid-template-columns: 1.1fr 2.4fr 1.4fr 1fr 1fr; }
+  .thead > :nth-child(n+4), .trow > :nth-child(n+4) { display: block; }
 }
 </style>

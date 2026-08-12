@@ -1,7 +1,7 @@
 // routes/sales.js
 const express = require('express');
 const db = require('../utils/postgres');
-const { authenticateToken, requireMaster } = require('../utils/authMiddleware');
+const { authenticateToken, requireMaster, requireOwnerOrMaster } = require('../utils/authMiddleware');
 const fetch = require('node-fetch');
 const { mlFetch } = require('../utils/mlClient');
 
@@ -499,6 +499,27 @@ router.get('/sync-status/:clientId', (req, res) => {
   });
 });
 
+router.get('/user/:uid/stats', authenticateToken, requireOwnerOrMaster, async (req, res) => {
+  const { uid } = req.params;
+  try {
+    const { rows } = await db.query(`
+      SELECT
+        COUNT(*)::int AS total_sales,
+        COUNT(*) FILTER (
+          WHERE LOWER(COALESCE(shipping_status, '')) IN
+            ('custom_06_despachado', 'expedited', 'despachado', 'shipped')
+        )::int AS expedited_count,
+        COUNT(*) FILTER (WHERE processed_at IS NOT NULL)::int AS processed_count
+      FROM public.unified_sales
+      WHERE uid = $1
+    `, [uid]);
+    res.json(rows[0] || { total_sales: 0, expedited_count: 0, processed_count: 0 });
+  } catch (error) {
+    console.error('Erro ao buscar contadores de vendas do usuário:', error);
+    res.status(500).json({ error: 'Erro interno ao buscar contadores de vendas.' });
+  }
+});
+
 router.get('/user/:uid', authenticateToken, requireMaster, async (req, res) => {
   const { uid } = req.params;
   if (!uid) return res.status(400).json({ error: 'O UID do usuário é obrigatório.' });
@@ -519,14 +540,33 @@ router.get('/user/:uid', authenticateToken, requireMaster, async (req, res) => {
 router.get('/my-sales', authenticateToken, async (req, res) => {
   const { uid } = req.user;
   try {
-    const query = `
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const offset = (page - 1) * limit;
+    const countQuery = 'SELECT COUNT(*) AS total FROM public.sales WHERE uid = $1';
+    const dataQuery = `
       SELECT id, sku, uid, seller_id, channel, account_nickname, sale_date,
         product_title, quantity, shipping_mode, shipping_limit_date,
         packages, shipping_status, raw_api_data, updated_at, processed_at
-      FROM public.sales WHERE uid = $1 ORDER BY sale_date DESC;
+      FROM public.sales
+      WHERE uid = $1
+      ORDER BY sale_date DESC
+      LIMIT $2 OFFSET $3;
     `;
-    const { rows } = await db.query(query, [uid]);
-    res.json(rows);
+
+    const [countResult, dataResult] = await Promise.all([
+      db.query(countQuery, [uid]),
+      db.query(dataQuery, [uid, limit, offset]),
+    ]);
+    const total = parseInt(countResult.rows[0]?.total || '0', 10);
+
+    res.json({
+      data: dataResult.rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    });
   } catch (error) {
     res.status(500).json({ error: 'Erro interno ao buscar vendas.' });
   }

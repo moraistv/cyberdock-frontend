@@ -30,14 +30,17 @@ async function safeJson(response) {
 /**
  * @param {import('vue').Ref<string|null>} userId
  * @param {Function|null} onInitialLoad
- * @param {{ withMovements?: boolean }} options
- *   `withMovements: false` pula o histórico completo de movimentações no carregamento
- *   inicial. Telas como o Dashboard não usam essa lista, e ela cresce sem limite —
- *   buscá-la à toa atrasava a primeira renderização. Quem precisa (tela de estoque)
- *   mantém o padrão, e `fetchAllMovements` continua disponível sob demanda.
+ * @param {{ withMovements?: boolean, withPackageTypes?: boolean, withBilling?: boolean, withContracts?: boolean }} options
+ *   Recursos pesados podem ser desativados por tela. O histórico é paginado e
+ *   carregado sob demanda no Armazenamento; o Dashboard não usa tipos de pacote.
  */
 export function useUserStorage(userId, onInitialLoad = null, options = {}) {
-  const { withMovements = true } = options;
+  const {
+    withMovements = true,
+    withPackageTypes = true,
+    withBilling = true,
+    withContracts = true,
+  } = options;
   const { token } = useAuth();
 
   const createNewUserState = () => ({
@@ -48,6 +51,8 @@ export function useUserStorage(userId, onInitialLoad = null, options = {}) {
     billingSummary: { isLoading: true, data: null, error: null },
     allMovements: [],
     isLoadingMovements: false,
+    movementsLoaded: false,
+    movementPagination: { total: 0, page: 1, limit: 25, totalPages: 1 },
     packageTypes: [],
     isLoadingPackageTypes: false,
     packageTypesError: null,
@@ -142,19 +147,31 @@ export function useUserStorage(userId, onInitialLoad = null, options = {}) {
     }
   };
 
-  // Todas as movimentações
-  const fetchAllMovements = async (currentUserId) => {
+  // Movimentações paginadas e carregadas apenas quando a tela solicitar.
+  const fetchAllMovements = async (currentUserId = userId.value, page = 1, limit = 25) => {
     if (!currentUserId) return;
     const state = userStorageCache[currentUserId];
     state.isLoadingMovements = true;
     try {
-      const response = await fetch(`${API_BASE_URL}/storage/user/${currentUserId}/movements`, {
+      const qs = new URLSearchParams({ page: String(page), limit: String(limit) });
+      const response = await fetch(`${API_BASE_URL}/storage/user/${currentUserId}/movements?${qs}`, {
         headers: { 'Authorization': `Bearer ${token.value}` }
       });
       if (!response.ok) throw new Error(await safeErrorMessage(response));
-      state.allMovements = (await safeJson(response)) || [];
+      const payload = (await safeJson(response)) || {};
+      state.allMovements = Array.isArray(payload) ? payload : (payload.data || []);
+      state.movementPagination = Array.isArray(payload)
+        ? { total: payload.length, page: 1, limit: payload.length || limit, totalPages: 1 }
+        : {
+            total: payload.total || 0,
+            page: payload.page || page,
+            limit: payload.limit || limit,
+            totalPages: payload.totalPages || 1,
+          };
+      state.movementsLoaded = true;
     } catch (err) {
       state.allMovements = [];
+      state.movementsLoaded = true;
     } finally {
       state.isLoadingMovements = false;
     }
@@ -287,13 +304,11 @@ export function useUserStorage(userId, onInitialLoad = null, options = {}) {
     state.error = null;
 
     try {
-      const jobs = [
-        fetchSkus(currentUserId),
-        fetchPackageTypes(currentUserId),
-        servicesComposable.fetchClientServices(currentUserId),
-        fetchBillingSummary(currentUserId),
-      ];
-      if (withMovements) jobs.push(fetchAllMovements(currentUserId));
+      const jobs = [fetchSkus(currentUserId)];
+      if (withPackageTypes) jobs.push(fetchPackageTypes(currentUserId));
+      if (withContracts) jobs.push(servicesComposable.fetchClientServices(currentUserId));
+      if (withBilling) jobs.push(fetchBillingSummary(currentUserId));
+      if (withMovements) jobs.push(fetchAllMovements(currentUserId, 1, 25));
       await Promise.all(jobs);
     } catch (e) {
       state.error = e.message || 'Falha ao carregar dados do armazenamento.';
@@ -526,6 +541,8 @@ const removeSku = async (skuId) => {
     billingSummary: computed(() => userState.value?.billingSummary ?? { isLoading: true, data: null, error: null }),
     allMovements: computed(() => userState.value?.allMovements ?? []),
     isLoadingMovements: computed(() => userState.value?.isLoadingMovements ?? false),
+    movementsLoaded: computed(() => userState.value?.movementsLoaded ?? false),
+    movementPagination: computed(() => userState.value?.movementPagination ?? { total: 0, page: 1, limit: 25, totalPages: 1 }),
     packageTypes: computed(() => userState.value?.packageTypes ?? []),
     isLoadingPackageTypes: computed(() => userState.value?.isLoadingPackageTypes ?? false),
     packageTypesError: computed(() => userState.value?.packageTypesError ?? null),

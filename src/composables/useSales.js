@@ -9,9 +9,14 @@ export function useSales() {
   const currentPage = ref(1);
   const totalPages = ref(1);
   const pageSize = ref(50);
-  const api = useApi(); 
+  const api = useApi();
+  let requestId = 0;
+  let activeController = null;
 
   const fetchSales = async (params = {}) => {
+    const myRequest = ++requestId;
+    if (activeController) activeController.abort();
+    activeController = new AbortController();
     isLoading.value = true;
     error.value = null;
     try {
@@ -28,27 +33,32 @@ export function useSales() {
       if (params.shippingLimitStart) queryParams.set('shippingLimitStart', params.shippingLimitStart);
       if (params.shippingLimitEnd) queryParams.set('shippingLimitEnd', params.shippingLimitEnd);
       if (params.shippingMode) queryParams.set('shippingMode', params.shippingMode);
-      // 'ML' | 'Shopee' — vazio traz os dois canais.
       if (params.marketplace) queryParams.set('marketplace', params.marketplace);
 
-      const result = await api.get(`/sales/my-sales?${queryParams.toString()}`);
-      
+      const result = await api.get(`/sales/my-sales?${queryParams.toString()}`, {
+        signal: activeController.signal,
+      });
+      if (myRequest !== requestId) return;
+
       if (result && result.data) {
         sales.value = Array.isArray(result.data) ? result.data : [];
         totalSales.value = result.total || 0;
         currentPage.value = result.page || 1;
         totalPages.value = result.totalPages || 1;
       } else {
-        // Backward compatibility: if backend returns array directly
         sales.value = Array.isArray(result) ? result : [];
         totalSales.value = sales.value.length;
         totalPages.value = 1;
       }
     } catch (err) {
-      console.error("Erro ao buscar vendas:", err);
-      error.value = "Não foi possível carregar a lista de vendas.";
+      if (err?.name === 'AbortError' || myRequest !== requestId) return;
+      console.error('Erro ao buscar vendas:', err);
+      error.value = 'Não foi possível carregar a lista de vendas.';
     } finally {
-      isLoading.value = false;
+      if (myRequest === requestId) {
+        activeController = null;
+        isLoading.value = false;
+      }
     }
   };
 
