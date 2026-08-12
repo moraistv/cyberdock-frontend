@@ -110,17 +110,40 @@
 </template>
 
 <script setup>
+import { onMounted, onUnmounted } from 'vue';
 import AutenticacaoComponent from '../components/AutenticacaoComponent.vue';
 
 const currentYear = new Date().getFullYear();
+
+// /auth ocupa exatamente a viewport. Sem este lock, o documento e o layout
+// interno podiam calcular alturas diferentes e exibir dois scrollbars.
+onMounted(() => {
+    document.documentElement.classList.add('auth-page-open');
+    document.body.classList.add('auth-page-open');
+});
+
+onUnmounted(() => {
+    document.documentElement.classList.remove('auth-page-open');
+    document.body.classList.remove('auth-page-open');
+});
 </script>
 
 <style scoped>
+:global(html.auth-page-open),
+:global(body.auth-page-open) {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
 .auth-page {
     position: relative;
     isolation: isolate;
-    min-height: 100vh;
-    min-height: 100svh;
+    width: 100%;
+    height: 100vh;
+    height: 100svh;
+    min-height: 0;
+    box-sizing: border-box;
     display: grid;
     grid-template-columns: minmax(430px, 0.94fr) minmax(500px, 1.06fr);
     overflow: hidden;
@@ -154,9 +177,11 @@ const currentYear = new Date().getFullYear();
     position: relative;
     display: flex;
     flex-direction: column;
-    min-height: calc(100svh - 32px);
+    height: calc(100svh - 32px);
+    min-height: 0;
     margin: 16px;
     padding: clamp(2rem, 4vw, 4.5rem);
+    box-sizing: border-box;
     overflow: hidden;
     border: 1px solid rgba(148, 163, 184, 0.2);
     border-radius: 28px;
@@ -313,16 +338,23 @@ const currentYear = new Date().getFullYear();
 
 .auth-main {
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    width: 100%;
+    height: 100%;
     min-width: 0;
+    min-height: 0;
     padding: clamp(1.25rem, 4vw, 3.25rem);
+    box-sizing: border-box;
+    overflow: hidden;
 }
 .auth-main__content {
     display: flex;
     align-items: center;
     justify-content: center;
     width: 100%;
+    min-height: 0;
     padding: 2rem 0;
+    box-sizing: border-box;
 }
 .mobile-brand { display: none; }
 .auth-footer {
@@ -348,13 +380,14 @@ const currentYear = new Date().getFullYear();
 @media (max-width: 820px) {
     .auth-page {
         display: block;
-        overflow: auto;
+        overflow: hidden;
         background: #fff;
     }
     .auth-story { display: none; }
     .auth-main {
-        min-height: 100vh;
-        min-height: 100svh;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
         padding: 1.25rem clamp(1.25rem, 5vw, 2.25rem);
         background:
             radial-gradient(circle at 100% 0%, rgba(219,234,254,0.7), transparent 35%),
@@ -387,6 +420,14 @@ const currentYear = new Date().getFullYear();
     .auth-main { padding: 1rem 1.1rem; }
     .auth-main__content { align-items: flex-start; padding: 2rem 0 1.5rem; }
     .auth-footer { padding-top: 1rem; border-top: 1px solid #eef1f5; }
+}
+
+@media (max-height: 720px) and (max-width: 820px) {
+    .auth-main { padding-block: 0.75rem; }
+    .mobile-brand > img { height: 25px; }
+    .mobile-marketplaces img { width: 26px; height: 26px; padding: 5px; }
+    .auth-main__content { align-items: center; padding: 0.65rem 0; }
+    .auth-footer { display: none; }
 }
 
 @media (max-height: 720px) and (min-width: 821px) {

@@ -427,11 +427,28 @@ const leave = (el, done) => {
 }
 @media (max-width: 480px) {
     .auth-container { padding: 0; border-radius: 0; }
-    .mode-tabs { margin-bottom: 1.9rem; }
-    .form-header { margin-bottom: 1.65rem; }
-    .form-title { font-size: 2rem; }
-    .input-field { height: 52px; font-size: 16px; }
-    .submit-button { min-height: 52px; }
+    .mode-tabs { margin-bottom: 1.35rem; }
+    .form-header { margin-bottom: 1.25rem; }
+    .form-title { font-size: 1.85rem; }
+    .input-group { margin-bottom: 0.85rem; }
+    .input-field { height: 50px; font-size: 16px; }
+    .submit-button { min-height: 50px; }
+    .form-assurance { margin-top: 0.8rem; }
+    .toggle-text { margin-top: 1rem; }
+}
+@media (max-height: 720px) and (max-width: 820px) {
+    .mode-tabs { min-height: 38px; margin-bottom: 0.85rem; }
+    .mode-tab { min-height: 36px; padding-block: 0.35rem; }
+    .form-header { margin-bottom: 0.9rem; }
+    .form-eyebrow { margin-bottom: 0.35rem; }
+    .form-title { margin-bottom: 0.35rem; font-size: 1.65rem; }
+    .form-subtitle { font-size: 0.8rem; }
+    .input-group { margin-bottom: 0.62rem; }
+    .label { margin-bottom: 0.28rem; }
+    .input-field { height: 44px; }
+    .submit-button { min-height: 44px; margin-top: 0.2rem; }
+    .form-assurance { display: none; }
+    .toggle-text { margin-top: 0.7rem; }
 }
 @media (prefers-reduced-motion: reduce) {
     .auth-container * { transition: none !important; animation-duration: 0.01ms !important; }
