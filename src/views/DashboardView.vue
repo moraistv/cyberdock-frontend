@@ -881,7 +881,14 @@ onUnmounted(() => {
 }
 .dashboard-wrapper button,
 .dashboard-wrapper summary { font-family: var(--font-sans); }
-.dashboard-content { width: 100%; padding: 1.25rem 1.5rem 2rem; }
+/* border-box é obrigatório aqui: o reset global do projeto zera margin/padding
+   mas não troca o box model. Com content-box, `width: 100%` somava os 3rem de
+   padding lateral e empurrava a página 48px além da viewport, criando scroll
+   horizontal. max-width/margin alinham o Dashboard às outras telas. */
+.dashboard-content {
+  width: 100%; max-width: 1640px; margin: 0 auto;
+  padding: 1.25rem 1.5rem 2rem; box-sizing: border-box;
+}
 .toolbar { align-items: center; margin-bottom: 1rem; }
 .toolbar-title { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.035em; color: #0f172a; }
 .toolbar-desc { margin: 0.2rem 0 0; color: var(--dash-muted); }
@@ -951,7 +958,7 @@ onUnmounted(() => {
 
 .grid { gap: 0.8rem; margin-bottom: 0.9rem; }
 .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .card {
   border-color: var(--dash-border); border-radius: 12px; padding: 1rem;
@@ -1002,7 +1009,6 @@ onUnmounted(() => {
 
 @media (max-width: 1280px) {
   .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .grid-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .grid-4 > .card { min-height: 150px; }
 }
 @media (max-width: 900px) {
@@ -1010,7 +1016,7 @@ onUnmounted(() => {
   .filters-primary { align-items: flex-start; flex-wrap: wrap; overflow: visible; }
   .filters-range { width: 100%; margin-left: 0; padding: 0.45rem 0 0; border-left: 0; border-top: 1px solid #eef2f7; }
   .filters-advanced__body { grid-template-columns: 1fr; }
-  .grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 680px) {
   .toolbar { align-items: flex-start; }
@@ -1019,7 +1025,7 @@ onUnmounted(() => {
   .toolbar-desc { font-size: 0.78rem; line-height: 1.35; }
   .filter-block--period, .filters-primary > .filter-block { width: 100%; align-items: flex-start; flex-direction: column; }
   .filters-primary .chip-row { width: 100%; overflow-x: auto; padding-bottom: 2px; }
-  .grid-4, .grid-5, .grid-2 { grid-template-columns: 1fr; }
+  .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
   .grid-4 > .card { min-height: 0; }
   .chart-card { min-height: 300px; }
   .thead, .trow { grid-template-columns: 1.1fr 2.4fr 1.4fr 1fr 1fr; }
