@@ -71,7 +71,7 @@ onMounted(async () => {
   padding: 2rem;
   text-align: center;
   background-color: #f3f4f6;
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   color: #0f172a;
 }
 .callback__logo {

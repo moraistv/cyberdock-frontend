@@ -276,9 +276,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-.dashboard-wrapper { display: flex; min-height: 100vh; font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+.dashboard-wrapper { display: flex; min-height: 100vh; font-family: var(--font-sans); background-color: #f3f4f6; }
 .dashboard-wrapper.is-modal-view { min-height: auto; background-color: #fff; }
 .main-content { flex: 1; display: flex; flex-direction: column; }
 .dashboard-content { flex: 1; padding: 2rem; }

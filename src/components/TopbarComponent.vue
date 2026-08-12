@@ -191,8 +191,6 @@ const leave = (el, done) => { gsap.to(el, { opacity: 0, y: -6, scale: 0.98, dura
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600&display=swap');
-
 .topbar{
   --border:#e5e7eb;
   --muted:#6b7280;
@@ -207,7 +205,7 @@ const leave = (el, done) => { gsap.to(el, { opacity: 0, y: -6, scale: 0.98, dura
   padding: 0 .875rem;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: var(--font-sans);
 }
 .breadcrumbs{
   display: flex; align-items: center; min-width: 0; overflow: hidden;

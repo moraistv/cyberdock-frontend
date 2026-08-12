@@ -3,34 +3,42 @@
         <Toast />
         <div v-if="loggedInUser" class="logged-in-view">
             <span class="logged-in-view__icon" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
             </span>
-            <h2 class="title">Bem-vindo(a)!</h2>
-            <p class="subtitle">Você está logado como:</p>
+            <span class="form-eyebrow">Sessão ativa</span>
+            <h2 class="form-title">Tudo certo por aqui.</h2>
+            <p class="form-subtitle">Você já está conectado como</p>
             <p class="user-email">{{ loggedInUser.email }}</p>
             <button @click="logout" class="logout-button">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
-                Sair
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+                Sair desta conta
             </button>
         </div>
 
         <div v-else class="form-container">
-            <div class="form-header">
-                <h2 class="form-title">{{ isLoginView ? 'Entrar' : 'Criar conta' }}</h2>
-                <p class="form-subtitle">{{ isLoginView ? 'Acesse o painel da sua operação.' : 'Leva menos de um minuto.' }}</p>
+            <div class="mode-tabs" role="tablist" aria-label="Acesso à CyberDock">
+                <button type="button" role="tab" class="mode-tab" :class="{ 'is-active': isLoginView }"
+                    :aria-selected="isLoginView" @click="setMode(true)">Entrar</button>
+                <button type="button" role="tab" class="mode-tab" :class="{ 'is-active': !isLoginView }"
+                    :aria-selected="!isLoginView" @click="setMode(false)">Criar conta</button>
             </div>
 
-            <form @submit.prevent="handleSubmit" novalidate>
+            <div class="form-header">
+                <span class="form-eyebrow">{{ isLoginView ? 'Bem-vindo de volta' : 'Comece agora' }}</span>
+                <h2 class="form-title">{{ isLoginView ? 'Acesse sua operação.' : 'Crie seu acesso.' }}</h2>
+                <p class="form-subtitle">
+                    {{ isLoginView ? 'Entre com o e-mail usado no seu cadastro.' : 'Preencha seus dados para configurar a CyberDock.' }}
+                </p>
+            </div>
+
+            <form @submit.prevent="handleSubmit" :aria-busy="isLoading">
                 <transition @before-enter="beforeEnter" @enter="enter" @leave="leave">
                     <div v-if="!isLoginView" class="input-group" key="name">
-                        <label for="name" class="label">Nome</label>
+                        <label for="name" class="label">Nome completo</label>
                         <div class="input-wrap">
-                            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                            <input
-                                v-model="formData.name" id="name" type="text" required
-                                autocomplete="name" placeholder="Seu nome completo"
-                                class="input-field"
-                            >
+                            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                            <input v-model.trim="formData.name" id="name" type="text" required autocomplete="name"
+                                placeholder="Como devemos chamar você?" class="input-field">
                         </div>
                     </div>
                 </transition>
@@ -38,52 +46,49 @@
                 <div class="input-group">
                     <label for="email" class="label">E-mail</label>
                     <div class="input-wrap">
-                        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
-                        <input
-                            v-model="formData.email" id="email" type="email" required
-                            autocomplete="email" placeholder="voce@empresa.com"
-                            class="input-field"
-                        >
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+                        <input v-model.trim="formData.email" id="email" type="email" required autocomplete="email"
+                            autocapitalize="none" spellcheck="false" inputmode="email"
+                            placeholder="nome@empresa.com" class="input-field">
                     </div>
                 </div>
 
                 <div class="input-group">
-                    <div class="label-row">
-                        <label for="password" class="label">Senha</label>
-                    </div>
+                    <label for="password" class="label">Senha</label>
                     <div class="input-wrap">
-                        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                        <input
-                            v-model="formData.password" id="password" :type="showPassword ? 'text' : 'password'" required
-                            :autocomplete="isLoginView ? 'current-password' : 'new-password'"
-                            placeholder="••••••••"
-                            class="input-field input-field--with-action"
-                        >
-                        <button
-                            type="button" class="input-action" @click="showPassword = !showPassword"
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                        <input v-model="formData.password" id="password" :type="showPassword ? 'text' : 'password'"
+                            required :minlength="isLoginView ? undefined : 6" :autocomplete="isLoginView ? 'current-password' : 'new-password'"
+                            placeholder="Digite sua senha" class="input-field input-field--with-action">
+                        <button type="button" class="input-action" @click="showPassword = !showPassword"
                             :aria-label="showPassword ? 'Ocultar senha' : 'Mostrar senha'"
-                            :title="showPassword ? 'Ocultar senha' : 'Mostrar senha'"
-                        >
-                            <svg v-if="!showPassword" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                            <svg v-else xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 4.22-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                            :title="showPassword ? 'Ocultar senha' : 'Mostrar senha'">
+                            <svg v-if="!showPassword" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" /><circle cx="12" cy="12" r="2.5" /></svg>
+                            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 18 18" /><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" /><path d="M9.4 5.2A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a16.3 16.3 0 0 1-2.1 3.1" /><path d="M6.6 6.6C3.6 8.3 2 12 2 12s3.5 7 10 7c1 0 2-.2 2.8-.5" /></svg>
                         </button>
                     </div>
+                    <p v-if="!isLoginView" class="field-hint">Use pelo menos 6 caracteres.</p>
                 </div>
 
                 <button type="submit" class="submit-button" :disabled="isLoading">
                     <span v-if="isLoading" class="loader" aria-hidden="true"></span>
                     <span v-else class="submit-button__label">
-                        {{ isLoginView ? 'Entrar' : 'Cadastrar' }}
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
+                        {{ isLoginView ? 'Entrar na CyberDock' : 'Criar minha conta' }}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
                     </span>
                 </button>
             </form>
 
+            <div class="form-assurance">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" /><path d="m9 12 2 2 4-4" /></svg>
+                <span>Seus dados são protegidos e usados somente para operar a plataforma.</span>
+            </div>
+
             <p class="toggle-text">
-                {{ isLoginView ? 'Não tem uma conta?' : 'Já tem uma conta?' }}
-                <a @click.prevent="toggleMode" href="#" class="toggle-link">
-                    {{ isLoginView ? 'Cadastre-se' : 'Faça login' }}
-                </a>
+                {{ isLoginView ? 'Ainda não usa a CyberDock?' : 'Já possui uma conta?' }}
+                <button type="button" @click="toggleMode" class="toggle-link">
+                    {{ isLoginView ? 'Crie seu acesso' : 'Entre agora' }}
+                </button>
             </p>
         </div>
     </div>
@@ -124,10 +129,13 @@ const clearForms = () => {
     formData.password = '';
 };
 
-const toggleMode = () => {
-    isLoginView.value = !isLoginView.value;
+const setMode = (loginMode) => {
+    if (isLoginView.value === loginMode) return;
+    isLoginView.value = loginMode;
     showPassword.value = false;
 };
+
+const toggleMode = () => setMode(!isLoginView.value);
 
 const handleSubmit = async () => {
     isLoading.value = true;
@@ -169,223 +177,263 @@ const leave = (el, done) => {
 </script>
 
 <style scoped>
+/* O componente vive dentro do layout editorial de AuthComponent; por isso
+   não precisa parecer um cartão flutuante pesado. */
 .auth-container {
-    background-color: #ffffff;
-    padding: 2.75rem;
-    border-radius: 1.25rem;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 20px 45px -20px rgba(15, 23, 42, 0.18), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-    position: relative;
-    overflow: hidden;
-    max-width: 420px;
-    width: 100%;
+    width: min(100%, 460px);
+    max-width: 460px;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
     box-sizing: border-box;
 }
 
-/* ===== Estado logado ===== */
-.logged-in-view {
-    text-align: center;
-    color: #374151;
+.mode-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    width: 100%;
+    margin-bottom: clamp(2rem, 6vh, 3.25rem);
+    padding: 4px;
+    border: 1px solid #e7ebf1;
+    border-radius: 14px;
+    background: #f4f6f9;
 }
+.mode-tab {
+    min-height: 40px;
+    padding: 0.55rem 0.8rem;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: #748196;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 650;
+    cursor: pointer;
+    transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.mode-tab.is-active {
+    background: #fff;
+    color: #172033;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.09), 0 4px 12px rgba(15, 23, 42, 0.04);
+}
+.mode-tab:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.18); outline-offset: 1px; }
+
+.form-header { margin-bottom: 2rem; }
+.form-eyebrow {
+    display: block;
+    margin-bottom: 0.65rem;
+    color: #2563eb;
+    font-size: 0.72rem;
+    font-weight: 750;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+.form-title {
+    margin: 0 0 0.65rem;
+    color: #111827;
+    font-size: clamp(2rem, 4vw, 2.55rem);
+    font-weight: 650;
+    line-height: 1.08;
+    letter-spacing: -0.045em;
+}
+.form-subtitle {
+    max-width: 380px;
+    margin: 0;
+    color: #657186;
+    font-size: 0.94rem;
+    line-height: 1.55;
+}
+
+.input-group { margin-bottom: 1.15rem; }
+.label {
+    display: block;
+    margin: 0 0 0.45rem;
+    color: #344054;
+    font-size: 0.8rem;
+    font-weight: 650;
+    text-align: left;
+}
+.input-wrap { position: relative; display: flex; align-items: center; }
+.input-icon {
+    position: absolute;
+    left: 1rem;
+    width: 18px;
+    height: 18px;
+    color: #98a2b3;
+    pointer-events: none;
+    transition: color 160ms ease;
+}
+.input-field {
+    width: 100%;
+    height: 54px;
+    padding: 0 1rem 0 3rem;
+    border: 1px solid #dce2ea;
+    border-radius: 13px;
+    box-sizing: border-box;
+    background: #fbfcfd;
+    color: #172033;
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 450;
+    outline: none;
+    transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+.input-field--with-action { padding-right: 3.25rem; }
+.input-field::placeholder { color: #a4adba; opacity: 1; }
+.input-wrap:focus-within .input-icon { color: #2563eb; }
+.input-field:focus {
+    border-color: #4b83e8;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.11);
+}
+.input-field:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px #fff inset;
+    -webkit-text-fill-color: #172033;
+}
+.input-action {
+    position: absolute;
+    right: 0.72rem;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #8a96a8;
+    cursor: pointer;
+    transition: color 150ms ease, background 150ms ease;
+}
+.input-action svg { width: 18px; height: 18px; }
+.input-action:hover { color: #344054; background: #eef3fa; }
+.input-action:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.18); }
+.field-hint { margin: 0.42rem 0 0; color: #8a96a8; font-size: 0.72rem; }
+
+.submit-button {
+    width: 100%;
+    min-height: 54px;
+    margin-top: 0.55rem;
+    padding: 0.8rem 1.15rem;
+    border: 0;
+    border-radius: 13px;
+    background: #1d64d8;
+    color: #fff;
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 680;
+    cursor: pointer;
+    box-shadow: 0 9px 22px rgba(29, 100, 216, 0.2);
+    transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.submit-button__label { display: inline-flex; align-items: center; justify-content: center; gap: 0.55rem; }
+.submit-button__label svg { width: 17px; height: 17px; transition: transform 160ms ease; }
+.submit-button:hover:not(:disabled) {
+    background: #1859c3;
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(29, 100, 216, 0.25);
+}
+.submit-button:hover:not(:disabled) .submit-button__label svg { transform: translateX(2px); }
+.submit-button:focus-visible { outline: 4px solid rgba(37, 99, 235, 0.18); outline-offset: 2px; }
+.submit-button:disabled { background: #9ab8e8; cursor: wait; box-shadow: none; }
+
+.form-assurance {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-top: 1.15rem;
+    color: #8490a2;
+    font-size: 0.7rem;
+    line-height: 1.45;
+}
+.form-assurance svg { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 1px; color: #4b83e8; }
+.toggle-text { margin: 1.65rem 0 0; color: #6d788a; font-size: 0.82rem; text-align: center; }
+.toggle-link {
+    margin: 0 0 0 0.2rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #1d64d8;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+.toggle-link:hover { color: #164ba6; text-decoration: underline; text-underline-offset: 3px; }
+.toggle-link:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.18); border-radius: 3px; }
+
+.logged-in-view { text-align: center; color: #344054; }
 .logged-in-view__icon {
     display: grid;
     place-items: center;
-    width: 52px;
-    height: 52px;
-    margin: 0 auto 1.1rem;
-    border-radius: 50%;
-    background: #ecfdf5;
-    color: #059669;
+    width: 54px;
+    height: 54px;
+    margin: 0 auto 1.2rem;
+    border-radius: 16px;
+    background: #ecfdf3;
+    color: #168352;
 }
-.title {
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: #111827;
-    margin-bottom: 0.6rem;
-}
-.subtitle {
-    color: #6b7280;
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
-}
+.logged-in-view__icon svg { width: 25px; height: 25px; }
+.logged-in-view .form-eyebrow { text-align: center; }
+.logged-in-view .form-title { font-size: 2rem; }
+.logged-in-view .form-subtitle { margin-inline: auto; }
 .user-email {
-    font-weight: 600;
-    color: #4f46e5;
-    word-break: break-all;
-    background-color: #f0f0f8;
-    padding: 0.6rem 1rem;
-    border-radius: 0.6rem;
-    font-size: 0.9rem;
+    margin: 1rem 0 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid #e5eaf1;
+    border-radius: 12px;
+    background: #f8fafc;
+    color: #344054;
+    font-size: 0.86rem;
+    font-weight: 650;
+    word-break: break-word;
 }
 .logout-button {
-    margin-top: 2rem;
-    width: 100%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    background-color: #ef4444;
-    color: #ffffff;
-    padding: 0.75rem 0;
-    border-radius: 0.6rem;
-    border: none;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.2s ease-in-out;
-}
-.logout-button:hover {
-    background-color: #dc2626;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.2);
-}
-
-/* ===== Formulário ===== */
-.form-container {
-    position: relative;
-}
-.form-header { margin-bottom: 1.9rem; }
-.form-title {
-    font-size: 1.7rem;
-    font-weight: 800;
-    color: #0f172a;
-    letter-spacing: -0.01em;
-    margin: 0 0 0.35rem;
-}
-.form-subtitle {
-    color: #6b7280;
-    margin: 0;
-    font-size: 0.9rem;
-}
-
-.input-group { margin-bottom: 1.15rem; }
-.label-row { display: flex; align-items: baseline; justify-content: space-between; }
-.label {
-    display: block;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 0.4rem;
-    text-align: left;
-}
-
-/* Campo com ícone à esquerda (e ação opcional à direita, ex: mostrar senha) */
-.input-wrap {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-.input-icon {
-    position: absolute;
-    left: 0.85rem;
-    color: #9ca3af;
-    pointer-events: none;
-    flex-shrink: 0;
-}
-.input-field {
     width: 100%;
-    padding: 0.7rem 0.9rem 0.7rem 2.55rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.6rem;
-    box-sizing: border-box;
-    background-color: #f9fafb;
-    color: #1f2937;
-    font-size: 0.925rem;
-    transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
-}
-.input-field--with-action { padding-right: 2.6rem; }
-.input-field::placeholder { color: #9ca3af; }
-.input-field:focus {
-    outline: none;
-    border-color: #6366f1;
-    background-color: #fff;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-}
-.input-field:focus ~ .input-icon,
-.input-wrap:focus-within .input-icon { color: #6366f1; }
-
-.input-action {
-    position: absolute;
-    right: 0.6rem;
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: transparent;
-    color: #9ca3af;
-    border-radius: 0.4rem;
+    min-height: 50px;
+    margin-top: 1.25rem;
+    border: 1px solid #e5eaf1;
+    border-radius: 12px;
+    background: #fff;
+    color: #344054;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 650;
     cursor: pointer;
-    transition: color 0.15s, background-color 0.15s;
 }
-.input-action:hover { color: #4b5563; background-color: #eef2ff; }
-.input-action:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
-
-.submit-button {
-    margin-top: 0.5rem;
-    width: 100%;
-    background-color: #4f46e5;
-    color: #ffffff;
-    padding: 0.85rem 0;
-    border-radius: 0.6rem;
-    border: none;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.975rem;
-    transition: all 0.2s ease-in-out;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-}
-.submit-button__label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-}
-.submit-button:disabled {
-    background-color: #a5b4fc;
-    cursor: not-allowed;
-}
-.submit-button:hover:not(:disabled) {
-    background-color: #4338ca;
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px -4px rgba(79, 70, 229, 0.4);
-}
-.submit-button:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
-}
+.logout-button svg { width: 16px; height: 16px; }
+.logout-button:hover { background: #f8fafc; color: #b42318; transform: none; box-shadow: none; }
 
 .loader {
-    border: 2px solid rgba(255, 255, 255, 0.4);
-    border-top: 2px solid #ffffff;
-    border-radius: 50%;
     width: 18px;
     height: 18px;
-    animation: spin 0.8s linear infinite;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+@media (max-width: 820px) {
+    .auth-container { width: min(100%, 460px); }
+    .mode-tabs { margin-bottom: 2.25rem; }
 }
-
-.toggle-text {
-    text-align: center;
-    font-size: 0.875rem;
-    color: #4b5563;
-    margin-top: 1.6rem;
-}
-.toggle-link {
-    font-weight: 600;
-    color: #4f46e5;
-    text-decoration: none;
-    cursor: pointer;
-    transition: color 0.2s;
-}
-.toggle-link:hover { color: #4338ca; }
-
 @media (max-width: 480px) {
-    .auth-container { padding: 2rem 1.5rem; border-radius: 1rem; }
+    .auth-container { padding: 0; border-radius: 0; }
+    .mode-tabs { margin-bottom: 1.9rem; }
+    .form-header { margin-bottom: 1.65rem; }
+    .form-title { font-size: 2rem; }
+    .input-field { height: 52px; font-size: 16px; }
+    .submit-button { min-height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .auth-container * { transition: none !important; animation-duration: 0.01ms !important; }
 }
 </style>

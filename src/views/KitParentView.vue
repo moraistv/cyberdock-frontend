@@ -423,12 +423,10 @@ const showToast = (message, type = 'info') => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 .dashboard-wrapper { 
     display: flex; 
     min-height: 100vh; 
-    font-family: 'Inter', sans-serif; 
+    font-family: var(--font-sans);
     background-color: #f3f4f6; 
 }
 

@@ -707,7 +707,7 @@ onMounted(() => {
   display: flex;
   min-height: 100vh;
   background: #f3f4f6;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-sans);
 }
 .main-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .dashboard-content { padding: 1.5rem 2rem; flex: 1; }
@@ -869,7 +869,7 @@ onMounted(() => {
 .id-copy:hover { background: #f1f5f9; border-color: var(--color-border); color: var(--color-text); }
 .id-copy svg { flex-shrink: 0; opacity: 0.7; }
 .id-copy__ok {
-  font-family: 'Inter', sans-serif; font-weight: 700; color: #16a34a; font-size: 0.65rem;
+  font-family: var(--font-sans); font-weight: 700; color: #16a34a; font-size: 0.65rem;
   text-transform: uppercase; letter-spacing: 0.03em;
 }
 

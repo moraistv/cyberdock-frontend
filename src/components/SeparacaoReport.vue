@@ -171,7 +171,7 @@ function variacao(item) {
 <style scoped>
 .sep-report {
   display: none;
-  font-family: 'Inter', Arial, sans-serif;
+  font-family: var(--font-sans);
   color: #1f2937;
   background: #fff;
 }

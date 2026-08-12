@@ -739,7 +739,7 @@ watch(() => syncState.value.isSyncing, (isSyncing, wasSyncing) => {
 .users-wrapper {
   display: flex;
   height: 100vh;
-  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-family: var(--font-sans);
   background-color: #f7f8fa;
 }
 

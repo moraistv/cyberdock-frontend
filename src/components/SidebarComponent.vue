@@ -293,7 +293,7 @@ watch(() => route.fullPath, (newPath) => {
 
 <style scoped>
 .sidebar {
-  --font-family-sans: 'Inter', sans-serif;
+  --font-family-sans: var(--font-sans);
   --color-bg: #ffffff;
   --color-border: #e5e7eb;
   --color-text-primary: #1f2937;

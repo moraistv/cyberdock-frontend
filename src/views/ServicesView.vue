@@ -98,7 +98,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.services-view-wrapper { padding: 1rem; font-family: 'Inter', sans-serif; }
+.services-view-wrapper { padding: 1rem; font-family: var(--font-sans); }
 .table-container { background-color: #ffffff; border-radius: 0.75rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); overflow-x: auto; }
 .table-header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; border-bottom: 1px solid #e5e7eb; }
 .table-title { font-size: 1.25rem; font-weight: 600; color: #111827; margin: 0; }

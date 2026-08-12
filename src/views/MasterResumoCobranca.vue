@@ -362,8 +362,7 @@ watch(() => props.userId, (newId) => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-.dashboard-wrapper { display: flex; min-height: 100vh; font-family: 'Inter', sans-serif; }
+.dashboard-wrapper { display: flex; min-height: 100vh; font-family: var(--font-sans); }
 .main-content { flex: 1; display: flex; flex-direction: column; }
 .dashboard-content { flex: 1; }
 .error-state { padding: 2rem; text-align: center; font-size: 1rem; color: #b91c1c; background-color: #fee2e2; border-radius: 0.5rem; }

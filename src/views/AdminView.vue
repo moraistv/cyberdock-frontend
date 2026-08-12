@@ -309,14 +309,12 @@ const handleGlobalSync = async () => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 .admin-wrapper {
   display: flex;
   min-height: 100vh;
   margin: 0;
   padding: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-sans);
   background-color: #f3f4f6;
 }
 
@@ -455,7 +453,7 @@ const handleGlobalSync = async () => {
 
 <style scoped>
 /* ===== Modal de sincronização global (mesmo padrão profissional) ===== */
-.sync-results-content { display: flex; flex-direction: column; gap: 20px; font-family: 'Inter', system-ui, sans-serif; }
+.sync-results-content { display: flex; flex-direction: column; gap: 20px; font-family: var(--font-sans); }
 
 .sync-message {
     padding: 12px 16px; border-radius: 10px; font-size: 14px; line-height: 1.5;

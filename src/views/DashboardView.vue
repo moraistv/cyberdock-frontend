@@ -480,7 +480,7 @@ function dayLabel(iso) {
 }
 
 const BASE_CHART = {
-  chart: { toolbar: { show: false }, fontFamily: 'Inter, system-ui, sans-serif' },
+  chart: { toolbar: { show: false }, fontFamily: 'Google Sans Flex, Google Sans, system-ui, sans-serif' },
   tooltip: { theme: 'light' },
   dataLabels: { enabled: false },
   grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
@@ -586,7 +586,7 @@ onUnmounted(() => {
   display: flex;
   min-height: 100vh;
   background-color: #f3f4f6;
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   color: #0f172a;
 }
 .main-content { flex: 1; display: flex; flex-direction: column; min-width: 0; }

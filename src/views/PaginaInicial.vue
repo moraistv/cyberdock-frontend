@@ -46,7 +46,7 @@ onMounted(() => {
   justify-content: center;
   gap: 1rem;
   background-color: #f3f4f6;
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
 }
 .splash__logo {
   height: 52px;

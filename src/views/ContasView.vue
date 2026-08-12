@@ -710,7 +710,7 @@ onUnmounted(() => {
   --danger: #ef4444;
   display: flex;
   min-height: 100vh;
-  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
+  font-family: var(--font-sans);
   background-color: var(--bg);
   color: var(--text);
 }

@@ -91,7 +91,7 @@ function fmtDuration(ms) {
 </script>
 
 <style scoped>
-.live-content { display: flex; flex-direction: column; gap: 18px; font-family: 'Inter', system-ui, sans-serif; }
+.live-content { display: flex; flex-direction: column; gap: 18px; font-family: var(--font-sans); }
 
 .live-overall-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .live-overall-label { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #334155; }

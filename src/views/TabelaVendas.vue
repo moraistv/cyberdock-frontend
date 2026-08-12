@@ -1700,7 +1700,7 @@ function hideTooltip() {
 .dashboard-wrapper {
     display: flex;
     min-height: 100vh;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-sans);
     background-color: #f3f4f6;
 }
 
@@ -3024,7 +3024,7 @@ function hideTooltip() {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: var(--font-sans);
 }
 
 .sync-message {
