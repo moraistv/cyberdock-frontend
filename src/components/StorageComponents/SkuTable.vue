@@ -174,6 +174,14 @@
                     <path d="M18 4v2"/>
                   </svg>
                 </button>
+                <button
+                  v-if="activeKits.length > 0"
+                  @click="$emit('connect-to-kit', child)"
+                  class="icon kit-connect"
+                  title="Gerenciar vínculos deste SKU com kits"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.5l-5 -3l5 -3l5 3v5.5l-5 3z"/><path d="M2 13.5v5.5l5 3"/><path d="M7 16.545l5 -3.03"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/></svg>
+                </button>
                 <button @click="$emit('edit-sku', child)" class="icon" title="Editar SKU">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1"/><path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z"/><path d="M16 5l3 3"/></svg>
                 </button>
@@ -184,7 +192,7 @@
             <tr v-if="item.type === 'orphan'" class="orphan-sku-row">
               <td data-label="Hierarquia" class="hierarchy-col">
                 <div class="orphan-sku-item">
-                  <span class="hierarchy-icon">📄</span>
+                  <span class="hierarchy-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/><path d="M12 12L4 7.5"/></svg></span>
                   <span class="sku orphan-code">{{ item.sku }}</span>
                 </div>
               </td>
@@ -215,10 +223,10 @@
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9l-8 4.5-8-4.5v-9L12 3"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/><path d="M12 12L4 7.5"/><path d="M16 5.25L8 9.75"/></svg>
                 </button>
                 <button 
-                  v-if="activeKits.length > 0 && !isSkuComponent(item)" 
+                  v-if="activeKits.length > 0"
                   @click="$emit('connect-to-kit', item)" 
                   class="icon kit-connect" 
-                  title="Conectar a Kit"
+                  title="Gerenciar vínculos deste SKU com kits"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.5l-5 -3l5 -3l5 3v5.5l-5 3z"/><path d="M2 13.5v5.5l5 3"/><path d="M7 16.545l5 -3.03"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/></svg>
                 </button>
@@ -247,7 +255,7 @@
       </div>
 
       <div v-if="!isLoading && !error && filteredSkus.length === 0" class="empty">
-        <div class="emoji" aria-hidden="true">📦</div>
+        <div class="emoji" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
         <p>Nenhum SKU encontrado.</p>
         <button v-if="!query && !pkgFilter" class="btn primary" @click="$emit('add-sku')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -271,7 +279,7 @@ export default defineComponent({
     error: { type: String, default: null },
     calcularVolumePorSku: { type: Function, required: true },
   },
-  emits: ['add-sku', 'edit-sku', 'delete-sku', 'adjust-stock', 'open-history', 'open-package-manager', 'open-kit-manager', 'connect-to-kit'],
+  emits: ['add-sku', 'edit-sku', 'delete-sku', 'adjust-stock', 'adjust-component-stock', 'open-history', 'open-package-manager', 'open-kit-manager', 'connect-to-kit'],
   setup(props) {
     const query = ref('')
     const pkgFilter = ref('')
@@ -304,7 +312,7 @@ export default defineComponent({
       }
       if (sku.used_in_kits && sku.used_in_kits.length > 0) {
         const kitNames = sku.used_in_kits.map(k => k.kit_sku_code).join(', ')
-        return `Este SKU é componente do(s) kit(s): ${kitNames}. O estoque é controlado através do kit.`
+        return `Ajustar o estoque físico compartilhado. Kits afetados: ${kitNames}.`
       }
       return 'Ajustar estoque'
     }
@@ -320,9 +328,7 @@ export default defineComponent({
     }
     
     const canAdjustStock = (sku) => {
-      if (sku.is_kit) return false
-      if (isSkuComponent(sku)) return false
-      return true
+      return !sku.is_kit
     }
     
     // Função para alternar a expansão de um kit
@@ -522,25 +528,25 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; color: #0f172a; }
   outline: none;
   min-width: 240px;
 }
-.search input:focus { border-color: #4f46e5; background: #ffffff; }
+.search input:focus { border-color: #2563eb; background: #ffffff; }
 
 .select { padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f8fafc; color: #0f172a; }
 
 .stock-filter-group { display: flex; gap: 0.25rem; background-color: #f8fafc; padding: 0.25rem; border-radius: 10px; border: 1px solid #e5e7eb; }
 .filter-btn { border: none; background: none; padding: 0.375rem 0.75rem; font-size: 0.813rem; font-weight: 500; color: #64748b; border-radius: 0.375rem; cursor: pointer; transition: all 0.2s ease; }
 .filter-btn:hover { color: #0f172a; }
-.filter-btn.active { background-color: #ffffff; color: #4f46e5; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+.filter-btn.active { background-color: #ffffff; color: #2563eb; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
 
 .actions { margin-left: auto; display: flex; gap: 8px; }
 .btn { display: inline-flex; align-items: center; gap: 8px; border: none; cursor: pointer; border-radius: 10px; padding: 10px 14px; font-weight: 600; transition: transform .02s ease-in; }
 .btn:active { transform: translateY(1px); }
-.btn.primary { background: #4f46e5; color: #ffffff; }
-.btn.primary:hover { background: #4338ca; }
+.btn.primary { background: #2563eb; color: #ffffff; }
+.btn.primary:hover { background: #1d4ed8; }
 .btn.ghost { background: #f8fafc; color: #0f172a; border: 1px solid #e5e7eb; }
 .btn.ghost:hover { filter: brightness(0.98); }
-.btn.ghost.kit-manager { background: #faf5ff; color: #7c3aed; border: 1px solid #e9d5ff; }
-.btn.ghost.kit-manager:hover { background: #f3e8ff; color: #6d28d9; filter: none; }
-.btn.ghost.kit-manager svg { color: #7c3aed; }
+.btn.ghost.kit-manager { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.btn.ghost.kit-manager:hover { background: #dbeafe; color: #1d4ed8; filter: none; }
+.btn.ghost.kit-manager svg { color: #2563eb; }
 
 .table-container { overflow: auto; max-width: 100%; }
 .sku-table th, .sku-table td { padding: 14px 16px; }
@@ -553,10 +559,10 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; color: #0f172a; }
 .ellipsis { max-width: 380px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .muted { color: #94a3b8; font-style: italic; }
 .sku { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; border: 1px dashed #e5e7eb; padding: 2px 8px; border-radius: 999px; background: #ffffff; color: #0f172a; }
-.qty { background: transparent; color: #4f46e5; border: 1px solid #c7d2fe; border-radius: 999px; padding: 2px 10px; font-weight: 700; cursor: pointer; }
-.qty:hover { background: #eef2ff; }
-.qty.kit-qty { color: #7c3aed; border-color: #ddd6fe; }
-.qty.kit-qty:hover { background: #f5f3ff; }
+.qty { background: transparent; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 999px; padding: 2px 10px; font-weight: 700; cursor: pointer; }
+.qty:hover { background: #eff6ff; }
+.qty.kit-qty { color: #0369a1; border-color: #bae6fd; }
+.qty.kit-qty:hover { background: #f0f9ff; }
 
 .no-components {
   color: #6b7280;
@@ -584,8 +590,8 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; color: #0f172a; }
 .icon { background: transparent; border: none; padding: 6px; border-radius: 10px; cursor: pointer; color: #64748b; }
 .icon:hover { background: #f8fafc; color: #0f172a; }
 .icon.danger { color: #ef4444; }
-.icon.kit-connect { color: #7c3aed; border: 1px solid #a78bfa; }
-.icon.kit-connect:hover { background: #f3f4f6; border-color: #8b5cf6; color: #6d28d9; }
+.icon.kit-connect { color: #2563eb; border: 1px solid #93c5fd; }
+.icon.kit-connect:hover { background: #eff6ff; border-color: #60a5fa; color: #1d4ed8; }
 .icon.component-stock { color: #059669; border: 1px solid #6ee7b7; }
 .icon.component-stock:hover { background: #f0fdf4; border-color: #34d399; color: #047857; }
 .icon:disabled { opacity: .5; cursor: not-allowed; }
@@ -642,9 +648,9 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
   font-style: italic;
 }
 
-.kit-parent-row { background: #faf5ff !important; border-left: 4px solid #7c3aed; }
-.kit-parent-row:hover { background: #f3e8ff !important; }
-.kit-parent-code { font-weight: 700; color: #6b21a8; background: #e9d5ff; border-color: #c4b5fd; }
+.kit-parent-row { background: #eff6ff !important; border-left: 4px solid #2563eb; }
+.kit-parent-row:hover { background: #dbeafe !important; }
+.kit-parent-code { font-weight: 700; color: #1e40af; background: #dbeafe; border-color: #93c5fd; }
 .kit-status { padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
 .kit-status.active { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
 .kit-status.inactive { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }

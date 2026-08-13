@@ -142,6 +142,7 @@
       :is-open="isConnectToKitModalOpen"
       :sku="skuToConnect"
       :available-kits="activeKits"
+      :existing-connections="skuKitConnections"
       :is-connecting="isConnecting"
       @close="closeConnectToKitModal"
       @connect="handleConnectToKit"
@@ -237,7 +238,7 @@ export default defineComponent({
     })
 
     const { sales } = useSalesForUser(reactiveUserId)
-    const { activeKits } = useKitManagement(reactiveUserId)
+    const { activeKits, loadActiveKits } = useKitManagement(reactiveUserId)
     const { activeKitParents, loadActiveKitParents } = useKitParent(reactiveUserId)
 
     const toast = (message, type = 'info', duration = 3200) => {
@@ -312,7 +313,7 @@ export default defineComponent({
       isSkuModalOpen.value = true
       
       // Carregar conexões de kit para este SKU
-      getSkuKitConnections(sku.sku).then(connections => {
+      getSkuKitConnections(sku.id).then(connections => {
         skuKitConnections.value = connections
       })
     }
@@ -517,14 +518,22 @@ export default defineComponent({
     }
 
     // Connect to Kit Methods
-    const openConnectToKitModal = (sku) => {
-      skuToConnect.value = sku
+    const openConnectToKitModal = async (sku) => {
+      if (!sku?.id) {
+        toast('SKU inválido para conexão.', 'error')
+        return
+      }
+      await loadActiveKits()
+      skuKitConnections.value = await getSkuKitConnections(sku.id)
+      skuToConnect.value = { ...sku }
+      await nextTick()
       isConnectToKitModalOpen.value = true
     }
     
     const closeConnectToKitModal = () => {
       isConnectToKitModalOpen.value = false
       skuToConnect.value = null
+      skuKitConnections.value = []
     }
     
     const handleConnectToKit = async (payload) => {
@@ -560,13 +569,11 @@ export default defineComponent({
       }
     }
     
-    const handleDisconnectFromKit = async (kitId) => {
+    const handleDisconnectFromKit = async ({ skuId, kitId }) => {
       try {
-        await disconnectSkuFromKit(currentSku.value.sku, kitId)
+        await disconnectSkuFromKit(skuId, kitId)
         toast('SKU desconectado do kit com sucesso.', 'success')
-        
-        // Atualizar as conexões
-        skuKitConnections.value = await getSkuKitConnections(currentSku.value.sku)
+        skuKitConnections.value = await getSkuKitConnections(skuId)
       } catch (err) {
         toast(`Erro ao desconectar SKU do kit: ${err.message}`, 'error', 4200)
       }
@@ -634,13 +641,14 @@ export default defineComponent({
       isPackageTypeManagerModalOpen, isPackageTypeSelectModalOpen, isKitManagementModalOpen, isConnectToKitModalOpen, isComponentStockModalOpen,
       isStorageModalOpen, skuFormModalRef, viewWrapperEl,
       isEditing, currentSku, skuToDelete, skuToAdjust, skuForHistory, stockMovements, isLoadingHistory, componentToAdjust,
+      skuToConnect, skuKitConnections, isConnecting,
       calcularVolumePorSku,
       openAddModal, openEditModal, closeSkuModal, handleSaveSku,
       openDeleteModal, closeDeleteModal, handleConfirmDelete,
       openAdjustStockModal, closeAdjustStockModal, handleConfirmAdjustment,
       openComponentStockModal, closeComponentStockModal, handleConfirmComponentAdjustment,
       openHistoryModal, closeHistoryModal,
-      selectPackageType, handleSavePackageType, handleDeletePackageType, openPackageTypeManagerModal,
+      selectPackageType, openPackageTypeSelect, handleSavePackageType, handleDeletePackageType, openPackageTypeManagerModal,
       openKitManagementModal, closeKitManagementModal, handleKitCreated, handleKitUpdated, handleKitDeleted,
       openConnectToKitModal, closeConnectToKitModal, handleConnectToKit, handleDisconnectFromKit,
       handleDeleteMovement,

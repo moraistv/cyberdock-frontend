@@ -33,9 +33,19 @@
     <!-- Cards de resumo -->
     <div class="rep-cards">
       <div class="rep-card">
-        <span class="rep-card__label">Total de Itens</span>
+        <span class="rep-card__label">Pacotes</span>
+        <span class="rep-card__value">{{ summary.totalPacotes }}</span>
+        <span class="rep-card__hint">a montar</span>
+      </div>
+      <div class="rep-card">
+        <span class="rep-card__label">Itens</span>
         <span class="rep-card__value">{{ summary.totalItens }}</span>
-        <span class="rep-card__hint">a separar</span>
+        <span class="rep-card__hint">linhas de SKU</span>
+      </div>
+      <div class="rep-card">
+        <span class="rep-card__label">Unidades</span>
+        <span class="rep-card__value">{{ summary.totalUnidades }}</span>
+        <span class="rep-card__hint">total físico</span>
       </div>
       <div class="rep-card">
         <span class="rep-card__label">Atrasados</span>
@@ -87,42 +97,50 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(item, idx) in rows" :key="`${item.id}-${item.sku}-${item.uid}`">
-          <td>{{ idx + 1 }}</td>
-          <!-- Quantidade destacada (realce quando for mais de 1 unidade) -->
-          <td>
-            <span class="rep-qty" :class="{ 'rep-qty--multi': Number(item.quantity) > 1 }">{{ item.quantity }}</span>
-          </td>
-          <!-- Produto: descrição + SKU + variação juntos -->
-          <td>
-            <div class="rep-prod-desc">{{ descricaoProduto(item) }}</div>
-            <div class="rep-prod-meta">
-              <span class="rep-chip rep-chip--sku">{{ item.sku || '—' }}</span>
-              <span v-if="variacao(item)" class="rep-chip rep-chip--var">{{ variacao(item) }}</span>
-            </div>
-          </td>
-          <td>
-            <div class="rep-strong">{{ item.account_nickname || '—' }}</div>
-            <div class="rep-sub">{{ item.user_nickname || '—' }}</div>
-          </td>
-          <td>
-            <div class="rep-strong">{{ customerName(item) }}</div>
-            <div class="rep-sub">{{ item.buyer_nickname || '—' }}</div>
-          </td>
-          <td>
-            <span class="rep-mode-badge" :style="{ borderColor: modeMeta(item.shipping_mode).color, color: modeMeta(item.shipping_mode).color }">
-              {{ modeMeta(item.shipping_mode).label }}
-            </span>
-          </td>
-          <!-- Prazo + ID da venda -->
-          <td>
-            <div class="rep-strong">
-              {{ formatDate(prazoDate(item)) }}
-              <span class="rep-rel">{{ relativeDay(prazoDate(item)) }}</span>
-            </div>
-            <div class="rep-sub rep-mono">{{ item.id }}</div>
-          </td>
-        </tr>
+        <template v-for="(group, groupIndex) in groupedRows" :key="group._groupKey">
+          <tr class="rep-package-row">
+            <td colspan="7">
+              <strong>Pacote {{ groupIndex + 1 }}</strong>
+              <span>{{ packageLabel(group) }}</span>
+              <span>{{ group._items.length }} {{ group._items.length === 1 ? 'item' : 'itens' }}</span>
+              <span>{{ group._totalQty }} {{ group._totalQty === 1 ? 'unidade' : 'unidades' }}</span>
+            </td>
+          </tr>
+          <tr v-for="(item, itemIndex) in group._items" :key="`${group._groupKey}-${item.id}-${item.sku}-${itemIndex}`" class="rep-item-row">
+            <td>{{ itemIndex + 1 }}</td>
+            <td>
+              <span class="rep-qty" :class="{ 'rep-qty--multi': Number(item.quantity) > 1 }">{{ item.quantity }}</span>
+            </td>
+            <td>
+              <div class="rep-prod-desc">{{ descricaoProduto(item) }}</div>
+              <div class="rep-prod-meta">
+                <span class="rep-chip rep-chip--sku">{{ item.sku || '—' }}</span>
+                <span v-if="variacao(item)" class="rep-chip rep-chip--var">{{ variacao(item) }}</span>
+                <span class="rep-chip rep-chip--status">{{ statusLabel(item) }}</span>
+              </div>
+            </td>
+            <td v-if="itemIndex === 0" :rowspan="group._items.length" class="rep-common">
+              <div class="rep-strong">{{ group.account_nickname || '—' }}</div>
+              <div class="rep-sub">{{ group.user_nickname || '—' }}</div>
+            </td>
+            <td v-if="itemIndex === 0" :rowspan="group._items.length" class="rep-common">
+              <div class="rep-strong">{{ customerName(group) }}</div>
+              <div class="rep-sub">{{ group.buyer_nickname || '—' }}</div>
+            </td>
+            <td v-if="itemIndex === 0" :rowspan="group._items.length" class="rep-common">
+              <span class="rep-mode-badge" :style="{ borderColor: modeMeta(group.shipping_mode).color, color: modeMeta(group.shipping_mode).color }">
+                {{ modeMeta(group.shipping_mode).label }}
+              </span>
+            </td>
+            <td v-if="itemIndex === 0" :rowspan="group._items.length" class="rep-common">
+              <div class="rep-strong">
+                {{ formatDate(prazoDate(group)) }}
+                <span class="rep-rel">{{ relativeDay(prazoDate(group)) }}</span>
+              </div>
+              <div v-for="orderId in group._orderIds" :key="orderId" class="rep-sub rep-mono">{{ orderId }}</div>
+            </td>
+          </tr>
+        </template>
         <tr v-if="rows.length === 0">
           <td colspan="7" class="rep-empty">Nenhum item encontrado para os filtros selecionados.</td>
         </tr>
@@ -132,17 +150,17 @@
     <!-- Rodapé único no fim do documento -->
     <div class="rep-footer">
       <span>Cyberdock — Armazenamento e Logística</span>
-      <span>Total de Itens: {{ rows.length }}</span>
+      <span>Pacotes: {{ groupedRows.length }} · Itens: {{ rows.length }} · Unidades: {{ totalUnits }}</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { defineProps } from 'vue';
+import { computed, defineProps } from 'vue';
 import logo from '@/assets/logo.png';
 import { formatVariation } from '@/utils/variation';
 
-defineProps({
+const props = defineProps({
   rows: { type: Array, default: () => [] },
   summary: { type: Object, default: () => ({}) },
   filters: { type: Object, default: () => ({}) },
@@ -157,6 +175,38 @@ defineProps({
 const emissionDate = new Date().toLocaleString('pt-BR', {
   day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
 });
+
+const groupedRows = computed(() => {
+  const groups = new Map();
+  for (const item of props.rows) {
+    const key = item.package_key
+      || (item.shipping_id ? `ML:${item.uid}:ship:${item.shipping_id}` : `${item.marketplace || 'ML'}:${item.uid}:order:${item.id}`);
+    if (!groups.has(key)) groups.set(key, { ...item, _groupKey: key, _items: [], _orderIds: [] });
+    const group = groups.get(key);
+    group._items.push(item);
+    if (!group._orderIds.includes(String(item.id))) group._orderIds.push(String(item.id));
+  }
+  return Array.from(groups.values()).map(group => ({
+    ...group,
+    _totalQty: group._items.reduce((total, item) => total + (Number(item.quantity) || 0), 0),
+  }));
+});
+
+const totalUnits = computed(() => props.rows.reduce(
+  (total, item) => total + (Number(item.quantity) || 0),
+  0
+));
+
+function packageLabel(group) {
+  return group.shipping_id ? `Envio ${group.shipping_id}` : `Pedido ${group.id}`;
+}
+
+function statusLabel(item) {
+  const status = String(item.shipping_status_live || item.shipping_status || '').toLowerCase();
+  if (['shipped', 'delivered', 'completed', 'expedited'].includes(status)) return 'Despachado';
+  if (['cancelled', 'canceled'].includes(status)) return 'Cancelado';
+  return status ? status.replaceAll('_', ' ') : 'A despachar';
+}
 
 function prazoDate(item) {
   return item.sla_expected_date || item.shipping_limit_date || null;
@@ -186,7 +236,7 @@ function variacao(item) {
 .rep-filters { display: flex; flex-wrap: wrap; gap: 6px 20px; padding: 8px 12px; background: #f1f5f9; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 10px; color: #334155; margin-top: 10px; }
 .rep-filter__label { color: #64748b; font-weight: 600; }
 
-.rep-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 14px 0; }
+.rep-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 8px; margin: 14px 0; }
 .rep-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; background: #f8fafc; }
 .rep-card__label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.03em; }
 .rep-card__value { font-size: 24px; font-weight: 800; line-height: 1.25; color: #0f172a; }
@@ -204,7 +254,10 @@ function variacao(item) {
   font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.02em; color: #fff; font-weight: 700;
 }
 .rep-table td { padding: 6px 7px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
-.rep-table tbody tr:nth-child(even) { background: #f8fafc; }
+.rep-package-row td { padding: 5px 7px; background: #dbeafe !important; color: #1e3a8a; border-top: 1px solid #93c5fd; border-bottom: 1px solid #93c5fd; text-align: left !important; }
+.rep-package-row td span { margin-left: 12px; color: #475569; font-size: 8.5px; }
+.rep-common { background: #fbfdff; border-left: 1px solid #e2e8f0; }
+.rep-item-row { page-break-inside: avoid; }
 /* Centraliza # , Qtd. e Envio */
 .rep-table th:nth-child(1), .rep-table td:nth-child(1),
 .rep-table th:nth-child(2), .rep-table td:nth-child(2),
@@ -222,14 +275,15 @@ function variacao(item) {
   display: inline-block; min-width: 18px; padding: 1px 4px; border-radius: 4px;
   background: #f1f5f9; border: 1px solid #e2e8f0; color: #334155; font-weight: 700; font-size: 9px;
 }
-.rep-qty--multi { background: #eef2ff; border-color: #c7d2fe; color: #4338ca; }
+.rep-qty--multi { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
 
 /* Produto: descrição + chips de SKU e variação */
 .rep-prod-desc { font-weight: 600; color: #1f2937; line-height: 1.3; }
 .rep-prod-meta { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
 .rep-chip { display: inline-block; padding: 0 4px; border-radius: 3px; font-size: 8px; font-weight: 600; line-height: 1.6; }
 .rep-chip--sku { font-family: Consolas, monospace; background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }
-.rep-chip--var { background: #eef2ff; border: 1px solid #e0e7ff; color: #4338ca; }
+.rep-chip--var { background: #eff6ff; border: 1px solid #dbeafe; color: #1d4ed8; }
+.rep-chip--status { background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; text-transform: capitalize; }
 
 .rep-footer {
   display: flex; justify-content: space-between; font-size: 9px; color: #6b7280;

@@ -1,12 +1,12 @@
 <template>
   <UniversalModal
-    :title="`Conectar ${sku?.sku || 'SKU'} a Kits`"
+    :title="`Gerenciar kits do SKU ${sku?.sku || ''}`"
     :is-open="isOpen"
     size="lg"
     @close="$emit('close')"
   >
     <div v-if="!sku || !sku.id" class="error-state">
-      <div class="error-icon">⚠️</div>
+      <div class="error-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
       <p>Erro: SKU inválido ou não carregado.</p>
       <p class="error-details">Por favor, feche e tente novamente.</p>
     </div>
@@ -73,6 +73,7 @@
                   <div class="kit-info">
                     <span class="kit-icon"><svg  xmlns="http://www.w3.org/2000/svg"  width="24"  height="24"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-packages"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 16.5l-5 -3l5 -3l5 3v5.5l-5 3z" /><path d="M2 13.5v5.5l5 3" /><path d="M7 16.545l5 -3.03" /><path d="M17 16.5l-5 -3l5 -3l5 3v5.5l-5 3z" /><path d="M12 19l5 3" /><path d="M17 16.5l5 -3" /><path d="M12 13.5v-5.5l-5 -3l5 -3l5 3v5.5" /><path d="M7 5.03v5.455" /><path d="M12 8l5 -3" /></svg></span>
                     <span class="kit-sku">{{ kit.sku }}</span>
+                    <span v-if="isExistingConnection(kit.id)" class="existing-badge">Vínculo atual</span>
                   </div>
                 </td>
                 <td class="description-cell" data-label="Descrição">
@@ -102,9 +103,12 @@
       </div>
 
       <!-- Resumo das conexões -->
-      <div v-if="selectedKitIds.length > 0" class="connections-summary">
-        <h4>📋 Resumo das Conexões</h4>
-        <div class="summary-list">
+      <div class="connections-summary">
+        <h4>Resumo dos vínculos</h4>
+        <p v-if="selectedKitIds.length === 0" class="empty-selection">
+          Este SKU será removido de todos os kits. O estoque físico será preservado.
+        </p>
+        <div v-else class="summary-list">
           <div v-for="kitId in selectedKitIds" :key="kitId" class="summary-item">
             <span class="summary-kit">{{ getKitName(kitId) }}</span>
             <span class="summary-qty">{{ getQuantityForKit(kitId) }}x por kit</span>
@@ -123,10 +127,10 @@
           @click="handleConnect" 
           type="button" 
           class="btn btn-primary" 
-          :disabled="!sku || !sku.id || selectedKitIds.length === 0 || isConnecting"
+          :disabled="!sku || !sku.id || isConnecting"
         >
           <SpinnerIcon v-if="isConnecting" />
-          Conectar a{{ selectedKitIds.length > 1 ? 'os' : '' }} {{ selectedKitIds.length }} Kit(s)
+          Salvar vínculos
         </button>
       </div>
     </template>
@@ -149,6 +153,7 @@ export default defineComponent({
     isOpen: { type: Boolean, required: true },
     sku: { type: Object, default: null },
     availableKits: { type: Array, default: () => [] },
+    existingConnections: { type: Array, default: () => [] },
     isConnecting: { type: Boolean, default: false }
   },
   emits: ['close', 'connect', 'create-kit'],
@@ -165,9 +170,13 @@ export default defineComponent({
     }
 
     const getKitName = (kitId) => {
-      const kit = props.availableKits.find(k => k.id === kitId)
+      const kit = props.availableKits.find(k => String(k.id) === String(kitId))
       return kit ? `${kit.sku}` : 'Kit não encontrado'
     }
+
+    const isExistingConnection = (kitId) => props.existingConnections.some(
+      connection => String(connection.kit_id) === String(kitId)
+    )
 
     const toggleSelectAll = (event) => {
       if (event.target.checked) {
@@ -192,11 +201,6 @@ export default defineComponent({
         return;
       }
       
-      if (selectedKitIds.value.length === 0) {
-        console.warn('handleConnect: Nenhum kit selecionado.');
-        return;
-      }
-      
       const connections = selectedKitIds.value.map(kitId => ({
         kit_id: kitId,
         quantity_per_kit: getQuantityForKit(kitId)
@@ -210,14 +214,27 @@ export default defineComponent({
       emit('connect', payload);
     }
 
-    // Reset do estado local quando o modal abre ou fecha
-    watch(() => props.isOpen, (isOpen) => {
-      if (isOpen) {
-        // Quando abrir, limpa seleções anteriores.
-        selectedKitIds.value = []
-        kitQuantities.value = {}
+    const initializeConnections = () => {
+      const availableById = new Map(props.availableKits.map(kit => [String(kit.id), kit.id]))
+      selectedKitIds.value = []
+      kitQuantities.value = {}
+      for (const connection of props.existingConnections) {
+        const kitId = availableById.get(String(connection.kit_id))
+        if (kitId === undefined) continue
+        selectedKitIds.value.push(kitId)
+        kitQuantities.value[kitId] = Math.max(1, Number(connection.quantity_per_kit) || 1)
       }
-    })
+    }
+
+    // Pré-marca os kits atuais; o usuário pode adicionar, alterar a quantidade
+    // ou desmarcar somente o vínculo que deseja remover.
+    watch(
+      [() => props.isOpen, () => props.existingConnections, () => props.availableKits],
+      ([isOpen]) => {
+        if (isOpen) initializeConnections()
+      },
+      { deep: true }
+    )
 
     return {
       selectedKitIds,
@@ -225,6 +242,7 @@ export default defineComponent({
       getQuantityForKit,
       setQuantityForKit,
       getKitName,
+      isExistingConnection,
       toggleSelectAll,
       handleConnect
     }
@@ -394,6 +412,7 @@ export default defineComponent({
 .kit-info { display: flex; align-items: center; gap: 0.5rem; }
 .kit-icon { font-size: 1.1rem; }
 .kit-sku { font-family: ui-monospace, 'Courier New', monospace; font-weight: 600; color: #111827; }
+.existing-badge { padding: 0.1rem 0.35rem; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-size: 0.65rem; font-weight: 700; white-space: nowrap; }
 .kit-description { color: #6b7280; line-height: 1.4; }
 
 .components-count {
@@ -451,6 +470,7 @@ export default defineComponent({
   font-size: 1rem;
   font-weight: 600;
 }
+.empty-selection { margin: 0; color: #b45309; font-size: 0.85rem; }
 .summary-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .summary-item {
   display: flex;
@@ -486,8 +506,8 @@ export default defineComponent({
   min-height: 42px;
 }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-primary { background: #6366f1; color: white; }
-.btn-primary:hover:not(:disabled) { background: #4f46e5; }
+.btn-primary { background: #2563eb; color: white; }
+.btn-primary:hover:not(:disabled) { background: #1d4ed8; }
 .btn-secondary { background: white; color: #374151; border: 1px solid #d1d5db; }
 .btn-secondary:hover:not(:disabled) { background: #f9fafb; }
 

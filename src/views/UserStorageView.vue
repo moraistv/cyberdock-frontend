@@ -120,6 +120,7 @@
       :is-open="isConnectToKitModalOpen"
       :sku="skuToConnect"
       :available-kits="activeKits"
+      :existing-connections="skuKitConnections"
       :is-connecting="isConnecting"
       @close="closeConnectToKitModal"
       @connect="handleConnectToKit"
@@ -280,13 +281,10 @@ export default defineComponent({
       }
       
       await loadActiveKits();
-      skuToConnect.value = { ...sku };
-      
-      await nextTick();
-      
-      isConnectToKitModalOpen.value = true;
-      
       await loadSkuKitConnections(sku.id);
+      skuToConnect.value = { ...sku };
+      await nextTick();
+      isConnectToKitModalOpen.value = true;
     }
 
 

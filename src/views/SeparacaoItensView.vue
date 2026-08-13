@@ -138,13 +138,35 @@
         <!-- Cards de resumo -->
         <div class="summary-cards">
           <div class="s-card">
-            <div class="s-card__icon s-card__icon--indigo">
-              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
+            <div class="s-card__icon s-card__icon--blue">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
             </div>
             <div class="s-card__body">
-              <span class="s-card__label">Total de Itens</span>
+              <span class="s-card__label">Pacotes</span>
+              <span class="s-card__value">{{ summary.totalPacotes }}</span>
+              <span class="s-card__hint">a montar</span>
+            </div>
+          </div>
+
+          <div class="s-card">
+            <div class="s-card__icon s-card__icon--green">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            </div>
+            <div class="s-card__body">
+              <span class="s-card__label">Itens</span>
               <span class="s-card__value">{{ summary.totalItens }}</span>
-              <span class="s-card__hint">a separar</span>
+              <span class="s-card__hint">linhas de SKU</span>
+            </div>
+          </div>
+
+          <div class="s-card">
+            <div class="s-card__icon s-card__icon--orange">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+            </div>
+            <div class="s-card__body">
+              <span class="s-card__label">Unidades</span>
+              <span class="s-card__value">{{ summary.totalUnidades }}</span>
+              <span class="s-card__hint">total físico</span>
             </div>
           </div>
 
@@ -201,7 +223,7 @@
         <!-- Tabela -->
         <div class="table-card">
           <div class="table-toolbar">
-            <span class="table-count">{{ total }} itens encontrados</span>
+            <span class="table-count">{{ total }} pacotes · {{ summary.totalItens }} itens · {{ summary.totalUnidades }} unidades</span>
             <div class="sort-control">
               <label>Ordenar por</label>
               <select v-model="filters.sort" @change="aplicarFiltros">
@@ -230,73 +252,90 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in items" :key="`${item.id}-${item.sku}-${item.uid}`">
-                  <!-- Qtd em destaque: é o número que o separador precisa ver primeiro -->
-                  <td class="col-qtd">
-                    <span class="qty-badge" :class="{ 'qty-badge--multi': Number(item.quantity) > 1 }">
-                      {{ item.quantity }}
-                    </span>
-                  </td>
-
-                  <!-- Produto: descrição + SKU + variação juntos (antes eram 3 colunas) -->
-                  <td class="col-produto">
-                    <div class="prod">
-                      <span class="desc-origin" :class="temDescricaoInterna(item) ? 'desc-origin--cd' : 'desc-origin--ml'" :title="descricaoTitle(item)">
-                        <svg v-if="temDescricaoInterna(item)" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                          <line x1="12" y1="22.08" x2="12" y2="12" />
-                        </svg>
-                        <img v-else :src="marketplaceLogo(item)" :alt="marketplaceLabel(item)" class="desc-origin__img" />
+                <template v-for="(group, groupIndex) in groupedItems" :key="group._groupKey">
+                  <tr class="package-row">
+                    <td colspan="6">
+                      <div class="package-row__content">
+                        <span class="package-number">Pacote {{ (page - 1) * limit + groupIndex + 1 }}</span>
+                        <span class="package-id">{{ packageLabel(group) }}</span>
+                        <span>{{ group._items.length }} {{ group._items.length === 1 ? 'item' : 'itens' }}</span>
+                        <span>{{ group._totalQty }} {{ group._totalQty === 1 ? 'unidade' : 'unidades' }}</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr
+                    v-for="(item, itemIndex) in group._items"
+                    :key="`${group._groupKey}-${item.id}-${item.sku}-${itemIndex}`"
+                    class="package-item-row"
+                  >
+                    <td class="col-qtd">
+                      <span class="qty-badge" :class="{ 'qty-badge--multi': Number(item.quantity) > 1 }">
+                        {{ item.quantity }}
                       </span>
-                      <div class="prod__body">
-                        <div class="prod__desc" :title="descricaoProduto(item)">{{ descricaoProduto(item) }}</div>
-                        <div class="prod__meta">
-                          <img :src="marketplaceLogo(item)" :alt="marketplaceLabel(item)"
-                               :title="marketplaceLabel(item)" class="prod__mk-logo" />
-                          <span class="chip chip--sku" :title="`SKU: ${item.sku || '—'}`">{{ item.sku || '—' }}</span>
-                          <span v-if="variacao(item)" class="chip chip--var" :title="variacao(item)">{{ variacao(item) }}</span>
+                    </td>
+
+                    <td class="col-produto">
+                      <div class="prod">
+                        <span class="desc-origin" :class="temDescricaoInterna(item) ? 'desc-origin--cd' : 'desc-origin--ml'" :title="descricaoTitle(item)">
+                          <svg v-if="temDescricaoInterna(item)" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                            <line x1="12" y1="22.08" x2="12" y2="12" />
+                          </svg>
+                          <img v-else :src="marketplaceLogo(item)" :alt="marketplaceLabel(item)" class="desc-origin__img" />
+                        </span>
+                        <div class="prod__body">
+                          <div class="prod__desc" :title="descricaoProduto(item)">{{ descricaoProduto(item) }}</div>
+                          <div class="prod__meta">
+                            <img :src="marketplaceLogo(item)" :alt="marketplaceLabel(item)" :title="marketplaceLabel(item)" class="prod__mk-logo" />
+                            <span class="chip chip--sku" :title="`SKU: ${item.sku || '—'}`">{{ item.sku || '—' }}</span>
+                            <span v-if="variacao(item)" class="chip chip--var" :title="variacao(item)">{{ variacao(item) }}</span>
+                            <span class="chip chip--status" :class="statusClass(item)">{{ statusLabel(item) }}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  <!-- Conta / Cliente -->
-                  <td class="col-conta">
-                    <div class="cell-strong">{{ item.account_nickname || '—' }}</div>
-                    <div class="cell-sub">{{ item.user_nickname || '—' }}</div>
-                  </td>
+                    <td v-if="itemIndex === 0" class="col-conta package-common" :rowspan="group._items.length">
+                      <div class="cell-strong">{{ group.account_nickname || '—' }}</div>
+                      <div class="cell-sub">{{ group.user_nickname || '—' }}</div>
+                    </td>
 
-                  <!-- Comprador -->
-                  <td class="col-comprador">
-                    <div class="cell-strong">{{ customerName(item) }}</div>
-                    <div class="cell-sub">{{ item.buyer_nickname || '—' }}</div>
-                  </td>
+                    <td v-if="itemIndex === 0" class="col-comprador package-common" :rowspan="group._items.length">
+                      <div class="cell-strong">{{ customerName(group) }}</div>
+                      <div class="cell-sub">{{ group.buyer_nickname || '—' }}</div>
+                    </td>
 
-                  <!-- Modalidade de envio -->
-                  <td class="col-envio">
-                    <span class="mode-badge" :style="{ background: modeMeta(item.shipping_mode).bg, color: modeMeta(item.shipping_mode).color }">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="modeMeta(item.shipping_mode).icon"></svg>
-                      {{ modeMeta(item.shipping_mode).label }}
-                    </span>
-                  </td>
+                    <td v-if="itemIndex === 0" class="col-envio package-common" :rowspan="group._items.length">
+                      <span class="mode-badge" :style="{ background: modeMeta(group.shipping_mode).bg, color: modeMeta(group.shipping_mode).color }">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="modeMeta(group.shipping_mode).icon"></svg>
+                        {{ modeMeta(group.shipping_mode).label }}
+                      </span>
+                    </td>
 
-                  <!-- Prazo + ID da venda (com copiar, sem cortar) -->
-                  <td class="col-prazo">
-                    <div class="prazo" :class="{ 'prazo--late': isLate(prazoDate(item)) }">
-                      {{ formatDate(prazoDate(item)) }}
-                      <span class="prazo-rel-inline">{{ relativeDay(prazoDate(item)) }}</span>
-                    </div>
-                    <button type="button" class="id-copy" :title="`Copiar ID da venda: ${item.id}`" @click="copiarId(item.id)">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                      </svg>
-                      <span>{{ item.id }}</span>
-                      <span v-if="idCopiado === String(item.id)" class="id-copy__ok">copiado</span>
-                    </button>
-                  </td>
-                </tr>
+                    <td v-if="itemIndex === 0" class="col-prazo package-common" :rowspan="group._items.length">
+                      <div class="prazo" :class="{ 'prazo--late': isLate(prazoDate(group)) }">
+                        {{ formatDate(prazoDate(group)) }}
+                        <span class="prazo-rel-inline">{{ relativeDay(prazoDate(group)) }}</span>
+                      </div>
+                      <button
+                        v-for="orderId in group._orderIds"
+                        :key="orderId"
+                        type="button"
+                        class="id-copy"
+                        :title="`Copiar ID da venda: ${orderId}`"
+                        @click="copiarId(orderId)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                        <span>{{ orderId }}</span>
+                        <span v-if="idCopiado === String(orderId)" class="id-copy__ok">copiado</span>
+                      </button>
+                    </td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>
@@ -304,7 +343,7 @@
           <!-- Paginação -->
           <div v-if="!isLoading && items.length > 0" class="pagination">
             <div class="per-page">
-              <label>Itens por página:</label>
+              <label>Pacotes por página:</label>
               <select v-model.number="limit" @change="onLimitChange">
                 <option :value="20">20</option>
                 <option :value="50">50</option>
@@ -379,6 +418,7 @@ const page = ref(1);
 const limit = ref(20);
 const totalPages = ref(1);
 const summary = reactive({
+  totalPacotes: 0,
   totalItens: 0,
   totalUnidades: 0,
   atrasados: 0,
@@ -386,6 +426,43 @@ const summary = reactive({
   usuariosAtivos: 0,
   porModalidade: {},
 });
+
+const groupedItems = computed(() => {
+  const groups = new Map();
+  for (const item of items.value) {
+    const key = item.package_key
+      || (item.shipping_id ? `ML:${item.uid}:ship:${item.shipping_id}` : `${item.marketplace || 'ML'}:${item.uid}:order:${item.id}`);
+    if (!groups.has(key)) {
+      groups.set(key, { ...item, _groupKey: key, _items: [], _orderIds: [] });
+    }
+    const group = groups.get(key);
+    group._items.push(item);
+    if (!group._orderIds.includes(String(item.id))) group._orderIds.push(String(item.id));
+  }
+  return Array.from(groups.values()).map(group => ({
+    ...group,
+    _totalQty: group._items.reduce((totalQty, item) => totalQty + (Number(item.quantity) || 0), 0),
+  }));
+});
+
+function packageLabel(group) {
+  if (group.shipping_id) return `Envio ${group.shipping_id}`;
+  return `${itemMarketplace(group) === 'Shopee' ? 'Pedido Shopee' : 'Pedido'} ${group.id}`;
+}
+
+function statusLabel(item) {
+  const status = String(item.shipping_status_live || item.shipping_status || '').toLowerCase();
+  if (['shipped', 'delivered', 'completed', 'expedited'].includes(status)) return 'Despachado';
+  if (['cancelled', 'canceled'].includes(status)) return 'Cancelado';
+  return status ? status.replaceAll('_', ' ') : 'A despachar';
+}
+
+function statusClass(item) {
+  const status = String(item.shipping_status_live || item.shipping_status || '').toLowerCase();
+  if (['shipped', 'delivered', 'completed', 'expedited'].includes(status)) return 'chip--status-done';
+  if (['cancelled', 'canceled'].includes(status)) return 'chip--status-cancelled';
+  return 'chip--status-pending';
+}
 
 const isLoading = ref(false);
 const isExporting = ref(false);
@@ -664,10 +741,10 @@ function variacao(item) {
 }
 
 const MODE_META = {
-  FULL: { label: 'FULL', color: '#4f46e5', bg: '#eef2ff', icon: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" />' },
+  FULL: { label: 'FULL', color: '#2563eb', bg: '#eff6ff', icon: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" />' },
   FLEX: { label: 'FLEX', color: '#ea580c', bg: '#fff7ed', icon: '<circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" />' },
   Correios: { label: 'CORREIOS', color: '#16a34a', bg: '#f0fdf4', icon: '<rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />' },
-  'Agência': { label: 'AGÊNCIA', color: '#7c3aed', bg: '#f5f3ff', icon: '<path d="M3 21h18" /><path d="M5 21V7l8-4v18" /><path d="M19 21V11l-6-4" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="9" y1="12" x2="9.01" y2="12" />' },
+  'Agência': { label: 'AGÊNCIA', color: '#0369a1', bg: '#f0f9ff', icon: '<path d="M3 21h18" /><path d="M5 21V7l8-4v18" /><path d="M19 21V11l-6-4" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="9" y1="12" x2="9.01" y2="12" />' },
   Coleta: { label: 'COLETA', color: '#2563eb', bg: '#eff6ff', icon: '<rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />' },
   'Envio Padrão': { label: 'ENVIO PADRÃO', color: '#0891b2', bg: '#ecfeff', icon: '<path d="M16.5 9.4 7.55 4.24" /><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" />' },
   Outros: { label: 'OUTROS', color: '#64748b', bg: '#f1f5f9', icon: '<circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />' },
@@ -684,7 +761,7 @@ async function exportCsv() {
     const qs = buildQuery({ full: '1' });
     const data = await api.get(`sales/separacao?${qs}`);
     const rows = data.items || [];
-    const header = ['Conta', 'Usuario', 'Qtd', 'SKU', 'Descricao', 'Variacao', 'Apelido Comprador', 'Nome Comprador', 'Modalidade', 'Data para Despachar', 'ID da Venda'];
+    const header = ['Pacote', 'ID do Envio', 'Conta', 'Usuario', 'Qtd', 'SKU', 'Descricao', 'Variacao', 'Status do Item', 'Apelido Comprador', 'Nome Comprador', 'Modalidade', 'Data para Despachar', 'ID da Venda'];
     const csvEscape = (v) => {
       const s = String(v ?? '');
       return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -692,12 +769,15 @@ async function exportCsv() {
     const lines = [header.join(';')];
     for (const it of rows) {
       lines.push([
+        it.package_key || '',
+        it.shipping_id || '',
         it.account_nickname || '',
         it.user_nickname || '',
         it.quantity ?? '',
         it.sku || '',
         descricaoProduto(it),
         variacao(it),
+        statusLabel(it),
         it.buyer_nickname || '',
         customerName(it),
         modeMeta(it.shipping_mode).label,
@@ -772,8 +852,8 @@ onMounted(() => {
 
 <style scoped>
 .dashboard-wrapper {
-  --color-primary: #6366f1;
-  --color-primary-hover: #4f46e5;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
   --color-border: #e5e7eb;
   --color-text: #1f2937;
   --color-text-secondary: #6b7280;
@@ -883,7 +963,7 @@ onMounted(() => {
 .s-card { background: #fff; border: 1px solid var(--color-border); border-radius: 14px; padding: 1rem 1.1rem; display: flex; align-items: center; gap: 0.9rem; }
 .s-card--modes { flex-direction: column; align-items: stretch; gap: 0.6rem; }
 .s-card__icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.s-card__icon--indigo { background: #eef2ff; color: #4f46e5; }
+.s-card__icon--blue { background: #eff6ff; color: #2563eb; }
 .s-card__icon--orange { background: #fff7ed; color: #ea580c; }
 .s-card__icon--green { background: #f0fdf4; color: #16a34a; }
 .s-card__icon--red { background: #fef2f2; color: #dc2626; }
@@ -921,8 +1001,12 @@ onMounted(() => {
   position: sticky; top: 0; z-index: 2;
 }
 .sep-table tbody td { padding: 0.7rem 0.9rem; border-bottom: 1px solid #f3f4f6; color: var(--color-text); vertical-align: middle; }
-.sep-table tbody tr:nth-child(even) { background: #fcfcfd; }
-.sep-table tbody tr:hover { background: #f5f6ff; }
+.sep-table tbody tr.package-item-row:hover { background: #eff6ff; }
+.package-row td { padding: 0.45rem 0.9rem !important; background: #eaf2ff; border-top: 1px solid #bfdbfe; border-bottom: 1px solid #bfdbfe !important; }
+.package-row__content { display: flex; align-items: center; flex-wrap: wrap; gap: 0.45rem 0.8rem; color: #475569; font-size: 0.72rem; }
+.package-number { color: #1d4ed8; font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
+.package-id { padding: 0.1rem 0.45rem; border-radius: 999px; background: #fff; border: 1px solid #bfdbfe; color: #1e3a8a; font-family: 'SFMono-Regular', Consolas, monospace; font-weight: 700; }
+.package-common { background: #fbfdff; border-left: 1px solid #e2e8f0; vertical-align: top !important; }
 
 /* Larguras — sobra espaço para o produto e o ID não corta mais */
 .col-qtd { width: 62px; text-align: center; }
@@ -942,7 +1026,7 @@ onMounted(() => {
   padding: 0 0.4rem; border-radius: 8px; background: #f1f5f9; border: 1px solid #e2e8f0;
   font-size: 0.85rem; font-weight: 700; color: #334155;
 }
-.qty-badge--multi { background: #eef2ff; border-color: #c7d2fe; color: #4338ca; }
+.qty-badge--multi { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
 
 /* Produto: descrição + SKU + variação em um só bloco */
 .prod { display: flex; align-items: flex-start; gap: 0.5rem; min-width: 0; }
@@ -957,14 +1041,18 @@ onMounted(() => {
   padding: 0.05rem 0.4rem; border-radius: 5px; font-size: 0.7rem; font-weight: 600; line-height: 1.5;
 }
 .chip--sku { font-family: 'SFMono-Regular', Consolas, monospace; background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }
-.chip--var { background: #eef2ff; border: 1px solid #e0e7ff; color: #4338ca; }
+.chip--var { background: #eff6ff; border: 1px solid #dbeafe; color: #1d4ed8; }
+.chip--status { text-transform: capitalize; border: 1px solid transparent; }
+.chip--status-pending { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+.chip--status-done { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+.chip--status-cancelled { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
 .prod__mk-logo { width: 14px; height: 14px; object-fit: contain; flex-shrink: 0; }
 /* Indicador da origem da descrição (CyberDock x Mercado Livre) */
 .desc-origin {
   display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; margin-top: 1px;
 }
-.desc-origin--cd { background: #eef2ff; color: #4f46e5; border: 1px solid #e0e7ff; }
+.desc-origin--cd { background: #eff6ff; color: #2563eb; border: 1px solid #dbeafe; }
 .desc-origin--ml { background: #fffbeb; border: 1px solid #fef3c7; }
 .desc-origin__img { width: 12px; height: 12px; object-fit: contain; }
 .text-muted { color: var(--color-text-secondary); }
