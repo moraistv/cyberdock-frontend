@@ -21,21 +21,21 @@
             </div>
           </div>
           <div class="header-actions">
-            <button @click="handleGlobalSync" :disabled="syncState.isSyncing || isFetchingAccounts"
-                :class="['btn', 'sync-btn', 'btn-primary']" 
-                title="Sincronizar massivamente todas as contas do sistema">
-                <svg v-if="syncState.isSyncing" class="sync-spinner"
+            <button @click="handleGlobalSync" :disabled="isGlobalSyncing || isFetchingAccounts"
+                :class="['btn', 'sync-btn', 'btn-primary']"
+                title="Sincronizar todas as contas do Mercado Livre e lojas Shopee do sistema">
+                <svg v-if="isGlobalSyncing" class="sync-spinner"
                     xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                     stroke-linejoin="round">
                     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                 </svg>
                 <span v-if="isFetchingAccounts">Buscando contas...</span>
-                <span v-else-if="syncState.isSyncing">Sincronizando...</span>
+                <span v-else-if="isGlobalSyncing">Sincronizando...</span>
                 <span v-else>Sincronizar Tudo</span>
-                
-                <span v-if="syncState.newSalesCount > 0" class="new-sales-badge">
-                    {{ syncState.newSalesCount }}
+
+                <span v-if="unifiedNewSalesCount > 0" class="new-sales-badge">
+                    {{ unifiedNewSalesCount }}
                 </span>
             </button>
           </div>
@@ -105,14 +105,14 @@
           <!-- Detalhes só das contas que tiveram novidade/erro -->
           <div v-if="relevantAccounts.length > 0" class="sr-accounts">
               <h4 class="sr-subtitle">Contas com novidade</h4>
-              <div class="sr-account" v-for="account in relevantAccounts" :key="account.userId" :class="account.status">
+              <div class="sr-account" v-for="account in relevantAccounts" :key="`${account.marketplace}-${account.userId}`" :class="account.status">
                   <span class="sr-account-status" :class="account.status">
                       <svg v-if="account.status === 'success'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                       <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                   </span>
                   <div class="sr-account-info">
                       <span class="sr-account-name">{{ account.nickname }}</span>
-                      <span class="sr-account-id">ML {{ account.userId }}<span v-if="account.durationMs" class="sr-account-time"> · {{ formatDuration(account.durationMs) }}</span></span>
+                      <span class="sr-account-id">{{ account.marketplace === 'Shopee' ? 'Shopee' : 'Mercado Livre' }} · ID {{ account.userId }}<span v-if="account.durationMs" class="sr-account-time"> · {{ formatDuration(account.durationMs) }}</span></span>
                   </div>
                   <div class="sr-account-badges" v-if="account.status === 'success'">
                       <span class="sr-badge is-new" v-if="account.newSalesCount > 0">{{ account.newSalesCount }} nova{{ account.newSalesCount > 1 ? 's' : '' }}</span>
@@ -138,10 +138,10 @@
       </template>
     </UniversalModal>
 
-    <ToastNotification :is-visible="syncState.isVisible" :title="syncState.title"
-            :description="syncState.description" :progress="syncState.progress" :type="syncState.type" />
+    <ToastNotification :is-visible="activeSyncState.isVisible" :title="activeSyncState.title"
+            :description="activeSyncState.description" :progress="activeSyncState.progress" :type="activeSyncState.type" />
 
-    <SyncLiveModal :open="isSyncLiveOpen" :accounts="liveAccounts" title="Sincronização global em andamento..." />
+    <SyncLiveModal :open="isSyncLiveOpen" :accounts="unifiedLiveAccounts" title="Sincronização global em andamento..." />
   </div>
 </template>
 
@@ -156,9 +156,35 @@ import SyncLiveModal from '../components/SyncLiveModal.vue';
 import ToastNotification from '../components/ToastNotification.vue';
 import { useApi } from '@/composables/useApi';
 import { useSyncManager } from '@/composables/useSyncManager';
+import { useShopeeSyncManager } from '@/composables/useShopeeSyncManager';
 
 const api = useApi();
 const { syncState, liveAccounts, syncAccountsBatch } = useSyncManager();
+const {
+    syncState: shopeeSyncState,
+    liveAccounts: shopeeLiveAccounts,
+    syncAccountsBatch: syncShopeeAccountsBatch,
+} = useShopeeSyncManager();
+
+// O painel ao vivo mostra as contas dos dois canais numa fila só.
+const unifiedLiveAccounts = computed(() => [
+    ...(liveAccounts.value || []).map(account => ({ ...account, marketplace: 'ML' })),
+    ...(shopeeLiveAccounts.value || []).map(account => ({ ...account, marketplace: 'Shopee' })),
+]);
+
+const isGlobalSyncing = computed(() => syncState.value.isSyncing || shopeeSyncState.value.isSyncing);
+
+// Badge do botão soma as novidades dos dois canais.
+const unifiedNewSalesCount = computed(() =>
+    (syncState.value.newSalesCount || 0) + (shopeeSyncState.value.newSalesCount || 0)
+);
+
+// O toast segue o canal que está em atividade, para não sobrepor mensagens.
+const activeSyncState = computed(() =>
+    shopeeSyncState.value.isSyncing || shopeeSyncState.value.isVisible
+        ? shopeeSyncState.value
+        : syncState.value
+);
 
 const masterTableRef = ref(null);
 const isFetchingAccounts = ref(false);
@@ -227,44 +253,87 @@ const handleGlobalSync = async () => {
     const accountResults = [];
 
     try {
-        const mlAccountsData = await api.get('/ml/all-accounts');
+        // Descobre os dois canais em paralelo. A ausência de contas em um deles
+        // não impede o outro de sincronizar.
+        const [mlAccountsData, shopeeAccountsData] = await Promise.all([
+            api.get('/ml/all-accounts'),
+            api.get('/shopee/all-accounts'),
+        ]);
         const accounts = Array.isArray(mlAccountsData) ? mlAccountsData : [];
+        const shopeeAccounts = Array.isArray(shopeeAccountsData) ? shopeeAccountsData : [];
 
-        if (accounts.length === 0) {
+        if (accounts.length === 0 && shopeeAccounts.length === 0) {
             syncResults.value = {
                 title: 'Atenção', type: 'warning', accounts: [],
                 summary: { total: 0, successful: 0, failed: 0 },
-                message: 'Nenhuma conta ativa do Mercado Livre no sistema inteiro para sincronizar.'
+                message: 'Nenhuma conta ativa do Mercado Livre ou loja Shopee no sistema inteiro para sincronizar.'
             };
             isSyncResultsModalOpen.value = true;
             isFetchingAccounts.value = false;
             return;
         }
 
-        totalAccounts = accounts.length;
+        totalAccounts = accounts.length + shopeeAccounts.length;
 
         // Abre o painel de progresso ao vivo enquanto sincroniza.
         isSyncLiveOpen.value = true;
 
-        // Sincroniza todas as contas em paralelo controlado (o backend limita
-        // globalmente o rate do ML). Sem esperas artificiais e sem recarregar
-        // a tabela a cada conta — só uma vez no final.
-        const batch = await syncAccountsBatch(
-            accounts.map(account => ({
-                mlAccountId: account.user_id,
-                accountNickname: account.nickname,
-                clientUid: account.uid,
-                daysToSync: null
-            })),
-            { concurrency: accounts.length }
-        );
+        const emptyBatch = {
+            results: [],
+            summary: { total: 0, successful: 0, failed: 0 },
+            totalNewSales: 0,
+            totalUpdated: 0,
+            totalSkipped: 0,
+            totalDurationMs: 0,
+        };
 
-        successCount = batch.summary.successful;
-        errorCount = batch.summary.failed;
+        // Os canais têm limitadores independentes no backend, então rodam
+        // juntos. A tabela é recarregada uma única vez, no final.
+        const [batch, shopeeBatch] = await Promise.all([
+            accounts.length
+                ? syncAccountsBatch(
+                    accounts.map(account => ({
+                        mlAccountId: account.user_id,
+                        accountNickname: account.nickname,
+                        clientUid: account.uid,
+                        daysToSync: null
+                    })),
+                    { concurrency: accounts.length }
+                )
+                : Promise.resolve(emptyBatch),
+            shopeeAccounts.length
+                ? syncShopeeAccountsBatch(
+                    shopeeAccounts.map(account => ({
+                        shopId: account.shop_id,
+                        accountNickname: account.shop_name || String(account.shop_id),
+                        clientUid: account.uid,
+                    })),
+                    { concurrency: 3 }
+                )
+                : Promise.resolve(emptyBatch),
+        ]);
+
+        successCount = batch.summary.successful + shopeeBatch.summary.successful;
+        errorCount = batch.summary.failed + shopeeBatch.summary.failed;
         for (const r of batch.results) {
             accountResults.push({
+                marketplace: 'ML',
                 nickname: r.accountNickname,
                 userId: r.mlAccountId,
+                uid: r.clientUid,
+                status: r.status,
+                newSalesCount: r.newSalesCount || 0,
+                updatedCount: r.updatedCount || 0,
+                skippedCount: r.skippedCount || 0,
+                durationMs: r.durationMs || 0,
+                message: r.status === 'error' ? (r.message || 'Erro desconhecido') : ''
+            });
+        }
+        for (const r of shopeeBatch.results) {
+            accountResults.push({
+                marketplace: 'Shopee',
+                nickname: r.accountNickname,
+                userId: r.shopId,
                 uid: r.clientUid,
                 status: r.status,
                 newSalesCount: r.newSalesCount || 0,
@@ -294,10 +363,12 @@ const handleGlobalSync = async () => {
                 successful: successCount,
                 failed: errorCount
             },
-            totalNewSales: batch.totalNewSales,
-            totalUpdated: batch.totalUpdated,
-            totalSkipped: batch.totalSkipped,
-            totalDurationMs: batch.totalDurationMs
+            totalNewSales: batch.totalNewSales + shopeeBatch.totalNewSales,
+            totalUpdated: batch.totalUpdated + shopeeBatch.totalUpdated,
+            totalSkipped: batch.totalSkipped + shopeeBatch.totalSkipped,
+            // Os canais rodam em paralelo, então o tempo total é o do mais
+            // demorado, não a soma dos dois.
+            totalDurationMs: Math.max(batch.totalDurationMs, shopeeBatch.totalDurationMs)
         };
         isSyncResultsModalOpen.value = true;
 
