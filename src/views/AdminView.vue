@@ -9,6 +9,16 @@
           <div>
             <h1 class="title">Tabelão de Vendas (Master)</h1>
             <p class="subtitle">Visão global e unificada de todas as vendas de todos os clientes.</p>
+            <div class="mk-legend">
+              <span class="mk-legend__item">
+                <img src="/img/ml-logo.svg" alt="" class="mk-legend__logo" />
+                Mercado Livre
+              </span>
+              <span class="mk-legend__item">
+                <img src="/img/shopee-logo.svg" alt="" class="mk-legend__logo" />
+                Shopee
+              </span>
+            </div>
           </div>
           <div class="header-actions">
             <button @click="handleGlobalSync" :disabled="syncState.isSyncing || isFetchingAccounts"
@@ -354,6 +364,28 @@ const handleGlobalSync = async () => {
   font-size: 1rem;
   color: #4b5563;
   margin: 0;
+}
+
+/* Legenda de canais, idêntica à da tabela de vendas do usuário. */
+.mk-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+}
+.mk-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+.mk-legend__logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
 }
 
 .table-card {

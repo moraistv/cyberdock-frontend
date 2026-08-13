@@ -26,6 +26,29 @@
                             class="search-input">
                     </div>
 
+                    <!-- Filtro rápido: Canal (Mercado Livre / Shopee) -->
+                    <div class="filter-container" ref="marketplaceFilterContainerRef">
+                        <button @click="isMarketplaceDropdownOpen = !isMarketplaceDropdownOpen"
+                                :class="['btn', 'btn-outline', { 'btn-outline--active': selectedMarketplaces.length > 0 }]">
+                            <img v-if="selectedMarketplaceLogo" :src="selectedMarketplaceLogo" alt="" class="filter-btn__logo" />
+                            <span class="truncate pr-2">Canal: {{ selectedMarketplaceLabel }}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
+                                <path d="m6 9 6 6 6-6"></path>
+                            </svg>
+                        </button>
+                        <div v-if="isMarketplaceDropdownOpen" class="filter-popover">
+                            <ul class="filter-popover-list">
+                                <li @click="selectedMarketplaces = []">
+                                    <span :class="{'font-bold': !selectedMarketplaces.length}">Todos os Canais</span>
+                                </li>
+                                <li v-for="mk in marketplaceOptions" :key="mk.value" @click="toggleMarketplace(mk.value)">
+                                    <img :src="mk.logo" alt="" class="filter-popover__logo" />
+                                    <span :class="{'font-bold': selectedMarketplaces.includes(mk.value)}">{{ mk.label }}</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
                     <!-- Filtro rápido: Status da Venda -->
                     <div class="filter-container" ref="saleStatusFilterContainerRef">
                         <button @click="toggleSaleStatusDropdown" :class="['btn', 'btn-outline', { 'btn-outline--active': selectedSaleStatusFilter }]">
@@ -100,6 +123,7 @@
                                     <span :class="{'font-bold': !selectedAccountFilter}">Todas</span>
                                 </li>
                                 <li v-for="acc in filteredAccountOptions" :key="acc" @click="applyAccountFilter(acc)">
+                                    <img v-if="accountLogoByLabel.get(acc)" :src="accountLogoByLabel.get(acc)" alt="" class="filter-popover__logo" />
                                     <span :class="{'font-bold': selectedAccountFilter === acc}">{{ acc }}</span>
                                 </li>
                             </ul>
@@ -242,7 +266,7 @@
             <div v-else>
                 <!-- Contador de resultados -->
                 <div class="sale-cards-counter">
-                    <span>Mostrando <strong>{{ sales.length }}</strong> de <strong>{{ totalSales }}</strong> vendas</span>
+                    <span>Mostrando <strong>{{ sales.length }}</strong> de <strong>{{ formattedTotalSales }}</strong> vendas</span>
                     <span v-if="isLoading" class="sale-cards-counter__loading">Atualizando...</span>
                 </div>
                 <div class="sale-cards-list" ref="salesTableBodyRef">
@@ -262,11 +286,13 @@
                             
                             <!-- Thumbnail do Produto -->
                             <div class="sale-card__thumb">
-                                <img v-if="getThumbUrl(sale)" 
-                                     :src="getThumbUrl(sale)" 
-                                     :alt="sale.product_title" 
-                                     class="sale-card__thumb-img" 
-                                     loading="lazy" />
+                                <img v-if="getThumbUrl(sale)"
+                                     :src="getThumbUrl(sale)"
+                                     :alt="sale.product_title"
+                                     class="sale-card__thumb-img"
+                                     loading="lazy"
+                                     decoding="async"
+                                     @error="onThumbError" />
                                 <div v-else class="sale-card__thumb-placeholder">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                                 </div>
@@ -286,15 +312,15 @@
                                 <div class="sale-card__title-row">
                                     <span class="desc-origin"
                                           :class="hasInternalDescription(sale) ? 'desc-origin--cd' : 'desc-origin--ml'"
-                                          :title="hasInternalDescription(sale) ? 'Descrição cadastrada na CyberDock (Armazenamento)' : 'Título original do anúncio no Mercado Livre'">
+                                          :title="hasInternalDescription(sale) ? 'Descrição cadastrada na CyberDock (Armazenamento)' : `Título original do anúncio na ${marketplaceLabel(sale)}`">
                                         <!-- CyberDock: descrição interna -->
                                         <svg v-if="hasInternalDescription(sale)" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                                             <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
                                             <line x1="12" y1="22.08" x2="12" y2="12" />
                                         </svg>
-                                        <!-- Mercado Livre: título original do anúncio -->
-                                        <img v-else src="/img/ml-logo.svg" alt="Mercado Livre" class="desc-origin__img" />
+                                        <!-- Marketplace: título original do anúncio -->
+                                        <img v-else :src="marketplaceLogo(sale)" :alt="marketplaceLabel(sale)" class="desc-origin__img" />
                                     </span>
                                     <a v-if="getProductLink(sale)" :href="getProductLink(sale)" target="_blank" rel="noopener" class="sale-card__product-link" :title="getProductDescription(sale)">
                                         {{ getProductDescription(sale) }}
@@ -303,8 +329,8 @@
                                         {{ getProductDescription(sale) }}
                                     </h3>
                                     <div class="sale-card__badges">
-                                        <img v-if="sale.channel?.toLowerCase() === 'ml'" src="/img/ml-logo.svg" alt="Mercado Livre" class="sale-card__ml-logo" />
-                                        <span v-else class="sale-card__badge sale-card__badge--other">{{ sale.channel }}</span>
+                                        <img :src="marketplaceLogo(sale)" :alt="marketplaceLabel(sale)"
+                                             :title="marketplaceLabel(sale)" class="sale-card__ml-logo" />
                                     </div>
                                 </div>
 
@@ -421,10 +447,11 @@
                         </div>
                     </div>
                 </div>
-                <div class="pagination-controls" v-if="totalPages > 1">
+                <div class="pagination-controls" v-if="currentPage > 1 || hasNextPage || totalPages > 1">
                     <button @click="goToPage(currentPage - 1)" :disabled="currentPage <= 1 || isLoading">Anterior</button>
-                    <span>Página {{ currentPage }} de {{ totalPages }} ({{ totalSales }} vendas)</span>
-                    <button @click="goToPage(currentPage + 1)" :disabled="currentPage >= totalPages || isLoading">Próximo</button>
+                    <span>Página {{ currentPage }} de {{ formattedTotalPages }} ({{ formattedTotalSales }} vendas)</span>
+                    <button @click="goToPage(currentPage + 1)"
+                            :disabled="isLoading || (!hasNextPage && currentPage >= totalPages)">Próximo</button>
                 </div>
             </div>
         </div>
@@ -566,11 +593,76 @@ function showToast(message, type = 'info') {
 
 // ===== END UTILITY FUNCTIONS =====
 
-const { 
-    sales, isLoading, error, totalSales, currentPage, totalPages, 
-    fetchSales, processSales: processSalesApi, 
-    globalAccountOptions, globalUserOptions, fetchFilterOptions 
+const {
+    sales, isLoading, error, totalSales, totalIsExact, hasNextPage, currentPage, totalPages,
+    fetchSales, processSales: processSalesApi,
+    globalAccountOptions, globalAccountsDetailed, globalUserOptions, fetchFilterOptions
 } = useMasterSales();
+
+// Logos oficiais dos canais, iguais aos da tela do usuário.
+const MK_LOGOS = {
+    ML: '/img/ml-logo.svg',
+    Shopee: '/img/shopee-logo.svg',
+};
+
+const marketplaceOptions = [
+    { value: 'ML', label: 'Mercado Livre', logo: MK_LOGOS.ML },
+    { value: 'Shopee', label: 'Shopee', logo: MK_LOGOS.Shopee },
+];
+
+/**
+ * Canal da venda. O backend envia `marketplace` pela view unificada e
+ * `channel` continua chegando como apelido do campo antigo.
+ */
+function saleMarketplace(sale) {
+    const raw = String(sale?.marketplace || sale?.channel || 'ML').toLowerCase();
+    return raw.includes('shopee') || raw === 'sp' ? 'Shopee' : 'ML';
+}
+
+function marketplaceLogo(sale) {
+    return MK_LOGOS[saleMarketplace(sale)];
+}
+
+function marketplaceLabel(sale) {
+    return saleMarketplace(sale) === 'Shopee' ? 'Shopee' : 'Mercado Livre';
+}
+
+const selectedMarketplaces = ref([]);
+const isMarketplaceDropdownOpen = ref(false);
+const marketplaceFilterContainerRef = ref(null);
+
+function toggleMarketplace(value) {
+    const i = selectedMarketplaces.value.indexOf(value);
+    if (i === -1) selectedMarketplaces.value.push(value);
+    else selectedMarketplaces.value.splice(i, 1);
+}
+
+const selectedMarketplaceLabel = computed(() => {
+    const list = selectedMarketplaces.value;
+    if (!list.length) return 'Todos';
+    if (list.length === 1) return marketplaceOptions.find((o) => o.value === list[0])?.label ?? list[0];
+    return `${list.length} canais`;
+});
+
+const selectedMarketplaceLogo = computed(() =>
+    selectedMarketplaces.value.length === 1 ? MK_LOGOS[selectedMarketplaces.value[0]] : null
+);
+
+/** Logo da conta no dropdown, conforme o canal informado pelo backend. */
+const accountLogoByLabel = computed(() => {
+    const map = new Map();
+    for (const account of globalAccountsDetailed.value || []) {
+        map.set(account.label, MK_LOGOS[account.marketplace] || MK_LOGOS.ML);
+    }
+    return map;
+});
+
+const formattedTotalSales = computed(() =>
+    `${Number(totalSales.value || 0).toLocaleString('pt-BR')}${totalIsExact.value ? '' : '+'}`
+);
+const formattedTotalPages = computed(() =>
+    `${totalPages.value}${totalIsExact.value ? '' : '+'}`
+);
 
 const { systemStatuses } = useSystemStatus();
 const { downloadLabel, downloadLabelsForSales, getLabelInfo: composableLabelInfo } = useLabels();
@@ -827,14 +919,35 @@ const activeSaleDatePreset = ref(null);
 const activeShipDatePreset = ref(null);
 
 const selectedShippingModes = ref([]);
-const shippingModeOptions = [
-    { value: 'FULL', label: 'FULL' },
-    { value: 'FLEX', label: 'FLEX' },
-    { value: 'Correios', label: 'Correios' },
-    { value: 'Agência', label: 'Agência' },
-    { value: 'Coleta', label: 'Coleta' },
-    { value: 'Envio Padrão', label: 'Envio Padrão' },
-];
+// Modalidades reais dos DOIS canais. Antes só havia as do Mercado Livre, então
+// nenhum chip desta linha alcançava uma venda da Shopee.
+const shippingModeOptions = computed(() => {
+    const base = [
+        { value: 'FULL', label: 'FULL' },
+        { value: 'FLEX', label: 'FLEX' },
+        { value: 'Correios', label: 'Correios' },
+        { value: 'Agência', label: 'Agência' },
+        { value: 'Coleta', label: 'Coleta' },
+        { value: 'Envio Padrão', label: 'Envio Padrão' },
+    ];
+    // A modalidade da Shopee é a transportadora do pacote, que varia por loja;
+    // acumular o que já apareceu evita oferecer opção inexistente.
+    const seen = new Set(base.map((o) => o.value));
+    for (const sale of sales.value || []) {
+        const mode = sale.shipping_mode;
+        if (mode && !seen.has(mode)) {
+            seen.add(mode);
+            base.push({ value: mode, label: mode });
+        }
+    }
+    for (const mode of selectedShippingModes.value) {
+        if (!seen.has(mode)) {
+            seen.add(mode);
+            base.push({ value: mode, label: mode });
+        }
+    }
+    return base;
+});
 
 function toggleShippingMode(mode) {
     const idx = selectedShippingModes.value.indexOf(mode);
@@ -952,6 +1065,7 @@ function triggerServerFetch(resetPage = true) {
         shippingMode: selectedShippingModes.value.length > 0 ? selectedShippingModes.value.join(',') : undefined,
         userNickname: selectedUserFilter.value || undefined,
         processed: selectedProcessedFilter.value || undefined,
+        marketplace: selectedMarketplaces.value.length > 0 ? selectedMarketplaces.value.join(',') : undefined,
     });
 }
 
@@ -961,6 +1075,7 @@ watch(searchQuery, () => {
 });
 
 watch([selectedSaleStatusFilter, selectedStatusFilter, selectedProcessedFilter], () => triggerServerFetch(true));
+watch(selectedMarketplaces, () => triggerServerFetch(true), { deep: true });
 watch([() => filters.saleDateStart, () => filters.saleDateEnd, () => filters.shippingLimitStart, () => filters.shippingLimitEnd], () => {
     triggerServerFetch(true);
 });
@@ -1179,22 +1294,43 @@ function getVariation(sale) {
     return formatVariation(sale?.variation_attributes);
 }
 
-// Thumbnail - usa o proxy do backend para servir imagens do ML sem 403
+/**
+ * Se o CDN recusar o acesso direto (hotlink bloqueado), tenta uma única vez
+ * pelo proxy do backend. O flag evita laço infinito de erro.
+ */
+function onThumbError(event) {
+    const img = event?.target;
+    if (!img || img.dataset.proxied === '1') return;
+    const original = img.getAttribute('src');
+    if (!original || original.includes('/ml/img-proxy')) return;
+    img.dataset.proxied = '1';
+    img.src = `${API_BASE_URL}/ml/img-proxy?url=${encodeURIComponent(original)}`;
+}
+
+// Thumbnail do produto, igual à tela do usuário.
 function getThumbUrl(sale) {
     let thumbUrl = sale.product_thumbnail;
     if (thumbUrl === 'not_found') return null;
     
-    // Fallback: tenta extrair do raw_api_data
+    // Fallback lendo o payload bruto: o formato difere por marketplace.
+    if (!thumbUrl && Array.isArray(sale.raw_api_data?.item_list)) {
+        const shopeeItem = sale.raw_api_data.item_list.find(
+            it => it.item_sku === sale.sku || it.model_sku === sale.sku
+        ) || sale.raw_api_data.item_list[0];
+        if (shopeeItem?.image_info?.image_url) thumbUrl = shopeeItem.image_info.image_url;
+    }
     if (!thumbUrl && sale.raw_api_data?.order_items) {
         const itemObj = sale.raw_api_data.order_items.find(it => it.item?.seller_sku === sale.sku || it.item?.id === sale.sku);
         if (itemObj?.item?.thumbnail) thumbUrl = itemObj.item.thumbnail;
     }
     
     if (!thumbUrl) return null;
-    
-    // Passa a URL pelo proxy do backend para evitar 403
-    const encodedUrl = encodeURIComponent(thumbUrl);
-    return `${API_BASE_URL}/ml/img-proxy?url=${encodedUrl}`;
+
+    // Carrega DIRETO do CDN do marketplace, como na tela do usuário. Passar
+    // TODAS as imagens pelo proxy fazia o backend refazer um fetch por card, o
+    // que somava segundos numa página de 50 vendas. O proxy segue como
+    // fallback em onThumbError, para quando o CDN bloqueia o acesso direto.
+    return thumbUrl.replace(/^http:\/\//i, 'https://');
 }
 
 </script>
@@ -1752,6 +1888,25 @@ function getThumbUrl(sale) {
 .desc-origin--ml {
     background: #fffbeb;
     border: 1px solid #fef3c7;
+}
+/* Logos de canal nos filtros, no mesmo padrão da tela do usuário. */
+.filter-btn__logo {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    object-fit: contain;
+}
+.filter-popover__logo {
+    width: 16px;
+    height: 16px;
+    margin-right: 0.35rem;
+    flex-shrink: 0;
+    object-fit: contain;
+    vertical-align: middle;
+}
+.filter-popover-list li {
+    display: flex;
+    align-items: center;
 }
 .desc-origin__img {
     width: 14px;
