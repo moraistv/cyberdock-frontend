@@ -99,6 +99,19 @@ export function useUsers() {
     }
   };
 
+  /**
+   * Define uma nova senha para o usuário (ação de suporte do master).
+   * A senha não é guardada em estado nem registrada em log.
+   */
+  const updateUserPassword = async (uid, password) => {
+    try {
+      const response = await api.put(`/users/${uid}/password`, { password });
+      return { success: true, message: response.message || 'Senha atualizada com sucesso.' };
+    } catch (err) {
+      return { success: false, message: err.message || 'Falha ao atualizar a senha.' };
+    }
+  };
+
   return {
     users,
     isLoading,
@@ -106,6 +119,7 @@ export function useUsers() {
     fetchUsers,
     updateUserRole,
     toggleUserActiveStatus,
+    updateUserPassword,
     deleteUser, // Exporta a nova função
   };
 }

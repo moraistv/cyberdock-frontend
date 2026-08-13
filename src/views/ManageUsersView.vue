@@ -193,6 +193,11 @@
             </span>
           </div>
 
+          <p v-if="passwordSuccess" class="password-success" role="status">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+            {{ passwordSuccess }}
+          </p>
+
           <div class="table-container" ref="tableContainer">
             <div class="table-wrapper">
                <template v-if="isLoadingUsers">
@@ -360,6 +365,10 @@
           ref="actionsDropdown"
         >
           <span class="dropdown-heading">{{ activeMenu.user.name || activeMenu.user.mlNickname || activeMenu.user.email }}</span>
+          <a @click="openPasswordModal(activeMenu.user)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            Alterar Senha
+          </a>
           <a @click="openEditNameModal(activeMenu.user)">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
             Editar Nome
@@ -499,6 +508,33 @@
             </div>
             <div class="modal-actions"><button @click="closeDeleteUserModal" class="btn btn-secondary">Cancelar</button><button @click="confirmDeleteUser" class="btn btn-danger">Sim, Excluir</button></div>
         </UniversalModal>
+        <UniversalModal title="Alterar Senha do Usuário" :is-open="isPasswordModalOpen" @close="closePasswordModal">
+          <div v-if="passwordTarget">
+            <p style="margin-bottom: 0.75rem; color: #6b7280;">
+              Usuário: <strong>{{ passwordTarget.name || passwordTarget.mlNickname || passwordTarget.email }}</strong>
+            </p>
+            <div class="form-group">
+              <label>Nova senha</label>
+              <input type="password" v-model="passwordValue" autocomplete="new-password"
+                     placeholder="Mínimo de 8 caracteres" @keyup.enter="handleSavePassword" />
+            </div>
+            <div class="form-group">
+              <label>Confirmar nova senha</label>
+              <input type="password" v-model="passwordConfirm" autocomplete="new-password"
+                     placeholder="Repita a nova senha" @keyup.enter="handleSavePassword" />
+            </div>
+            <p class="password-hint">
+              O acesso do cliente passa a usar esta senha imediatamente. Informe a ele por um canal seguro.
+            </p>
+            <p v-if="passwordError" class="password-error">{{ passwordError }}</p>
+          </div>
+          <div class="modal-actions">
+            <button @click="closePasswordModal" class="btn btn-secondary">Cancelar</button>
+            <button @click="handleSavePassword" class="btn btn-primary" :disabled="isSavingPassword">
+              {{ isSavingPassword ? 'Salvando...' : 'Salvar senha' }}
+            </button>
+          </div>
+        </UniversalModal>
         <UniversalModal title="Editar Nome do Usuário" :is-open="isEditNameModalOpen" @close="closeEditNameModal">
           <div v-if="editNameUser">
             <p style="margin-bottom: 0.75rem; color: #6b7280;">Usuário: <strong>{{ editNameUser.mlNickname || editNameUser.email }}</strong></p>
@@ -579,7 +615,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { gsap } from 'gsap';
 
 import SidebarComponent from '../components/SidebarComponent.vue';
@@ -597,7 +633,7 @@ import { useServices } from '@/composables/useServices.js';
 import { useSyncManager } from '@/composables/useSyncManager';
 import { API_BASE_URL } from '@/config';
 
-const { users, isLoading: isLoadingUsers, error: usersError, fetchUsers, updateUserRole, toggleUserActiveStatus, deleteUser } = useUsers();
+const { users, isLoading: isLoadingUsers, error: usersError, fetchUsers, updateUserRole, toggleUserActiveStatus, updateUserPassword, deleteUser } = useUsers();
 const { syncState } = useSyncManager();
 const {
   services: availableServices, isLoadingServices, isEditingService, currentService, isServiceModalOpen,
@@ -748,16 +784,101 @@ const handleRoleChange = async (user, newRole) => {
 
 const toggleActionsMenu = async (user, event) => {
   const isSame = activeMenu.value.user && activeMenu.value.user.uid === user.uid;
-  activeMenu.value = isSame ? { user: null } : {
+  if (isSame) {
+    activeMenu.value = { user: null, style: {} };
+    return;
+  }
+
+  const rect = event.currentTarget.getBoundingClientRect();
+
+  // Abre invisível só para medir: o menu é `position: fixed` e, alinhado pela
+  // borda esquerda do botão, saía pela direita da janela — os itens apareciam
+  // cortados ("Gerenciar Cobranç...", "Suspender Acess..."). Com a medida real
+  // dá para encostar o menu na borda do botão e virá-lo para cima quando não
+  // houver espaço embaixo.
+  activeMenu.value = {
     user,
-    style: {
-      top: `${event.target.getBoundingClientRect().bottom + 6}px`,
-      left: `${event.target.getBoundingClientRect().left}px`
-    }
+    style: { top: `${rect.bottom + 6}px`, left: `${rect.left}px`, visibility: 'hidden' },
   };
   await nextTick();
-  if (activeMenu.value.user && actionsDropdown.value) {
+
+  const el = actionsDropdown.value;
+  if (!el) return;
+
+  const menu = el.getBoundingClientRect();
+  const margin = 8;
+
+  let left = rect.left;
+  if (left + menu.width > window.innerWidth - margin) {
+    left = Math.max(margin, rect.right - menu.width);
+  }
+
+  let top = rect.bottom + 6;
+  if (top + menu.height > window.innerHeight - margin) {
+    const above = rect.top - menu.height - 6;
+    top = above >= margin ? above : Math.max(margin, window.innerHeight - menu.height - margin);
+  }
+
+  activeMenu.value = { user, style: { top: `${top}px`, left: `${left}px` } };
+  await nextTick();
+  if (actionsDropdown.value) {
     gsap.fromTo(actionsDropdown.value, { opacity: 0, y: -6, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.18, ease: 'power1.out' });
+  }
+};
+
+// Menu fixo não acompanha a rolagem da tabela: fechar evita que ele fique
+// flutuando desalinhado da linha que o abriu.
+const closeActionsMenu = () => { activeMenu.value = { user: null, style: {} }; };
+
+/* ------------------------- Alteração de senha ---------------------------- */
+const isPasswordModalOpen = ref(false);
+const passwordTarget = ref(null);
+const passwordValue = ref('');
+const passwordConfirm = ref('');
+const passwordError = ref('');
+const passwordSuccess = ref('');
+const isSavingPassword = ref(false);
+
+const openPasswordModal = (user) => {
+  passwordTarget.value = user;
+  passwordValue.value = '';
+  passwordConfirm.value = '';
+  passwordError.value = '';
+  isPasswordModalOpen.value = true;
+  closeActionsMenu();
+};
+
+const closePasswordModal = () => {
+  isPasswordModalOpen.value = false;
+  passwordTarget.value = null;
+  // Não deixa a senha digitada viva em memória depois de fechar.
+  passwordValue.value = '';
+  passwordConfirm.value = '';
+};
+
+const handleSavePassword = async () => {
+  passwordError.value = '';
+  const senha = passwordValue.value.trim();
+
+  if (senha.length < 8) {
+    passwordError.value = 'A senha deve ter ao menos 8 caracteres.';
+    return;
+  }
+  if (senha !== passwordConfirm.value.trim()) {
+    passwordError.value = 'As senhas não coincidem.';
+    return;
+  }
+
+  isSavingPassword.value = true;
+  const result = await updateUserPassword(passwordTarget.value.uid, senha);
+  isSavingPassword.value = false;
+
+  if (result.success) {
+    passwordSuccess.value = `Senha de ${passwordTarget.value.email} atualizada.`;
+    closePasswordModal();
+    setTimeout(() => { passwordSuccess.value = ''; }, 6000);
+  } else {
+    passwordError.value = result.message;
   }
 };
 
@@ -923,7 +1044,29 @@ const animateModal = () => {
     { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.22, ease: 'power1.out' });
 };
 
-onMounted(async () => { await fetchUsers(); nextTick(() => animateRows()); });
+/** Fecha o menu ao clicar fora dele e do botão que o abriu. */
+const handleMenuClickOutside = (event) => {
+  if (!activeMenu.value.user) return;
+  const menu = actionsDropdown.value;
+  if (menu && menu.contains(event.target)) return;
+  if (event.target.closest && event.target.closest('.actions-button')) return;
+  closeActionsMenu();
+};
+
+onMounted(async () => {
+  document.addEventListener('click', handleMenuClickOutside);
+  // `capture` para pegar a rolagem da tabela, que não borbulha.
+  window.addEventListener('scroll', closeActionsMenu, true);
+  window.addEventListener('resize', closeActionsMenu);
+  await fetchUsers();
+  nextTick(() => animateRows());
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleMenuClickOutside);
+  window.removeEventListener('scroll', closeActionsMenu, true);
+  window.removeEventListener('resize', closeActionsMenu);
+});
 watch([paginatedUsers, currentPage], () => nextTick(() => animateRows()));
 watch([userSearchQuery, userStatusFilter], () => { currentPage.value = 1; });
 watch(() => syncState.value.isSyncing, (isSyncing, wasSyncing) => {
@@ -1324,6 +1467,22 @@ button, input, select, table { font-family: var(--font-sans); }
 .btn-action.save { color: #059669; }
 .btn-sm { min-height: 30px; padding: .28rem .6rem; font-size: .76rem; }
 .btn-full-width { width: 100%; }
+
+/* Modal de senha */
+.password-hint {
+  margin: 0.25rem 0 0; padding: 0.55rem 0.65rem;
+  border: 1px solid #dbeafe; border-radius: 8px; background: #eff6ff;
+  color: #1d4ed8; font-size: 0.74rem; line-height: 1.35;
+}
+.password-error {
+  margin: 0.6rem 0 0; color: #dc2626; font-size: 0.78rem; font-weight: 600;
+}
+.password-success {
+  display: flex; align-items: center; gap: 0.4rem;
+  margin: 0 0 0.75rem; padding: 0.6rem 0.75rem;
+  border: 1px solid #a7f3d0; border-radius: 9px; background: #ecfdf5;
+  color: #047857; font-size: 0.8rem; font-weight: 650;
+}
 
 /* ===================== DROPDOWN DE AÇÕES ===================== */
 .actions-dropdown-floating {
