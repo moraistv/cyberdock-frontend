@@ -250,6 +250,26 @@
         </div>
 
 
+        <!-- Resumo da listagem, no mesmo padrão da tabela do usuário -->
+        <section class="sales-overview" aria-label="Resumo da listagem">
+            <article class="sales-overview__item">
+                <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="m5 15 4-5 4 3 6-8"/></svg></span>
+                <div><strong>{{ formattedTotalSales }}</strong><span>vendas no filtro</span></div>
+            </article>
+            <article class="sales-overview__item">
+                <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                <div><strong>{{ globalAccountOptions.length }}</strong><span>contas no sistema</span></div>
+            </article>
+            <article class="sales-overview__item">
+                <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h6M7 16h4"/></svg></span>
+                <div><strong>{{ currentPage }} / {{ formattedTotalPages }}</strong><span>página atual</span></div>
+            </article>
+            <article class="sales-overview__item">
+                <span class="sales-overview__icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                <div><strong>{{ selectedSaleIds.size }}</strong><span>selecionada(s)</span></div>
+            </article>
+        </section>
+
         <!-- Container da Tabela de Vendas -->
         <div class="sales-table-container">
             <div v-if="isLoading && sales.length === 0" class="loading-state">
@@ -2290,6 +2310,85 @@ function getThumbUrl(sale) {
 .label-error-fade-leave-to {
     opacity: 0;
     transform: translateX(100%) scale(0.9);
+}
+
+/* =======================================================================
+   Consolidação visual do painel admin no MESMO layout da tabela de vendas
+   do usuário: identidade azul, cantos e bordas iguais, Google Sans Flex e
+   cards de resumo. Fica no fim do arquivo para sobrepor o estilo antigo
+   sem reescrever as regras herdadas.
+   ======================================================================= */
+.main-container { font-family: var(--font-sans); color: #0f172a; }
+
+.sales-overview {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.7rem;
+    margin-bottom: 0.8rem;
+}
+.sales-overview__item {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-width: 0;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid #dbe3ef;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+}
+.sales-overview__icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    background: #eff6ff;
+    color: #2563eb;
+}
+.sales-overview__item div { min-width: 0; }
+.sales-overview__item strong,
+.sales-overview__item div > span { display: block; }
+.sales-overview__item strong {
+    color: #0f172a;
+    font-size: 1rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+.sales-overview__item div > span {
+    margin-top: 0.08rem;
+    overflow: hidden;
+    color: #64748b;
+    font-size: 0.68rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.filters-panel-v2,
+.sales-table-container {
+    border: 1px solid #dbe3ef;
+    border-radius: 12px;
+    background: #fff;
+}
+.sale-card { border-color: #e2e8f0; border-radius: 10px; box-shadow: none; }
+.sale-card:hover { border-color: #93c5fd; box-shadow: 0 6px 18px rgba(37, 99, 235, 0.08); }
+.sale-card__product-link:hover { color: #2563eb; }
+.sale-card__checkbox { accent-color: #2563eb; }
+.status-badge-purple, .status-badge-indigo { background-color: #2563eb; }
+.desc-origin--cd { background: #eff6ff; border-color: #dbeafe; color: #2563eb; }
+.pagination-controls button:hover:not(:disabled) {
+    border-color: #93c5fd;
+    color: #1d4ed8;
+    background: #eff6ff;
+}
+.btn-outline--active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+
+@media (max-width: 1050px) {
+    .sales-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+    .sales-overview { grid-template-columns: 1fr; }
 }
 </style>
 

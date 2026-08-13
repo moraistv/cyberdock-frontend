@@ -23,12 +23,26 @@
           <div class="filter-block filter-block--period">
             <span class="filter-label">
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-              Período
+              Data da venda
             </span>
             <div class="chip-row">
               <button v-for="p in periodOptions" :key="p.value"
                       class="chip" :class="{ 'is-active': period === p.value }"
                       @click="period = p.value">
+                {{ p.label }}
+              </button>
+            </div>
+          </div>
+
+          <div class="filter-block filter-block--period">
+            <span class="filter-label">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+              Prazo de envio
+            </span>
+            <div class="chip-row">
+              <button v-for="p in shipPeriodOptions" :key="p.value"
+                      class="chip" :class="{ 'is-active': shipPeriod === p.value, 'chip--danger': p.value === 'overdue' && shipPeriod === 'overdue' }"
+                      @click="shipPeriod = p.value">
                 {{ p.label }}
               </button>
             </div>
@@ -52,8 +66,14 @@
           </div>
 
           <div class="filters-range" aria-label="Intervalo efetivo">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v3M16 2v3M3 9h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z" /></svg>
-            {{ dateRange.from }} — {{ dateRange.to }}
+            <span class="filters-range__item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2v3M16 2v3M3 9h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z" /></svg>
+              Venda: {{ periodLabel }}
+            </span>
+            <span class="filters-range__item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+              Envio: {{ shipLabel }}
+            </span>
           </div>
           </div>
 
@@ -410,12 +430,27 @@ const { user, isAuthReady, mlAccounts, shopeeAccounts } = useAuth()
 const MK_LOGOS = { ML: '/img/ml-logo.svg', Shopee: '/img/shopee-logo.svg' }
 
 const periodOptions = [
+  { value: 'all', label: 'Todas' },
+  { value: 'today', label: 'Hoje' },
   { value: '7d', label: 'Últimos 7 dias' },
   { value: '30d', label: 'Últimos 30 dias' },
   { value: 'month', label: 'Este mês' },
   { value: '90d', label: 'Últimos 90 dias' },
 ]
-const period = ref('month')
+// Data da venda começa sem recorte para não brigar com o prazo de envio: um
+// pedido vendido semana passada pode ter despacho hoje e precisa aparecer.
+const period = ref('all')
+
+// Prazo de ENVIO é a janela operacional (o que precisa sair da casa). Começa em
+// "Hoje", que é a fila com que o cliente abre o dia.
+const shipPeriodOptions = [
+  { value: 'all', label: 'Todos' },
+  { value: 'overdue', label: 'Atrasados' },
+  { value: 'today', label: 'Hoje' },
+  { value: 'tomorrow', label: 'Amanhã' },
+  { value: '7d', label: 'Próximos 7 dias' },
+]
+const shipPeriod = ref('today')
 const selectedMarketplaces = ref([])
 const selectedAccounts = ref([])
 const selectedStatuses = ref([])
@@ -564,6 +599,8 @@ function toIso(d) {
 const dateRange = computed(() => {
   const now = new Date()
   const to = toIso(now)
+  if (period.value === 'all') return { from: '', to: '' }
+  if (period.value === 'today') return { from: to, to }
   if (period.value === '7d') {
     const d = new Date(now); d.setDate(d.getDate() - 6); return { from: toIso(d), to }
   }
@@ -577,8 +614,43 @@ const dateRange = computed(() => {
   return { from: toIso(d), to }
 })
 
+/** Janela do prazo de envio (independente da data da venda). */
+const shipRange = computed(() => {
+  const now = new Date()
+  const hoje = toIso(now)
+  if (shipPeriod.value === 'all') return { from: '', to: '' }
+  if (shipPeriod.value === 'today') return { from: hoje, to: hoje }
+  if (shipPeriod.value === 'tomorrow') {
+    const d = new Date(now); d.setDate(d.getDate() + 1)
+    return { from: toIso(d), to: toIso(d) }
+  }
+  if (shipPeriod.value === '7d') {
+    const d = new Date(now); d.setDate(d.getDate() + 6)
+    return { from: hoje, to: toIso(d) }
+  }
+  // Atrasados: tudo com prazo até ontem. Sem limite inferior, porque atraso
+  // antigo continua sendo atraso.
+  const ontem = new Date(now); ontem.setDate(ontem.getDate() - 1)
+  return { from: '', to: toIso(ontem) }
+})
+
+const periodLabel = computed(() => {
+  const { from, to } = dateRange.value
+  if (!from && !to) return 'Todas as vendas'
+  return `${from} — ${to}`
+})
+
+const shipLabel = computed(() => {
+  const option = shipPeriodOptions.find((o) => o.value === shipPeriod.value)
+  if (shipPeriod.value === 'all') return 'Qualquer prazo'
+  return option?.label ?? shipPeriod.value
+})
+
 const diasNoPeriodo = computed(() => {
   const { from, to } = dateRange.value
+  // Sem recorte de data da venda, a média por dia usa os dias realmente
+  // presentes nos dados, senão dividiríamos por um intervalo inexistente.
+  if (!from || !to) return Math.max(1, byDay.value.length)
   const ms = new Date(`${to}T00:00:00`) - new Date(`${from}T00:00:00`)
   return Math.max(1, Math.round(ms / 86400000) + 1)
 })
@@ -614,6 +686,8 @@ function toggleAccount(value) {
 }
 
 const hasActiveFilters = computed(() =>
+  period.value !== 'all' ||
+  shipPeriod.value !== 'today' ||
   selectedMarketplaces.value.length > 0 ||
   selectedAccounts.value.length > 0 ||
   selectedStatuses.value.length > 0 ||
@@ -624,6 +698,10 @@ const hasActiveFilters = computed(() =>
 )
 
 function clearFilters() {
+  // Volta ao estado com que a tela abre, não a "sem filtro nenhum": o padrão
+  // operacional é o prazo de envio de hoje.
+  period.value = 'all'
+  shipPeriod.value = 'today'
   selectedMarketplaces.value = []
   selectedAccounts.value = []
   selectedStatuses.value = []
@@ -636,9 +714,12 @@ function clearFilters() {
 /** Filtros atuais no formato aceito pelo backend. */
 function currentFilterParams() {
   const { from, to } = dateRange.value
+  const ship = shipRange.value
   return {
     from,
     to,
+    shipFrom: ship.from,
+    shipTo: ship.to,
     marketplace: selectedMarketplaces.value,
     account: selectedAccounts.value,
     shippingStatus: selectedStatuses.value,
@@ -773,7 +854,7 @@ function runEnterAnimations() {
 let filtersDebounceTimer = null
 watch(
   [
-    period, selectedMarketplaces, selectedAccounts, selectedStatuses, selectedModes,
+    period, shipPeriod, selectedMarketplaces, selectedAccounts, selectedStatuses, selectedModes,
     selectedQueue, selectedProcessed, selectedSkuMapped,
   ],
   () => {
@@ -1049,6 +1130,9 @@ onUnmounted(() => {
   font-size: 0.72rem; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .filters-range svg { color: var(--dash-blue); }
+.filters-range { gap: 0.85rem; flex-wrap: wrap; }
+.filters-range__item { display: inline-flex; align-items: center; gap: 0.35rem; }
+.chip--danger.is-active { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
 .filters-advanced { border-top: 1px solid #e2e8f0; }
 .filters-advanced > summary {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;

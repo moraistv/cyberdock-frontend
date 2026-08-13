@@ -28,8 +28,8 @@ export function useSalesFilterFacets() {
   let activeController = null;
 
   /**
-   * @param {object} params { from, to, marketplace, account, shippingStatus,
-   *   shippingMode, saleStatus, processed, skuMapped, queue }
+   * @param {object} params { from, to, shipFrom, shipTo, marketplace, account,
+   *   shippingStatus, shippingMode, saleStatus, processed, skuMapped, queue }
    *   Listas aceitam array ou string em CSV.
    */
   const fetchFacets = async (params = {}) => {

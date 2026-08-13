@@ -42,8 +42,11 @@ export function useDashboardStats() {
   let activeController = null;
 
   /**
-   * @param {object} params { from, to, marketplace, account, shippingStatus, shippingMode }
+   * @param {object} params { from, to, shipFrom, shipTo, marketplace, account,
+   *   shippingStatus, shippingMode, saleStatus, queue, processed, skuMapped }
    *  Os filtros de lista aceitam array (seleção múltipla) ou string.
+   *  `from/to` recortam a DATA DA VENDA e `shipFrom/shipTo` o PRAZO DE ENVIO —
+   *  são janelas independentes.
    */
   const fetchStats = async (params = {}) => {
     const myRequest = ++requestId;
@@ -56,11 +59,21 @@ export function useDashboardStats() {
       if (params.from) qs.set('from', params.from);
       if (params.to) qs.set('to', params.to);
 
+      if (params.shipFrom) qs.set('shipFrom', params.shipFrom);
+      if (params.shipTo) qs.set('shipTo', params.shipTo);
+
       const asCsv = (v) => (Array.isArray(v) ? v.join(',') : v);
       if (params.marketplace?.length) qs.set('marketplace', asCsv(params.marketplace));
       if (params.account?.length) qs.set('account', asCsv(params.account));
       if (params.shippingStatus?.length) qs.set('shippingStatus', asCsv(params.shippingStatus));
       if (params.shippingMode?.length) qs.set('shippingMode', asCsv(params.shippingMode));
+      if (params.saleStatus?.length) qs.set('saleStatus', asCsv(params.saleStatus));
+      // Estes três eram montados na tela mas nunca chegavam ao backend, então
+      // clicar em "A despachar", "Estoque abatido" ou "SKU ausente" não mudava
+      // número nenhum nos cards.
+      if (params.queue) qs.set('queue', params.queue);
+      if (params.processed) qs.set('processed', params.processed);
+      if (params.skuMapped) qs.set('skuMapped', params.skuMapped);
 
       const data = await api.get(`/sales/dashboard-stats?${qs.toString()}`, {
         signal: activeController.signal,

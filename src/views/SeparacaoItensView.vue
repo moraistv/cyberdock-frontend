@@ -71,6 +71,14 @@
               </select>
             </div>
             <div class="filter-block">
+              <label class="filter-label">Canal</label>
+              <select v-model="filters.marketplace" @change="aplicarFiltros">
+                <option value="">Todos os canais</option>
+                <option value="ML">Mercado Livre</option>
+                <option value="Shopee">Shopee</option>
+              </select>
+            </div>
+            <div class="filter-block">
               <label class="filter-label">Modalidade de Envio</label>
               <select v-model="filters.shippingMode">
                 <option value="">Todas</option>
@@ -217,11 +225,13 @@
                           <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
                           <line x1="12" y1="22.08" x2="12" y2="12" />
                         </svg>
-                        <img v-else src="/img/ml-logo.svg" alt="Mercado Livre" class="desc-origin__img" />
+                        <img v-else :src="marketplaceLogo(item)" :alt="marketplaceLabel(item)" class="desc-origin__img" />
                       </span>
                       <div class="prod__body">
                         <div class="prod__desc" :title="descricaoProduto(item)">{{ descricaoProduto(item) }}</div>
                         <div class="prod__meta">
+                          <img :src="marketplaceLogo(item)" :alt="marketplaceLabel(item)"
+                               :title="marketplaceLabel(item)" class="prod__mk-logo" />
                           <span class="chip chip--sku" :title="`SKU: ${item.sku || '—'}`">{{ item.sku || '—' }}</span>
                           <span v-if="variacao(item)" class="chip chip--var" :title="variacao(item)">{{ variacao(item) }}</span>
                         </div>
@@ -334,6 +344,7 @@ const filters = reactive({
   shippingLimitStart: '',
   shippingLimitEnd: '',
   shippingMode: '',
+  marketplace: '',
   account: '',
   userNickname: '',
   despacho: 'nao',
@@ -443,6 +454,7 @@ function buildQuery(extra = {}) {
   if (filters.shippingLimitStart) q.set('shippingLimitStart', filters.shippingLimitStart);
   if (filters.shippingLimitEnd) q.set('shippingLimitEnd', filters.shippingLimitEnd);
   if (filters.shippingMode) q.set('shippingMode', filters.shippingMode);
+  if (filters.marketplace) q.set('marketplace', filters.marketplace);
   if (filters.account) q.set('account', filters.account);
   if (filters.userNickname) q.set('userNickname', filters.userNickname);
   if (filters.despacho) q.set('despacho', filters.despacho);
@@ -490,6 +502,7 @@ function limparFiltros() {
   filters.shippingLimitStart = '';
   filters.shippingLimitEnd = '';
   filters.shippingMode = '';
+  filters.marketplace = '';
   filters.account = '';
   filters.userNickname = '';
   filters.despacho = 'nao';
@@ -577,10 +590,29 @@ function descricaoProduto(item) {
   return item?.product_title || '—';
 }
 
+const MK_LOGOS = {
+  ML: '/img/ml-logo.svg',
+  Shopee: '/img/shopee-logo.svg',
+};
+
+/** Canal do item; `channel` é o apelido antigo mantido pelo backend. */
+function itemMarketplace(item) {
+  const raw = String(item?.marketplace || item?.channel || 'ML').toLowerCase();
+  return raw.includes('shopee') || raw === 'sp' ? 'Shopee' : 'ML';
+}
+
+function marketplaceLogo(item) {
+  return MK_LOGOS[itemMarketplace(item)];
+}
+
+function marketplaceLabel(item) {
+  return itemMarketplace(item) === 'Shopee' ? 'Shopee' : 'Mercado Livre';
+}
+
 function descricaoTitle(item) {
   return temDescricaoInterna(item)
     ? `${descricaoProduto(item)} (descrição CyberDock)`
-    : `${descricaoProduto(item)} (título do anúncio no Mercado Livre)`;
+    : `${descricaoProduto(item)} (título do anúncio na ${marketplaceLabel(item)})`;
 }
 
 // Variação escolhida na venda (ex.: "Cor: Preto · Tamanho: 42 BR").
@@ -844,6 +876,7 @@ onMounted(() => {
 }
 .chip--sku { font-family: 'SFMono-Regular', Consolas, monospace; background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }
 .chip--var { background: #eef2ff; border: 1px solid #e0e7ff; color: #4338ca; }
+.prod__mk-logo { width: 14px; height: 14px; object-fit: contain; flex-shrink: 0; }
 /* Indicador da origem da descrição (CyberDock x Mercado Livre) */
 .desc-origin {
   display: inline-flex; align-items: center; justify-content: center;
