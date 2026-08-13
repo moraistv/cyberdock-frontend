@@ -25,32 +25,12 @@
           </div>
         </div>
 
-        <!-- Filtros -->
+        <!-- Filtros: só o essencial da fila fica à vista. O resto vai para
+             "Filtros avançados", igual ao padrão da tabela de vendas. -->
         <div class="filters-card">
-          <!-- Datas + presets -->
-          <div class="filters-dates">
-            <div class="filter-block">
-              <label class="filter-label">Período da Venda</label>
-              <div class="date-range">
-                <input type="date" v-model="filters.saleDateStart" @change="activeVendaPreset = null" />
-                <span>até</span>
-                <input type="date" v-model="filters.saleDateEnd" @change="activeVendaPreset = null" />
-              </div>
-              <div class="preset-chips">
-                <button :class="{ active: activeVendaPreset === 'hoje' }" @click="setVendaPeriodo('hoje')">Hoje</button>
-                <button :class="{ active: activeVendaPreset === '7dias' }" @click="setVendaPeriodo('7dias')">7 dias</button>
-                <button :class="{ active: activeVendaPreset === '30dias' }" @click="setVendaPeriodo('30dias')">30 dias</button>
-                <button :class="{ active: activeVendaPreset === 'mes' }" @click="setVendaPeriodo('mes')">Este mês</button>
-              </div>
-            </div>
-
-            <div class="filter-block">
-              <label class="filter-label">Prazo para Despachar</label>
-              <div class="date-range">
-                <input type="date" v-model="filters.shippingLimitStart" @change="activePrazoPreset = null" />
-                <span>até</span>
-                <input type="date" v-model="filters.shippingLimitEnd" @change="activePrazoPreset = null" />
-              </div>
+          <div class="filters-bar">
+            <div class="filters-bar__group">
+              <span class="filters-bar__label">Prazo</span>
               <div class="preset-chips">
                 <button class="chip-danger" :class="{ active: activePrazoPreset === 'atrasados' }" @click="setPrazoPeriodo('atrasados')">Atrasados</button>
                 <button :class="{ active: activePrazoPreset === 'hoje' }" @click="setPrazoPeriodo('hoje')">Hoje</button>
@@ -58,58 +38,100 @@
                 <button :class="{ active: activePrazoPreset === '7dias' }" @click="setPrazoPeriodo('7dias')">7 dias</button>
               </div>
             </div>
-          </div>
 
-          <!-- Selects -->
-          <div class="filters-selects">
-            <div class="filter-block">
-              <label class="filter-label">Situação de Despacho</label>
-              <select v-model="filters.despacho" @change="aplicarFiltros">
+            <div class="filters-bar__group">
+              <span class="filters-bar__label">Situação</span>
+              <select class="filters-bar__select" v-model="filters.despacho" @change="aplicarFiltros">
                 <option value="nao">A despachar</option>
                 <option value="sim">Já despachados</option>
                 <option value="todos">Todos</option>
               </select>
             </div>
-            <div class="filter-block">
-              <label class="filter-label">Canal</label>
-              <select v-model="filters.marketplace" @change="aplicarFiltros">
-                <option value="">Todos os canais</option>
+
+            <div class="filters-bar__group">
+              <span class="filters-bar__label">Canal</span>
+              <select class="filters-bar__select" v-model="filters.marketplace" @change="aplicarFiltros">
+                <option value="">Todos</option>
                 <option value="ML">Mercado Livre</option>
                 <option value="Shopee">Shopee</option>
               </select>
             </div>
-            <div class="filter-block">
-              <label class="filter-label">Modalidade de Envio</label>
-              <select v-model="filters.shippingMode">
-                <option value="">Todas</option>
-                <option v-for="m in modeOptions" :key="m" :value="m">{{ m }}</option>
-              </select>
-            </div>
-            <div class="filter-block">
-              <label class="filter-label">Conta</label>
-              <select v-model="filters.account">
-                <option value="">Todas as contas</option>
-                <option v-for="acc in accountOptions" :key="acc" :value="acc">{{ acc }}</option>
-              </select>
-            </div>
-            <div class="filter-block">
-              <label class="filter-label">Usuário</label>
-              <select v-model="filters.userNickname">
-                <option value="">Todos os usuários</option>
-                <option v-for="usr in userOptions" :key="usr" :value="usr">{{ usr }}</option>
-              </select>
-            </div>
+
+            <button class="adv-toggle" :class="{ 'is-active': advancedCount > 0 }"
+                    @click="showAdvanced = !showAdvanced">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></svg>
+              Filtros avançados
+              <span v-if="advancedCount > 0" class="adv-toggle__count">{{ advancedCount }}</span>
+              <svg class="adv-toggle__chev" :class="{ 'is-open': showAdvanced }" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+            </button>
+
+            <button v-if="hasAnyFilter" class="btn-link btn-link--inline" @click="limparFiltros">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              Limpar
+            </button>
           </div>
 
-          <div class="filters-actions">
-            <button class="btn-link" @click="limparFiltros">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              Limpar filtros
-            </button>
-            <button class="btn btn-primary" @click="aplicarFiltros" :disabled="isLoading">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-              Aplicar filtros
-            </button>
+          <div v-if="showAdvanced" class="filters-advanced">
+            <div class="filters-dates">
+              <div class="filter-block">
+                <label class="filter-label">Período da Venda</label>
+                <div class="date-range">
+                  <input type="date" v-model="filters.saleDateStart" @change="activeVendaPreset = null" />
+                  <span>até</span>
+                  <input type="date" v-model="filters.saleDateEnd" @change="activeVendaPreset = null" />
+                </div>
+                <div class="preset-chips">
+                  <button :class="{ active: activeVendaPreset === 'hoje' }" @click="setVendaPeriodo('hoje')">Hoje</button>
+                  <button :class="{ active: activeVendaPreset === '7dias' }" @click="setVendaPeriodo('7dias')">7 dias</button>
+                  <button :class="{ active: activeVendaPreset === '30dias' }" @click="setVendaPeriodo('30dias')">30 dias</button>
+                  <button :class="{ active: activeVendaPreset === 'mes' }" @click="setVendaPeriodo('mes')">Este mês</button>
+                </div>
+              </div>
+
+              <div class="filter-block">
+                <label class="filter-label">Prazo para Despachar</label>
+                <div class="date-range">
+                  <input type="date" v-model="filters.shippingLimitStart" @change="activePrazoPreset = null" />
+                  <span>até</span>
+                  <input type="date" v-model="filters.shippingLimitEnd" @change="activePrazoPreset = null" />
+                </div>
+              </div>
+            </div>
+
+            <div class="filters-selects">
+              <div class="filter-block">
+                <label class="filter-label">Modalidade de Envio</label>
+                <select v-model="filters.shippingMode">
+                  <option value="">Todas</option>
+                  <option v-for="m in modeOptions" :key="m" :value="m">{{ m }}</option>
+                </select>
+              </div>
+              <div class="filter-block">
+                <label class="filter-label">Conta</label>
+                <select v-model="filters.account">
+                  <option value="">Todas as contas</option>
+                  <option v-for="acc in accountOptions" :key="acc" :value="acc">{{ acc }}</option>
+                </select>
+              </div>
+              <div class="filter-block">
+                <label class="filter-label">Usuário</label>
+                <select v-model="filters.userNickname">
+                  <option value="">Todos os usuários</option>
+                  <option v-for="usr in userOptions" :key="usr" :value="usr">{{ usr }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="filters-actions">
+              <button class="btn-link" @click="limparFiltros">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                Limpar filtros
+              </button>
+              <button class="btn btn-primary" @click="aplicarFiltros" :disabled="isLoading">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                Aplicar filtros
+              </button>
+            </div>
           </div>
         </div>
 
@@ -590,6 +612,26 @@ function descricaoProduto(item) {
   return item?.product_title || '—';
 }
 
+const showAdvanced = ref(false);
+
+/** Quantos filtros avançados estão ativos (aparece no contador do botão). */
+const advancedCount = computed(() =>
+  (filters.saleDateStart ? 1 : 0) +
+  (filters.saleDateEnd ? 1 : 0) +
+  (filters.shippingMode ? 1 : 0) +
+  (filters.account ? 1 : 0) +
+  (filters.userNickname ? 1 : 0)
+);
+
+const hasAnyFilter = computed(() =>
+  advancedCount.value > 0 ||
+  Boolean(filters.marketplace) ||
+  filters.despacho !== 'nao' ||
+  Boolean(activePrazoPreset.value) ||
+  Boolean(filters.shippingLimitStart) ||
+  Boolean(filters.shippingLimitEnd)
+);
+
 const MK_LOGOS = {
   ML: '/img/ml-logo.svg',
   Shopee: '/img/shopee-logo.svg',
@@ -768,7 +810,46 @@ onMounted(() => {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Filtros */
-.filters-card { background: #fff; border: 1px solid var(--color-border); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.25rem; }
+.filters-card { background: #fff; border: 1px solid var(--color-border); border-radius: 14px; padding: 0; margin-bottom: 1rem; overflow: hidden; }
+
+/* Barra compacta: o painel antigo abria com 2 grades de data + 5 selects e
+   tomava metade da tela antes de mostrar um item. Aqui fica só o que a fila de
+   separação usa todo dia; o resto vive em "Filtros avançados". */
+.filters-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.9rem;
+  padding: 0.7rem 0.85rem;
+}
+.filters-bar__group { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+.filters-bar__label {
+  color: #475569; font-size: 0.68rem; font-weight: 800;
+  letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap;
+}
+.filters-bar__select {
+  height: 32px; padding: 0 0.55rem; border: 1px solid #dbe3ef; border-radius: 8px;
+  background: #fff; color: #334155; font-family: inherit; font-size: 0.78rem; font-weight: 600;
+}
+.filters-bar__select:focus { outline: none; border-color: #93c5fd; }
+
+.adv-toggle {
+  display: inline-flex; align-items: center; gap: 0.4rem; height: 32px;
+  margin-left: auto; padding: 0 0.7rem; border: 1px solid #dbe3ef; border-radius: 8px;
+  background: #fff; color: #475569; cursor: pointer;
+  font-family: inherit; font-size: 0.76rem; font-weight: 700;
+}
+.adv-toggle:hover { border-color: #93c5fd; background: #f8fbff; color: #1d4ed8; }
+.adv-toggle.is-active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.adv-toggle__count {
+  display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: #2563eb; color: #fff; font-size: 0.64rem;
+}
+.adv-toggle__chev { transition: transform 180ms ease; }
+.adv-toggle__chev.is-open { transform: rotate(180deg); }
+.btn-link--inline { height: 32px; padding: 0 0.5rem; }
+
+.filters-advanced {
+  display: flex; flex-direction: column; gap: 1rem;
+  padding: 0.9rem 0.85rem; border-top: 1px solid #eef2f7; background: #fbfdff;
+}
 .filters-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
 .filters-selects { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1.1rem; }
 .filter-block { display: flex; flex-direction: column; gap: 0.4rem; }

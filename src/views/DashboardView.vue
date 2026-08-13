@@ -1100,17 +1100,20 @@ onUnmounted(() => {
   border: 1px solid var(--dash-border); border-radius: 12px; background: #fff;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
+/* Com dois grupos de data + canal a linha não cabe mais na largura útil, e o
+   `overflow-x: auto` de antes virava uma barra de rolagem horizontal atravessada
+   no meio dos filtros. Agora os grupos quebram para a linha de baixo. */
 .filters-primary {
-  display: flex; align-items: center; gap: 1rem; min-width: 0;
-  padding: 0.7rem 0.85rem; overflow-x: auto; scrollbar-width: thin;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.55rem 1.1rem;
+  min-width: 0; padding: 0.7rem 0.85rem; overflow: visible;
 }
-.filter-block { display: flex; align-items: center; flex-wrap: nowrap; gap: 0.55rem; min-width: max-content; }
+.filter-block { display: flex; align-items: center; flex-wrap: wrap; gap: 0.55rem; min-width: 0; }
 .filter-label {
   min-width: 0; color: #475569; font-size: 0.68rem; font-weight: 800;
   letter-spacing: 0.055em; white-space: nowrap;
 }
 .filter-label svg { color: var(--dash-blue); }
-.chip-row { flex-wrap: nowrap; gap: 0.3rem; }
+.chip-row { flex-wrap: wrap; gap: 0.3rem; }
 .chip {
   min-height: 30px; padding: 0.32rem 0.62rem; border-color: #dbe3ef;
   border-radius: 7px; color: #475569; font-size: 0.75rem; white-space: nowrap;
@@ -1124,13 +1127,15 @@ onUnmounted(() => {
   font-variant-numeric: tabular-nums;
 }
 .chip.is-active .chip__count { background: #bfdbfe; color: #1d4ed8; }
+/* O resumo do intervalo vai para a linha inteira de baixo: disputando espaço na
+   mesma linha dos chips, era ele que estourava a largura. */
 .filters-range {
-  display: inline-flex; align-items: center; gap: 0.4rem; margin-left: auto;
-  padding-left: 0.9rem; border-left: 1px solid #e2e8f0; color: #475569;
-  font-size: 0.72rem; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap;
+  display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;
+  width: 100%; margin-left: 0; padding-top: 0.5rem;
+  border-top: 1px dashed #e2e8f0; color: #475569;
+  font-size: 0.72rem; font-weight: 650; font-variant-numeric: tabular-nums;
 }
 .filters-range svg { color: var(--dash-blue); }
-.filters-range { gap: 0.85rem; flex-wrap: wrap; }
 .filters-range__item { display: inline-flex; align-items: center; gap: 0.35rem; }
 .chip--danger.is-active { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
 .filters-advanced { border-top: 1px solid #e2e8f0; }
@@ -1224,8 +1229,7 @@ onUnmounted(() => {
 }
 @media (max-width: 900px) {
   .dashboard-content { padding: 1rem; }
-  .filters-primary { align-items: flex-start; flex-wrap: wrap; overflow: visible; }
-  .filters-range { width: 100%; margin-left: 0; padding: 0.45rem 0 0; border-left: 0; border-top: 1px solid #eef2f7; }
+  .filters-primary { align-items: flex-start; }
   .filters-advanced__body, .operational-filter-grid { grid-template-columns: 1fr; }
   .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -1235,7 +1239,8 @@ onUnmounted(() => {
   .toolbar-title { font-size: 1.5rem; }
   .toolbar-desc { font-size: 0.78rem; line-height: 1.35; }
   .filter-block--period, .filters-primary > .filter-block { width: 100%; align-items: flex-start; flex-direction: column; }
-  .filters-primary .chip-row { width: 100%; overflow-x: auto; padding-bottom: 2px; }
+  /* Também sem rolagem lateral no celular: os chips quebram linha. */
+  .filters-primary .chip-row { width: 100%; flex-wrap: wrap; }
   .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
   .grid-4 > .card { min-height: 0; }
   .chart-card { min-height: 300px; }

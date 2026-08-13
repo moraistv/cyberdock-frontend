@@ -34,7 +34,7 @@
           <h3 class="admin-metrics-title">Métricas do Sistema</h3>
         </div>
         <div class="admin-metrics-section">
-          <div v-if="isLoadingMetrics" class="metrics-grid">
+          <div v-if="isLoadingAccounts" class="metrics-grid">
             <div v-for="i in 4" :key="i" class="metric-item-skeleton">
               <div class="skeleton-value"></div>
               <div class="skeleton-label"></div>
@@ -42,20 +42,28 @@
           </div>
           <div v-else class="metrics-grid">
             <div class="metric-item">
-              <span class="metric-value">{{ metrics.onlineUsers }}</span>
-              <span class="metric-label">Usuários Online</span>
+              <img src="/img/ml-logo.svg" alt="" class="metric-logo" />
+              <span class="metric-value">{{ adminMetrics.mlAccounts }}</span>
+              <span class="metric-label">Contas ML</span>
             </div>
             <div class="metric-item">
-              <span class="metric-value">{{ metrics.newSignups }}</span>
-              <span class="metric-label">Novos (Mês)</span>
+              <img src="/img/shopee-logo.svg" alt="" class="metric-logo" />
+              <span class="metric-value">{{ adminMetrics.shopeeAccounts }}</span>
+              <span class="metric-label">Lojas Shopee</span>
             </div>
             <div class="metric-item">
-              <span class="metric-value">{{ metrics.connectedAccounts }}</span>
-              <span class="metric-label">Contas Ativas</span>
+              <span class="metric-icon is-ok">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+              </span>
+              <span class="metric-value">{{ adminMetrics.active }}</span>
+              <span class="metric-label">Ativas</span>
             </div>
             <div class="metric-item">
-              <span class="metric-value" :class="{ 'has-errors': metrics.apiErrors > 0 }">{{ metrics.apiErrors }}</span>
-              <span class="metric-label">Erros de API</span>
+              <span class="metric-icon" :class="adminMetrics.attention > 0 ? 'is-warn' : 'is-ok'">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /></svg>
+              </span>
+              <span class="metric-value" :class="{ 'has-errors': adminMetrics.attention > 0 }">{{ adminMetrics.attention }}</span>
+              <span class="metric-label">Atenção</span>
             </div>
           </div>
         </div>
@@ -114,7 +122,6 @@ import { ref, onMounted, onBeforeUpdate, onBeforeUnmount, watch, nextTick, compu
 import { useRoute } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { useAdminMode } from '@/composables/useAdminMode';
-import { useAdminMetrics } from '@/composables/useAdminMetrics';
 
 const { user, userRole, fetchMercadoLivreAccounts, fetchShopeeAccounts } = useAuth();
 
@@ -123,13 +130,6 @@ const MK_LOGOS = {
   Shopee: '/img/shopee-logo.svg',
 };
 const { isAdminMode } = useAdminMode();
-const { metrics, isLoading: isLoadingMetrics, fetchMetrics } = useAdminMetrics();
-
-watch(isAdminMode, (isNowAdmin) => {
-  if (isNowAdmin) {
-    fetchMetrics();
-  }
-}, { immediate: true });
 
 const route = useRoute();
 const navLinksRef = ref([]);
@@ -189,6 +189,8 @@ const isLoadingAccounts = ref(true);
 const accountsError = ref(null);
 const isAccountsSectionCollapsed = ref(false);
 
+/**
+ * Métricas do painel admin derivadas das contas que a sidebar JÁ carregou.
 /** Lista única dos dois marketplaces, normalizada para o item da sidebar. */
 const allConnectedAccounts = computed(() => [
   ...connectedAccounts.value.map((acc) => ({
@@ -206,6 +208,25 @@ const allConnectedAccounts = computed(() => [
     logo: MK_LOGOS.Shopee,
   })),
 ]);
+
+/**
+ * Métricas do painel admin derivadas das contas que a sidebar JÁ carregou.
+ *
+ * Antes vinham do Firebase Realtime Database, que responde "Permission denied"
+ * neste projeto — a fonte de verdade migrou para o PostgreSQL. O resultado eram
+ * duas requisições falhando em toda abertura de tela admin e um bloco fixo em
+ * zero, incluindo um campo (`newSignups`) que o composable nem devolvia.
+ * Aqui os números saem de dados reais já disponíveis, sem nova requisição.
+ */
+const adminMetrics = computed(() => {
+  const list = allConnectedAccounts.value;
+  return {
+    mlAccounts: list.filter((a) => a.marketplace === 'Mercado Livre').length,
+    shopeeAccounts: list.filter((a) => a.marketplace === 'Shopee').length,
+    active: list.filter((a) => a.status === 'active').length,
+    attention: list.filter((a) => a.status !== 'active').length,
+  };
+});
 
 async function fetchAccounts() {
   if (!user.value || !user.value.uid) {
@@ -329,14 +350,19 @@ watch(() => route.fullPath, (newPath) => {
   opacity: 0;
 }
 .nav-link {
-  display: flex; align-items: center; padding: 0.75rem 1.5rem; margin: 0.25rem 0;
-  font-size: 0.95rem; font-weight: 500; color: var(--color-text-secondary);
+  display: flex; align-items: center; padding: 0.7rem 1rem; margin: 0.25rem 0;
+  font-size: 0.92rem; font-weight: 500; color: var(--color-text-secondary);
+  white-space: nowrap;
   text-decoration: none; border-radius: 8px; transition: color 0.2s, background-color 0.2s;
   position: relative; z-index: 2; border-left: 4px solid transparent;
 }
 .nav-link:hover { background-color: #f0f0f8; color: var(--color-text-primary); }
 .nav-link.router-link-exact-active { color: var(--color-text-primary); font-weight: 700; }
-.nav-icon { margin-right: 1rem; display: flex; align-items: center; transition: transform 0.2s ease; }
+/* "Separação de Itens" não cabia em uma linha e quebrava no meio do menu. O
+   padding lateral generoso era o que roubava a largura; com menos padding,
+   texto sem quebra e ícone fixo, o rótulo inteiro cabe. */
+.nav-link span:not(.nav-icon) { min-width: 0; white-space: nowrap; }
+.nav-icon { margin-right: 0.75rem; display: flex; align-items: center; flex: 0 0 auto; transition: transform 0.2s ease; }
 .nav-icon svg { width: 20px; height: 20px; }
 .nav-icon.pulse-animation { animation: pulse-icon 0.3s ease-out; }
 @keyframes pulse-icon { 50% { transform: scale(1.2); } }
@@ -414,35 +440,58 @@ watch(() => route.fullPath, (newPath) => {
 }
 
 .admin-metrics-section {
-  padding: 0 1.5rem 1.5rem 1.5rem;
+  padding: 0 1rem 1.25rem 1rem;
 }
 .metrics-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 0.5rem;
 }
+/* Cartão em LINHA (ícone + número + rótulo) em vez de coluna centralizada: na
+   largura da sidebar o layout antigo quebrava rótulos curtos no meio, virando
+   "Usuários / Online" e "Novos / (Mês)" em duas linhas. */
 .metric-item {
-  background-color: #f9fafb;
-  border-radius: 8px;
-  padding: 0.75rem;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid #e8ecf3;
+  border-radius: 9px;
+  background-color: #f9fafb;
+  text-align: left;
 }
+.metric-logo,
+.metric-icon {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+}
+.metric-logo { object-fit: contain; }
+.metric-icon svg { width: 100%; height: 100%; }
+.metric-icon.is-ok { color: #059669; }
+.metric-icon.is-warn { color: #d97706; }
 .metric-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-primary);
+  font-size: 1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #2563eb;
+  line-height: 1;
 }
 .metric-value.has-errors {
-  color: var(--color-danger);
+  color: #d97706;
 }
 .metric-label {
-  font-size: 0.75rem;
+  min-width: 0;
+  overflow: hidden;
   color: var(--color-text-secondary);
-  margin-top: 0.25rem;
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .metric-item-skeleton {
   background-color: #f3f4f6;
