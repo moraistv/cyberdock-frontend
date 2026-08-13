@@ -141,7 +141,8 @@
     <ToastNotification :is-visible="activeSyncState.isVisible" :title="activeSyncState.title"
             :description="activeSyncState.description" :progress="activeSyncState.progress" :type="activeSyncState.type" />
 
-    <SyncLiveModal :open="isSyncLiveOpen" :accounts="unifiedLiveAccounts" title="Sincronização global em andamento..." />
+    <SyncLiveModal :open="isSyncLiveOpen" :accounts="unifiedLiveAccounts"
+        title="Sincronização global em andamento..." @close="isSyncLiveOpen = false" />
   </div>
 </template>
 

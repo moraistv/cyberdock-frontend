@@ -642,7 +642,8 @@
         </UniversalModal>
 
         <!-- Painel de progresso ao vivo (por conta, em tempo real) -->
-        <SyncLiveModal :open="isSyncLiveOpen" :accounts="unifiedLiveAccounts" title="Sincronizando vendas..." />
+        <SyncLiveModal :open="isSyncLiveOpen" :accounts="unifiedLiveAccounts"
+            title="Sincronizando vendas..." @close="isSyncLiveOpen = false" />
 
         <ToastNotification :is-visible="activeSyncState.isVisible" :title="activeSyncState.title"
             :description="activeSyncState.description" :progress="activeSyncState.progress" :type="activeSyncState.type" />

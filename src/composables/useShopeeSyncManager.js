@@ -30,38 +30,83 @@ export function useShopeeSyncManager() {
     }
   };
 
+  // Quantas vezes reconectar o SSE antes de desistir da conta.
+  const MAX_SSE_RETRIES = 10;
+
   const runSingleSync = (shopId, accountNickname, clientUid = null, force = false, onProgress = null) => {
     return new Promise((resolve, reject) => {
       let es = null;
+      let settled = false;
+      let retries = 0;
+      let retryTimer = null;
       const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+      const metrics = { newSalesCount: 0, updatedCount: 0, skippedCount: 0 };
+
+      const cleanup = () => {
+        settled = true;
+        clearTimeout(retryTimer);
+        if (es) { es.close(); es = null; }
+      };
+
+      const sseUrl = `${API_BASE_URL}/shopee/sync-status/${clientId}?token=${encodeURIComponent(token.value)}`;
+
+      const connect = () => {
+        if (settled) return;
+        es = new window.EventSource(sseUrl);
+
+        es.onmessage = (event) => {
+          // Heartbeats são comentários SSE e não chegam aqui; qualquer mensagem
+          // real significa que o canal está vivo, então zera o contador.
+          retries = 0;
+          const data = JSON.parse(event.data);
+          if (data.newSalesCount !== undefined) metrics.newSalesCount = data.newSalesCount;
+          if (data.updatedCount !== undefined) metrics.updatedCount = data.updatedCount;
+          if (data.skippedCount !== undefined) metrics.skippedCount = data.skippedCount;
+          if (typeof onProgress === 'function') onProgress({ ...data, accountNickname, shopId });
+
+          if (data.progress === 100) {
+            cleanup();
+            if (data.type === 'error') reject(new Error(data.message));
+            else resolve({ ...metrics });
+          }
+        };
+
+        /* Queda de conexão NÃO é mais falha da conta.
+         *
+         * A carga completa de uma loja pode levar minutos e o canal cai por
+         * timeout de proxy, troca de rede ou aba em segundo plano. O trabalho
+         * continua no servidor, que ainda guarda os eventos enquanto ninguém
+         * está conectado — inclusive o progresso final. Antes, o primeiro erro
+         * marcava a loja como "conexão perdida" mesmo tendo dado certo.
+         */
+        es.onerror = () => {
+          if (settled) return;
+          if (es) { es.close(); es = null; }
+
+          if (retries >= MAX_SSE_RETRIES) {
+            cleanup();
+            reject(new Error('Não foi possível acompanhar a sincronização Shopee: conexão instável.'));
+            return;
+          }
+
+          retries += 1;
+          if (typeof onProgress === 'function') {
+            onProgress({
+              message: `[${accountNickname}] Reconectando ao servidor (${retries}/${MAX_SSE_RETRIES})...`,
+              type: 'info',
+              accountNickname,
+              shopId,
+            });
+          }
+          // Espera crescente, com teto, para não martelar o servidor.
+          retryTimer = setTimeout(connect, Math.min(2000 * retries, 10000));
+        };
+      };
 
       api.post('/shopee/sync-account', { shopId, clientId, force, clientUid })
-        .then(() => {
-          const sseUrl = `${API_BASE_URL}/shopee/sync-status/${clientId}?token=${encodeURIComponent(token.value)}`;
-          es = new window.EventSource(sseUrl);
-          const metrics = { newSalesCount: 0, updatedCount: 0, skippedCount: 0 };
-
-          es.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.newSalesCount !== undefined) metrics.newSalesCount = data.newSalesCount;
-            if (data.updatedCount !== undefined) metrics.updatedCount = data.updatedCount;
-            if (data.skippedCount !== undefined) metrics.skippedCount = data.skippedCount;
-            if (typeof onProgress === 'function') onProgress({ ...data, accountNickname, shopId });
-
-            if (data.progress === 100) {
-              if (es) es.close();
-              if (data.type === 'error') reject(new Error(data.message));
-              else resolve({ ...metrics });
-            }
-          };
-
-          es.onerror = () => {
-            if (es) es.close();
-            reject(new Error('A conexão com o servidor foi perdida durante a sincronização Shopee.'));
-          };
-        })
+        .then(connect)
         .catch((error) => {
-          if (es) es.close();
+          cleanup();
           reject(new Error(error.message || 'Não foi possível iniciar a sincronização Shopee.'));
         });
     });

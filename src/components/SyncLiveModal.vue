@@ -1,6 +1,13 @@
 <template>
-    <UniversalModal :open="open" :title="title" :prevent-close="true" :show-close-button="false" :close-on-esc="false" :close-on-overlay="false" :lock-scroll="false" size="lg">
+    <!-- Fechável de propósito: a sincronização roda no servidor e continua
+         mesmo com o painel fechado. Antes o modal travava a tela até o fim,
+         que numa carga completa de loja passa de dois minutos. -->
+    <UniversalModal :open="open" :title="title" :lock-scroll="false" size="lg" @close="$emit('close')">
         <div class="live-content">
+            <p class="live-hint">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                Pode fechar esta janela: a sincronização continua no servidor e o resumo aparece ao terminar.
+            </p>
             <!-- Progresso geral -->
             <div class="live-overall">
                 <div class="live-overall-head">
@@ -62,6 +69,9 @@ const props = defineProps({
     title: { type: String, default: 'Sincronizando...' }
 });
 
+// eslint-disable-next-line no-undef
+defineEmits(['close']);
+
 const doneCount = computed(() =>
     props.accounts.filter(a => a.status === 'done' || a.status === 'error').length
 );
@@ -92,6 +102,13 @@ function fmtDuration(ms) {
 
 <style scoped>
 .live-content { display: flex; flex-direction: column; gap: 18px; font-family: var(--font-sans); }
+
+.live-hint {
+    display: flex; align-items: center; gap: 8px; margin: 0;
+    padding: 8px 10px; border: 1px solid #dbeafe; border-radius: 9px;
+    background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 600;
+}
+.live-hint svg { flex-shrink: 0; }
 
 .live-overall-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .live-overall-label { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #334155; }
