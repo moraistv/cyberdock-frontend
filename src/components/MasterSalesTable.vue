@@ -153,11 +153,34 @@
                         </div>
                     </div>
 
+                    <!-- Janela de datas visível: sem recorte, o tabelão pede as
+                         vendas mais recentes de TODOS os clientes e a consulta
+                         estourava o tempo limite do banco. "Tudo" continua
+                         disponível, mas como escolha explícita. -->
+                    <div class="window-chips">
+                        <span class="window-chips__label">Período</span>
+                        <button v-for="opt in windowOptions" :key="opt.value"
+                                class="window-chip" :class="{ 'is-active': salesWindow === opt.value }"
+                                @click="applyWindow(opt.value)">
+                            {{ opt.label }}
+                        </button>
+                    </div>
+
+                    <!-- Filtros avançados: recolhidos, no mesmo padrão da tabela
+                         do usuário. Abertos por padrão eles empurravam a listagem
+                         para fora da primeira tela. -->
+                    <button class="adv-toggle" :class="{ 'is-active': advancedFilterCount > 0 }"
+                            @click="showAdvancedFilters = !showAdvancedFilters">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></svg>
+                        Filtros avançados
+                        <span v-if="advancedFilterCount > 0" class="adv-toggle__count">{{ advancedFilterCount }}</span>
+                        <svg class="adv-toggle__chev" :class="{ 'is-open': showAdvancedFilters }" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+                    </button>
+
                 </div>
             </div>
 
-            <!-- Filtros Extras (sempre visíveis) -->
-            <div class="advanced-filters-content">
+            <div v-if="showAdvancedFilters" class="advanced-filters-content">
                 <div class="advanced-filters-grid">
                     <!-- Busca por Cliente removida (demanda 03) -->
 
@@ -680,6 +703,15 @@ const accountLogoByLabel = computed(() => {
 const formattedTotalSales = computed(() =>
     `${Number(totalSales.value || 0).toLocaleString('pt-BR')}${totalIsExact.value ? '' : '+'}`
 );
+
+/** Quantos filtros avançados estão ativos, para o contador do botão. */
+const advancedFilterCount = computed(() =>
+    selectedShippingModes.value.length +
+    (filters.saleDateStart ? 1 : 0) +
+    (filters.saleDateEnd ? 1 : 0) +
+    (filters.shippingLimitStart ? 1 : 0) +
+    (filters.shippingLimitEnd ? 1 : 0)
+);
 const formattedTotalPages = computed(() =>
     `${totalPages.value}${totalIsExact.value ? '' : '+'}`
 );
@@ -906,7 +938,31 @@ function deselectAll() {
 }
 
 
-// showAdvancedFilters removido — filtros sempre visíveis
+// Filtros avançados recolhidos por padrão: abertos, empurravam a listagem para
+// fora da primeira tela no painel admin.
+const showAdvancedFilters = ref(false);
+
+/**
+ * Janela de datas do tabelão. O padrão recorta os últimos 30 dias porque a
+ * consulta sem recorte precisa considerar o histórico completo dos dois canais
+ * de todos os clientes — passava dos 30s de limite do banco e a tela quebrava.
+ */
+const windowOptions = [
+    { value: '30d', label: '30 dias' },
+    { value: '7d', label: '7 dias' },
+    { value: 'today', label: 'Hoje' },
+    { value: 'all', label: 'Tudo' },
+];
+const salesWindow = ref('30d');
+
+function applyWindow(value) {
+    salesWindow.value = value;
+    // Uma janela explícita substitui as datas manuais, para não brigarem.
+    filters.saleDateStart = '';
+    filters.saleDateEnd = '';
+    activeSaleDatePreset.value = null;
+    triggerServerFetch(true);
+}
 
 const selectedSaleStatusFilter = ref(null);
 const isSaleStatusDropdownOpen = ref(false);
@@ -1086,6 +1142,8 @@ function triggerServerFetch(resetPage = true) {
         userNickname: selectedUserFilter.value || undefined,
         processed: selectedProcessedFilter.value || undefined,
         marketplace: selectedMarketplaces.value.length > 0 ? selectedMarketplaces.value.join(',') : undefined,
+        // A janela é resolvida no backend; data manual preenchida tem precedência.
+        window: salesWindow.value,
     });
 }
 
@@ -2383,6 +2441,35 @@ function getThumbUrl(sale) {
     background: #eff6ff;
 }
 .btn-outline--active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+
+/* Botão de filtros avançados e janela de datas, iguais aos da tela do usuário. */
+.adv-toggle {
+    display: inline-flex; align-items: center; gap: 0.4rem; height: 32px; flex: 0 0 auto;
+    padding: 0 0.7rem; border: 1px solid #dbe3ef; border-radius: 8px;
+    background: #fff; color: #475569; cursor: pointer;
+    font-family: inherit; font-size: 0.76rem; font-weight: 700;
+}
+.adv-toggle:hover { border-color: #93c5fd; background: #f8fbff; color: #1d4ed8; }
+.adv-toggle.is-active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.adv-toggle__count {
+    display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: 999px; background: #2563eb; color: #fff; font-size: 0.64rem;
+}
+.adv-toggle__chev { transition: transform 180ms ease; }
+.adv-toggle__chev.is-open { transform: rotate(180deg); }
+
+.window-chips { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.window-chips__label {
+    margin-right: 0.15rem; color: #475569; font-size: 0.68rem; font-weight: 800;
+    letter-spacing: 0.05em; text-transform: uppercase;
+}
+.window-chip {
+    height: 30px; padding: 0 0.6rem; border: 1px solid #dbe3ef; border-radius: 8px;
+    background: #fff; color: #475569; cursor: pointer;
+    font-family: inherit; font-size: 0.74rem; font-weight: 700;
+}
+.window-chip:hover { border-color: #93c5fd; background: #f8fbff; color: #1d4ed8; }
+.window-chip.is-active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
 
 @media (max-width: 1050px) {
     .sales-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }

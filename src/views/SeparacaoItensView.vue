@@ -833,6 +833,7 @@ onMounted(() => {
 .adv-toggle {
   display: inline-flex; align-items: center; gap: 0.4rem; height: 32px;
   margin-left: auto; padding: 0 0.7rem; border: 1px solid #dbe3ef; border-radius: 8px;
+  flex: 0 0 auto;
   background: #fff; color: #475569; cursor: pointer;
   font-family: inherit; font-size: 0.76rem; font-weight: 700;
 }

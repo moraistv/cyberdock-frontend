@@ -62,6 +62,7 @@ export function useMasterSales() {
       if (params.userNickname) queryParams.set('userNickname', params.userNickname);
       if (params.processed) queryParams.set('processed', params.processed);
       if (params.marketplace) queryParams.set('marketplace', params.marketplace);
+      if (params.window) queryParams.set('window', params.window);
 
       const result = await api.get(`/sales/all?${queryParams.toString()}`, {
         signal: activeController.signal,
