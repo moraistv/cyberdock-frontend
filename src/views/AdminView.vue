@@ -288,6 +288,22 @@ const handleGlobalSync = async () => {
             totalDurationMs: 0,
         };
 
+        /* Concorrência limitada por causa do NAVEGADOR, não do backend.
+         *
+         * Cada conta em sincronização mantém um EventSource aberto durante todo
+         * o trabalho dela. O navegador limita conexões simultâneas por host
+         * (6 em HTTP/1.1), então pedir 30 contas ao mesmo tempo saturava o
+         * limite: as conexões que sobravam ficavam NA FILA. Era exatamente o
+         * efeito visto na loja Shopee — presa em "Iniciando..." até as contas do
+         * Mercado Livre liberarem conexão, o que parecia lentidão daquela loja.
+         *
+         * Com os dois canais somando menos que o limite, cada conta abre o
+         * canal na hora e o progresso aparece de verdade. O ritmo de chamadas à
+         * API do Mercado Livre continua controlado no servidor.
+         */
+        const ML_CONCURRENCY = 3;
+        const SHOPEE_CONCURRENCY = 2;
+
         // Os canais têm limitadores independentes no backend, então rodam
         // juntos. A tabela é recarregada uma única vez, no final.
         const [batch, shopeeBatch] = await Promise.all([
@@ -299,7 +315,7 @@ const handleGlobalSync = async () => {
                         clientUid: account.uid,
                         daysToSync: null
                     })),
-                    { concurrency: accounts.length }
+                    { concurrency: ML_CONCURRENCY }
                 )
                 : Promise.resolve(emptyBatch),
             shopeeAccounts.length
@@ -309,7 +325,7 @@ const handleGlobalSync = async () => {
                         accountNickname: account.shop_name || String(account.shop_id),
                         clientUid: account.uid,
                     })),
-                    { concurrency: 3 }
+                    { concurrency: SHOPEE_CONCURRENCY }
                 )
                 : Promise.resolve(emptyBatch),
         ]);
