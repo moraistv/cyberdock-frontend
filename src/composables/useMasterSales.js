@@ -86,9 +86,12 @@ export function useMasterSales() {
             signal: countController.signal,
           }).then((countResult) => {
             if (myRequest !== requestId || !countResult) return;
-            totalSales.value = Number(countResult.total || 0);
+            // Total nulo = contagem indisponível no servidor. Mantém o número
+            // aproximado já exibido em vez de zerar a tela.
+            if (countResult.total === null || countResult.total === undefined) return;
+            totalSales.value = Number(countResult.total);
             totalPages.value = countResult.totalPages || 1;
-            totalIsExact.value = true;
+            totalIsExact.value = countResult.totalExact !== false;
           }).catch((countError) => {
             if (countError?.name !== 'AbortError' && myRequest === requestId) {
               console.warn('Não foi possível atualizar o total do tabelão:', countError.message);
