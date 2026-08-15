@@ -82,6 +82,19 @@ export function useBilling() {
     return api.post('/billing/add-manual-item', payload);
   };
 
+  /**
+   * Baixa ou reabre a fatura (somente master).
+   * O status deixou de ser reescrito pelo recálculo, então a baixa persiste.
+   */
+  const setInvoiceStatus = async (uid, period, status, paymentDate = null) => {
+    return api.patch(`/billing/invoices/${uid}/${period}/status`, { status, paymentDate });
+  };
+
+  /** Remove um serviço avulso lançado por engano (somente master). */
+  const deleteManualItem = async (itemId) => {
+    return api.delete(`/billing/manual-item/${itemId}`);
+  };
+
   return {
     invoices,
     billingSummary,
@@ -92,5 +105,7 @@ export function useBilling() {
     fetchBillingSummary,
     fetchManualServices,
     addManualService,
+    setInvoiceStatus,
+    deleteManualItem,
   };
 }

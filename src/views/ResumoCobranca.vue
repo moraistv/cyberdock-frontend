@@ -156,6 +156,26 @@
                             </div>
                             <p v-else class="composition-empty">Não há itens detalhados para esta competência.</p>
                         </section>
+
+                        <!-- Serviços pontuais em cards. Antes só existiam como
+                             linha crua dentro do modal de detalhes. -->
+                        <section v-if="manualItems.length" class="composition-card">
+                            <div class="section-heading">
+                                <div>
+                                    <span class="section-eyebrow">Fora da mensalidade</span>
+                                    <h2>Serviços pontuais</h2>
+                                </div>
+                                <span class="invoice-count">{{ manualItems.length }} lançamento(s) · {{ formatCurrency(manualTotal) }}</span>
+                            </div>
+                            <div class="punctual-grid">
+                                <article v-for="item in manualItems" :key="item.id || item.description" class="punctual-card">
+                                    <h4>{{ item.description }}</h4>
+                                    <p class="punctual-card__value">{{ formatCurrency(item.total_price) }}</p>
+                                    <p class="punctual-card__detail">{{ item.quantity }} {{ unitLabel(item.unit, item.quantity) || 'un.' }} × {{ formatCurrency(item.unit_price) }}</p>
+                                    <p v-if="item.service_date" class="punctual-card__date">Realizado em {{ formatDate(item.service_date) }}</p>
+                                </article>
+                            </div>
+                        </section>
                     </template>
 
                     <section class="table-container">
@@ -221,15 +241,42 @@
                         </div>
                     </div>
                     <div v-else-if="selectedInvoiceForModal" class="invoice-details-content">
-                        <div class="detail-block-wrapper">
-                            <div v-for="item in selectedInvoiceForModal.items" :key="item.description" class="detail-block">
-                                <h5>{{ item.type.charAt(0).toUpperCase() + item.type.slice(1) }}</h5>
-                                <ul>
-                                    <li>{{ item.description }}: <strong>{{ item.quantity }} x {{ formatCurrency(item.unit_price) }}</strong></li>
-                                    <li><strong>Subtotal: {{ formatCurrency(item.total_price) }}</strong></li>
-                                </ul>
+                        <div class="invoice-meta">
+                            <div><span>Competência</span><strong>{{ selectedInvoiceForModal.period }}</strong></div>
+                            <div><span>Vencimento</span><strong>{{ selectedInvoiceForModal.dueDate }}</strong></div>
+                            <div>
+                                <span>Status</span>
+                                <strong :class="['status-badge', getStatusClass(selectedInvoiceForModal.status)]">{{ getStatusLabel(selectedInvoiceForModal.status) }}</strong>
                             </div>
+                            <div v-if="selectedInvoiceForModal.paymentDate"><span>Pago em</span><strong>{{ selectedInvoiceForModal.paymentDate }}</strong></div>
                         </div>
+
+                        <!-- Agrupado por categoria com subtotal, no lugar de um
+                             bloco por item com o tipo cru em inglês. -->
+                        <section v-for="group in groupedItems(selectedInvoiceForModal)" :key="group.key" class="detail-group">
+                            <header class="detail-group__head">
+                                <h5>{{ group.label }}</h5>
+                                <strong>{{ formatCurrency(group.subtotal) }}</strong>
+                            </header>
+                            <table class="detail-table">
+                                <tbody>
+                                    <tr v-for="item in group.items" :key="item.id || item.description">
+                                        <td class="detail-table__desc">
+                                            {{ item.description }}
+                                            <small v-if="item.service_date">Realizado em {{ formatDate(item.service_date) }}</small>
+                                        </td>
+                                        <td class="detail-table__qty">{{ item.quantity }} {{ unitLabel(item.unit, item.quantity) }}</td>
+                                        <td class="detail-table__unit">{{ formatCurrency(item.unit_price) }}</td>
+                                        <td class="detail-table__total">{{ formatCurrency(item.total_price) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <footer class="detail-total">
+                            <span>Total da fatura</span>
+                            <strong>{{ formatCurrency(selectedInvoiceForModal.totalAmount) }}</strong>
+                        </footer>
                     </div>
                 </UniversalModal>
             </main>
@@ -286,9 +333,62 @@ const invoiceComposition = computed(() => {
 });
 
 const formatCurrency = (value) => {
-    if (typeof value !== 'number') return 'R$ 0,00';
+    if (typeof value !== 'number') value = parseFloat(value || 0);
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
+
+const formatDate = (d) => {
+    if (!d) return '';
+    const date = new Date(d);
+    date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
+    return date.toLocaleDateString('pt-BR');
+};
+
+/** Rótulos das seções da fatura, no lugar de "Storage"/"Shipment"/"Manual". */
+const ITEM_GROUPS = [
+    { key: 'storage', label: 'Armazenamento' },
+    { key: 'shipment', label: 'Expedição' },
+    { key: 'manual', label: 'Serviços pontuais' },
+];
+
+const UNIT_LABELS = { m3: 'm³', pacote: 'pacote', viagem: 'viagem', venda: 'venda', unidade: 'unidade' };
+
+function unitLabel(unit, quantity = 1) {
+    const label = UNIT_LABELS[unit] || unit || '';
+    if (!label || label === 'm³') return label;
+    return Number(quantity) > 1 ? `${label}s` : label;
+}
+
+/** Agrupa os itens por categoria, com subtotal por seção. */
+function groupedItems(invoice) {
+    const items = invoice?.items || [];
+    const groups = ITEM_GROUPS.map(({ key, label }) => {
+        const groupItems = items.filter((i) => i.type === key);
+        return {
+            key,
+            label,
+            items: groupItems,
+            subtotal: groupItems.reduce((sum, i) => sum + parseFloat(i.total_price || 0), 0),
+        };
+    }).filter((g) => g.items.length);
+
+    // Tipo desconhecido não pode desaparecer da fatura por não estar mapeado.
+    const known = ITEM_GROUPS.map((g) => g.key);
+    const others = items.filter((i) => !known.includes(i.type));
+    if (others.length) {
+        groups.push({
+            key: 'outros',
+            label: 'Outros lançamentos',
+            items: others,
+            subtotal: others.reduce((sum, i) => sum + parseFloat(i.total_price || 0), 0),
+        });
+    }
+    return groups;
+}
+
+// Serviços pontuais da competência selecionada, exibidos em cards próprios.
+const manualItems = computed(() => (currentInvoice.value?.items || []).filter((i) => i.type === 'manual'));
+const manualTotal = computed(() => manualItems.value.reduce((sum, i) => sum + parseFloat(i.total_price || 0), 0));
 
 const handlePeriodChange = () => {
     if (targetUserId.value) {
@@ -468,6 +568,34 @@ button, select { font-family: var(--font-sans); }
 .composition-track { width: 100%; height: 0.42rem; overflow: hidden; border-radius: 999px; background: #e8f2f8; }
 .composition-track span { display: block; min-width: 0.2rem; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--billing-blue-700), var(--billing-blue-500)); transition: width 0.5s ease; }
 .composition-empty { margin: 1rem 0 0; color: var(--billing-muted); font-size: 0.8rem; }
+
+/* Cards de serviços pontuais */
+.punctual-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+.punctual-card { padding: 0.85rem; border: 1px solid var(--billing-line); border-radius: 0.7rem; background: #fbfdff; }
+.punctual-card h4 { margin: 0; color: var(--billing-blue-950); font-size: 0.84rem; font-weight: 700; line-height: 1.35; }
+.punctual-card__value { margin: 0.5rem 0 0; color: var(--billing-blue-700); font-size: 1.2rem; font-weight: 780; font-variant-numeric: tabular-nums; }
+.punctual-card__detail { margin: 0.15rem 0 0; color: var(--billing-muted); font-size: 0.78rem; }
+.punctual-card__date { margin: 0.35rem 0 0; color: #94a3b8; font-size: 0.73rem; }
+
+/* Detalhes da fatura: seções por categoria, com subtotal */
+.invoice-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--billing-line); }
+.invoice-meta div { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.invoice-meta span { color: var(--billing-muted); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.invoice-meta strong { color: var(--billing-ink); font-size: 0.9rem; }
+.invoice-meta .status-badge { align-self: flex-start; }
+.detail-group { margin-bottom: 1rem; overflow: hidden; border: 1px solid var(--billing-line); border-radius: 0.6rem; background: #fff; }
+.detail-group__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.6rem 0.85rem; background: var(--billing-blue-50); }
+.detail-group__head h5 { margin: 0; color: var(--billing-blue-800); font-size: 0.85rem; font-weight: 750; }
+.detail-group__head strong { color: var(--billing-blue-900); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.detail-table { width: 100%; border-collapse: collapse; }
+.detail-table td { padding: 0.55rem 0.85rem; border-top: 1px solid #f1f5f9; color: #4b5563; font-size: 0.83rem; vertical-align: top; }
+.detail-table__desc { width: 50%; color: var(--billing-ink); font-weight: 600; }
+.detail-table__desc small { display: block; margin-top: 0.15rem; color: #94a3b8; font-weight: 500; }
+.detail-table__qty, .detail-table__unit { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.detail-table__total { white-space: nowrap; text-align: right; color: var(--billing-ink); font-weight: 750; font-variant-numeric: tabular-nums; }
+.detail-total { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.85rem 1rem; border-radius: 0.6rem; background: linear-gradient(140deg, var(--billing-blue-900), var(--billing-blue-700)); box-shadow: 0 10px 24px rgba(7, 89, 133, 0.22); color: #fff; }
+.detail-total span { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.detail-total strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 
 .table-container { overflow: hidden; border: 1px solid var(--billing-line); border-radius: 0.95rem; background: #fff; box-shadow: 0 5px 18px rgba(15, 71, 105, 0.055); }
 .table-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.15rem; border-bottom: 1px solid #e6eef4; }

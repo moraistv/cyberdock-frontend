@@ -1,6 +1,47 @@
 // composables/useServices.js
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useApi } from './useApi';
+
+/**
+ * Tipos de cobrança reconhecidos pelo faturamento (espelha router/services.js).
+ * Um serviço salvo sem tipo NÃO é cobrado por nenhuma rotina — foi assim que um
+ * armazenamento de R$ 397 ficou invisível para a fatura.
+ */
+export const SERVICE_TYPE_OPTIONS = [
+    { value: 'base_storage', label: 'Armazenamento inicial (mensal)', hint: 'Cobrado todo mês, com proporcional no mês de entrada do cliente.' },
+    { value: 'base_storage_50', label: 'Armazenamento inicial 50% | FULL (mensal)', hint: 'Metade do armazenamento inicial, para operação Full. Também tem proporcional na entrada.' },
+    { value: 'additional_storage', label: 'Armazenamento adicional por m³ (mensal)', hint: 'Multiplicado pelo volume contratado. Nunca é proporcional.' },
+    { value: 'avulso_simples', label: 'Avulso com preço fixo', hint: 'Lançado manualmente na fatura, sempre pelo mesmo valor.' },
+    { value: 'avulso_quantidade', label: 'Avulso com preço por faixa de quantidade', hint: 'Lançado com uma quantidade; o sistema escolhe a faixa de preço sozinho.' },
+];
+
+export const UNIT_OPTIONS = [
+    { value: 'm3', label: 'm³ (metro cúbico)' },
+    { value: 'pacote', label: 'pacote' },
+    { value: 'viagem', label: 'viagem' },
+    { value: 'venda', label: 'venda' },
+    { value: 'unidade', label: 'unidade' },
+];
+
+const UNIT_LABELS = { m3: 'm³', pacote: 'pacote', viagem: 'viagem', venda: 'venda', unidade: 'unidade' };
+
+export function unitLabel(unit, quantity = 1) {
+    const label = UNIT_LABELS[unit] || unit || '';
+    if (!label || label === 'm³') return label;
+    return quantity > 1 ? `${label}s` : label;
+}
+
+export function serviceTypeLabel(type) {
+    if (!type) return 'Não faturado';
+    return SERVICE_TYPE_OPTIONS.find((o) => o.value === type)?.label || type;
+}
+
+/** "De 101 até 300" / "Acima de 301" */
+export function tierRangeLabel(tier) {
+    const from = Number(tier.from) || 1;
+    if (tier.to === null || tier.to === undefined || tier.to === '') return `Acima de ${from}`;
+    return `${from} a ${tier.to}`;
+}
 
 /**
  * Composable para gerenciar o catálogo de serviços/produtos e os serviços contratados pelos clientes.
@@ -19,6 +60,7 @@ export function useServices() {
     const isEditingService = ref(false);
     const currentService = ref(null);
     const serviceToDelete = ref(null);
+    const serviceFormError = ref(null);
 
     // --- Estado para Serviços Contratados do Cliente ---
     const clientServices = ref([]);
@@ -45,25 +87,72 @@ export function useServices() {
     /**
      * Adiciona ou atualiza um serviço/produto no catálogo.
      */
+    /** Valida no cliente as mesmas regras do backend, para dar erro na hora. */
+    function validateCurrentService() {
+        const s = currentService.value;
+        if (!s?.name?.trim()) return 'Informe o nome do serviço.';
+        if (!s.type) return 'Escolha o tipo de cobrança, senão o serviço não será faturado.';
+
+        if (s.type === 'avulso_quantidade') {
+            const tiers = s.config?.tiers || [];
+            if (!tiers.length) return 'Adicione ao menos uma faixa de preço.';
+            for (const tier of tiers) {
+                if (!Number.isFinite(Number(tier.from)) || Number(tier.from) < 1) return 'Faixa com início inválido.';
+                if (!Number.isFinite(Number(tier.price)) || Number(tier.price) < 0) return 'Faixa com preço inválido.';
+                if (tier.to !== null && tier.to !== undefined && tier.to !== '' && Number(tier.to) < Number(tier.from)) {
+                    return 'Uma faixa tem o fim menor que o início.';
+                }
+            }
+            const hasOpen = tiers.some((t) => t.to === null || t.to === undefined || t.to === '');
+            if (!hasOpen) return 'Deixe a última faixa sem valor final, para cobrir quantidades maiores.';
+            return null;
+        }
+
+        if (s.price == null || Number(s.price) < 0) return 'Informe um preço válido.';
+        return null;
+    }
+
     async function handleSaveService() {
-        if (!currentService.value || !currentService.value.name || currentService.value.price == null) {
-            console.error("Nome e preço são obrigatórios.");
+        serviceFormError.value = null;
+        const invalid = validateCurrentService();
+        if (invalid) {
+            serviceFormError.value = invalid;
             return;
         }
 
+        const s = currentService.value;
+        const payload = {
+            name: s.name.trim(),
+            type: s.type,
+            unit: s.unit || null,
+            description: s.description || null,
+            // Serviço por faixa não tem preço único: o valor sai do tier.
+            price: s.type === 'avulso_quantidade' ? 0 : Number(s.price),
+            config: s.type === 'avulso_quantidade'
+                ? {
+                    ...(s.config || {}),
+                    tiers: (s.config?.tiers || []).map((t) => ({
+                        from: Number(t.from),
+                        to: t.to === '' || t.to === null || t.to === undefined ? null : Number(t.to),
+                        price: Number(t.price),
+                    })),
+                }
+                : (s.config ?? null),
+        };
+
         try {
             if (isEditingService.value) {
-                await api.put(`/services/${currentService.value.id}`, currentService.value);
+                await api.put(`/services/${s.id}`, payload);
             } else {
-                await api.post('/services', currentService.value);
+                await api.post('/services', payload);
             }
-            
+
             await fetchServices(); // Recarrega a lista
             closeServiceModal();
 
         } catch (err) {
             console.error("Erro ao salvar serviço:", err);
-            alert(err.message || "Falha ao salvar o item.");
+            serviceFormError.value = err.message || 'Falha ao salvar o item.';
         }
     }
 
@@ -135,13 +224,48 @@ export function useServices() {
     // --- Funções do Modal do Catálogo ---
     const openServiceModal = (service = null) => {
         isEditingService.value = !!service;
-        currentService.value = service ? { ...service } : { name: '', price: 0, description: '' };
+        serviceFormError.value = null;
+        currentService.value = service
+            ? {
+                ...service,
+                type: service.type || '',
+                unit: service.unit || 'unidade',
+                description: service.description || '',
+                // Clona as faixas para o formulário não editar o objeto da lista.
+                config: service.config
+                    ? { ...service.config, tiers: (service.config.tiers || []).map((t) => ({ ...t })) }
+                    : { tiers: [] },
+            }
+            : { name: '', price: 0, description: '', type: '', unit: 'unidade', config: { tiers: [] } };
         isServiceModalOpen.value = true;
     };
     const closeServiceModal = () => {
         isServiceModalOpen.value = false;
         currentService.value = null;
+        serviceFormError.value = null;
     };
+
+    /** Nova faixa já começa depois do fim da anterior. */
+    const addTier = () => {
+        if (!currentService.value) return;
+        if (!currentService.value.config) currentService.value.config = { tiers: [] };
+        if (!currentService.value.config.tiers) currentService.value.config.tiers = [];
+        const tiers = currentService.value.config.tiers;
+        const last = tiers[tiers.length - 1];
+        const nextFrom = last && Number(last.to) ? Number(last.to) + 1 : (last ? Number(last.from) + 1 : 1);
+        tiers.push({ from: nextFrom, to: null, price: 0 });
+    };
+
+    const removeTier = (index) => {
+        const tiers = currentService.value?.config?.tiers;
+        if (tiers && tiers.length > 1) tiers.splice(index, 1);
+    };
+
+    const selectedTypeHint = computed(() => {
+        const type = currentService.value?.type;
+        return SERVICE_TYPE_OPTIONS.find((o) => o.value === type)?.hint
+            || 'Escolha como este serviço entra na fatura.';
+    });
 
     // Funções do Modal de Deleção do Catálogo
     const openDeleteServiceModal = (service) => {
@@ -175,6 +299,17 @@ export function useServices() {
         closeDeleteServiceModal,
         handleConfirmDeleteService,
         fetchServices,
+
+        // Tipo de cobrança, unidade e faixas de preço
+        serviceFormError,
+        serviceTypeOptions: SERVICE_TYPE_OPTIONS,
+        unitOptions: UNIT_OPTIONS,
+        selectedTypeHint,
+        addTier,
+        removeTier,
+        serviceTypeLabel,
+        unitLabel,
+        tierRangeLabel,
 
         // Serviços do Cliente
         clientServices,

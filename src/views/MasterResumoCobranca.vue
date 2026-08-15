@@ -47,8 +47,21 @@
               <button @click="openManualServiceModal" class="action-button">
                 <i class="fas fa-plus-circle"></i> Lançar Serviço Avulso
               </button>
+              <!-- Baixa da fatura: exclusiva do master -->
+              <button
+                v-if="currentInvoice"
+                @click="toggleInvoicePayment"
+                class="action-button"
+                :class="isCurrentInvoicePaid ? 'action-button--reopen' : 'action-button--pay'"
+                :disabled="isUpdatingStatus"
+              >
+                <i :class="isCurrentInvoicePaid ? 'fas fa-rotate-left' : 'fas fa-circle-check'"></i>
+                {{ isUpdatingStatus ? 'Salvando...' : (isCurrentInvoicePaid ? 'Reabrir fatura' : 'Marcar como paga') }}
+              </button>
             </div>
           </div>
+
+          <p v-if="statusError" class="inline-error">{{ statusError }}</p>
 
           <div v-if="currentInvoice" class="stats-cards-grid-5">
             <div class="stat-card">
@@ -86,7 +99,34 @@
             </div>
           </div>
 
-          <div v-else class="empty-state-full-page">
+          <!-- Serviços pontuais da competência, um card por lançamento.
+               Antes só apareciam como linha crua dentro do modal de detalhes. -->
+          <section v-if="currentInvoice && manualItems.length" class="punctual-section">
+            <div class="punctual-head">
+              <h2 class="table-title">Serviços pontuais desta competência</h2>
+              <span class="punctual-total">{{ manualItems.length }} lançamento(s) · {{ formatCurrency(manualTotal) }}</span>
+            </div>
+            <div class="punctual-grid">
+              <article v-for="item in manualItems" :key="item.id" class="punctual-card">
+                <header class="punctual-card__head">
+                  <h4>{{ item.description }}</h4>
+                  <button
+                    class="punctual-card__remove"
+                    :disabled="removingItemId === item.id"
+                    title="Remover este lançamento"
+                    @click="removeManualItem(item)"
+                  >×</button>
+                </header>
+                <p class="punctual-card__value">{{ formatCurrency(item.total_price) }}</p>
+                <p class="punctual-card__detail">
+                  {{ item.quantity }} {{ unitLabel(item.unit, item.quantity) || 'un.' }} × {{ formatCurrency(item.unit_price) }}
+                </p>
+                <p v-if="item.service_date" class="punctual-card__date">Realizado em {{ formatDate(item.service_date) }}</p>
+              </article>
+            </div>
+          </section>
+
+          <div v-if="!currentInvoice" class="empty-state-full-page">
             <h3>Nenhuma fatura encontrada para {{ selectedPeriod }}</h3>
             <p>Você pode lançar um serviço avulso para criar uma nova fatura para este período.</p>
           </div>
@@ -131,17 +171,46 @@
           :title="`Detalhes da Fatura - ${selectedInvoiceForModal?.period}`"
           size="lg"
         >
+          <!-- Agrupado por categoria, com subtotal por seção e total geral.
+               Antes era um bloco por item, com o tipo cru em inglês no título
+               ("Storage", "Shipment", "Manual") e sem nenhum somatório. -->
           <div v-if="selectedInvoiceForModal" class="invoice-details-content">
-            <div class="detail-block-wrapper">
-              <div v-for="item in selectedInvoiceForModal.items" :key="item.id" class="detail-block">
-                <h5>{{ item.type.charAt(0).toUpperCase() + item.type.slice(1) }}</h5>
-                <ul>
-                  <li>{{ item.description }}: <strong>{{ item.quantity }} x {{ formatCurrency(item.unit_price) }}</strong></li>
-                  <li v-if="item.service_date"><small>Realizado em: {{ formatDate(item.service_date) }}</small></li>
-                  <li><strong>Subtotal: {{ formatCurrency(item.total_price) }}</strong></li>
-                </ul>
+            <div class="invoice-meta">
+              <div><span>Competência</span><strong>{{ selectedInvoiceForModal.period }}</strong></div>
+              <div><span>Vencimento</span><strong>{{ selectedInvoiceForModal.dueDate }}</strong></div>
+              <div>
+                <span>Status</span>
+                <strong :class="['status-badge', getStatusClass(selectedInvoiceForModal.status)]">
+                  {{ getStatusLabel(selectedInvoiceForModal.status) }}
+                </strong>
               </div>
+              <div v-if="selectedInvoiceForModal.paymentDate"><span>Pago em</span><strong>{{ selectedInvoiceForModal.paymentDate }}</strong></div>
             </div>
+
+            <section v-for="group in groupedItems(selectedInvoiceForModal)" :key="group.key" class="detail-group">
+              <header class="detail-group__head">
+                <h5>{{ group.label }}</h5>
+                <strong>{{ formatCurrency(group.subtotal) }}</strong>
+              </header>
+              <table class="detail-table">
+                <tbody>
+                  <tr v-for="item in group.items" :key="item.id || item.description">
+                    <td class="detail-table__desc">
+                      {{ item.description }}
+                      <small v-if="item.service_date">Realizado em {{ formatDate(item.service_date) }}</small>
+                    </td>
+                    <td class="detail-table__qty">{{ item.quantity }} {{ unitLabel(item.unit, item.quantity) }}</td>
+                    <td class="detail-table__unit">{{ formatCurrency(item.unit_price) }}</td>
+                    <td class="detail-table__total">{{ formatCurrency(item.total_price) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+
+            <footer class="detail-total">
+              <span>Total da fatura</span>
+              <strong>{{ formatCurrency(selectedInvoiceForModal.totalAmount) }}</strong>
+            </footer>
           </div>
         </UniversalModal>
 
@@ -218,8 +287,52 @@ const {
   fetchInvoices,
   addManualService,
   manualServices,
-  fetchManualServices
+  fetchManualServices,
+  setInvoiceStatus,
+  deleteManualItem
 } = useBilling();
+
+/** Rótulos das seções da fatura, no lugar de "Storage"/"Shipment"/"Manual". */
+const ITEM_GROUPS = [
+  { key: 'storage', label: 'Armazenamento' },
+  { key: 'shipment', label: 'Expedição' },
+  { key: 'manual', label: 'Serviços pontuais' },
+];
+
+const UNIT_LABELS = { m3: 'm³', pacote: 'pacote', viagem: 'viagem', venda: 'venda', unidade: 'unidade' };
+
+function unitLabel(unit, quantity = 1) {
+  const label = UNIT_LABELS[unit] || unit || '';
+  if (!label || label === 'm³') return label;
+  return Number(quantity) > 1 ? `${label}s` : label;
+}
+
+/** Agrupa os itens da fatura por categoria, com subtotal por seção. */
+function groupedItems(invoice) {
+  const items = invoice?.items || [];
+  const groups = ITEM_GROUPS.map(({ key, label }) => {
+    const groupItems = items.filter((i) => i.type === key);
+    return {
+      key,
+      label,
+      items: groupItems,
+      subtotal: groupItems.reduce((sum, i) => sum + parseFloat(i.total_price || 0), 0),
+    };
+  }).filter((g) => g.items.length);
+
+  // Tipo desconhecido não pode desaparecer da fatura só por não estar mapeado.
+  const known = ITEM_GROUPS.map((g) => g.key);
+  const others = items.filter((i) => !known.includes(i.type));
+  if (others.length) {
+    groups.push({
+      key: 'outros',
+      label: 'Outros lançamentos',
+      items: others,
+      subtotal: others.reduce((sum, i) => sum + parseFloat(i.total_price || 0), 0),
+    });
+  }
+  return groups;
+}
 
 const selectedPeriod = ref('');
 const contentArea = ref(null);
@@ -250,6 +363,48 @@ const isQuantityServiceSelected = computed(() => {
   const service = manualServices.value.find(s => s.id === manualService.value.serviceId);
   return service?.type === 'avulso_quantidade';
 });
+
+// --- Serviços pontuais da competência ---
+const manualItems = computed(() => (currentInvoice.value?.items || []).filter(i => i.type === 'manual'));
+const manualTotal = computed(() => manualItems.value.reduce((sum, i) => sum + parseFloat(i.total_price || 0), 0));
+
+// --- Baixa da fatura (master) ---
+const isUpdatingStatus = ref(false);
+const statusError = ref('');
+const removingItemId = ref(null);
+const isCurrentInvoicePaid = computed(() => currentInvoice.value?.status === 'paid');
+
+async function toggleInvoicePayment() {
+  if (!currentInvoice.value || !targetUserId.value) return;
+  const goingToPaid = !isCurrentInvoicePaid.value;
+  const label = goingToPaid ? 'marcar como paga' : 'reabrir';
+  if (!window.confirm(`Confirma ${label} a fatura de ${currentInvoice.value.period}?`)) return;
+
+  statusError.value = '';
+  isUpdatingStatus.value = true;
+  try {
+    await setInvoiceStatus(targetUserId.value, currentInvoice.value.period, goingToPaid ? 'paid' : 'pending');
+    await fetchInvoices(targetUserId.value, selectedPeriod.value);
+  } catch (e) {
+    statusError.value = e.message || 'Não foi possível atualizar o status da fatura.';
+  } finally {
+    isUpdatingStatus.value = false;
+  }
+}
+
+async function removeManualItem(item) {
+  if (!window.confirm(`Remover o lançamento "${item.description}" desta fatura?`)) return;
+  statusError.value = '';
+  removingItemId.value = item.id;
+  try {
+    await deleteManualItem(item.id);
+    await fetchInvoices(targetUserId.value, selectedPeriod.value);
+  } catch (e) {
+    statusError.value = e.message || 'Não foi possível remover o lançamento.';
+  } finally {
+    removingItemId.value = null;
+  }
+}
 
 // NOVO: serviço selecionado para usar config (rótulos/placeholder)
 const selectedService = computed(() =>
@@ -387,11 +542,49 @@ watch(() => props.userId, (newId) => {
 .status-paid { background-color: #dcfce7; color: #166534; }
 .status-open { background-color: #fef3c7; color: #92400e; }
 .details-button { background-color: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 500; cursor: pointer; }
-.invoice-details-content { padding: 1.5rem 2rem; background-color: #f9fafb; }
-.detail-block-wrapper { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; }
-.detail-block h5 { font-size: 1rem; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; margin-bottom: 1rem; }
-.detail-block li { padding: 0.25rem 0; color: #4b5563; }
-.detail-block li small { color: #6b7280; font-style: italic; }
+.invoice-details-content { padding: 1.25rem 1.5rem; background-color: #f9fafb; }
+
+/* Cabeçalho com competência, vencimento e status */
+.invoice-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--cd-line, #e5e7eb); }
+.invoice-meta div { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.invoice-meta span { color: var(--cd-muted, #6b7280); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.invoice-meta strong { color: var(--cd-ink, #111827); font-size: 0.9rem; }
+.invoice-meta .status-badge { align-self: flex-start; }
+
+/* Seções por categoria, com subtotal */
+.detail-group { margin-bottom: 1rem; overflow: hidden; border: 1px solid var(--cd-line, #e5e7eb); border-radius: 0.6rem; background: #fff; }
+.detail-group__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.6rem 0.85rem; background: var(--cd-blue-50, #f0f9ff); }
+.detail-group__head h5 { margin: 0; color: var(--cd-blue-800, #075985); font-size: 0.85rem; font-weight: 750; }
+.detail-group__head strong { color: var(--cd-blue-900, #0c3f68); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.detail-table { width: 100%; border-collapse: collapse; }
+.detail-table td { padding: 0.55rem 0.85rem; border-top: 1px solid #f1f5f9; color: #4b5563; font-size: 0.83rem; vertical-align: top; }
+.detail-table__desc { width: 50%; color: var(--cd-ink, #111827); font-weight: 600; }
+.detail-table__desc small { display: block; margin-top: 0.15rem; color: #94a3b8; font-weight: 500; font-style: normal; }
+.detail-table__qty, .detail-table__unit { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.detail-table__total { white-space: nowrap; text-align: right; color: var(--cd-ink, #111827); font-weight: 750; font-variant-numeric: tabular-nums; }
+
+/* Total geral da fatura */
+.detail-total { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.85rem 1rem; border-radius: 0.6rem; background: var(--cd-gradient, linear-gradient(140deg, #0c3f68, #0369a1)); box-shadow: var(--cd-shadow, 0 10px 24px rgba(7, 89, 133, 0.22)); color: #fff; }
+.detail-total span { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.detail-total strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+
+/* Cards de serviços pontuais */
+.punctual-section { margin-bottom: 1.5rem; }
+.punctual-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem; }
+.punctual-total { color: var(--cd-muted, #6b7280); font-size: 0.82rem; font-weight: 650; }
+.punctual-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.75rem; }
+.punctual-card { position: relative; padding: 0.85rem; border: 1px solid var(--cd-line, #e5e7eb); border-radius: 0.7rem; background: #fff; box-shadow: 0 4px 14px rgba(15, 71, 105, 0.05); }
+.punctual-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.punctual-card__head h4 { margin: 0; color: var(--cd-ink, #111827); font-size: 0.85rem; font-weight: 700; line-height: 1.35; }
+.punctual-card__remove { flex: 0 0 auto; width: 1.5rem; height: 1.5rem; border: none; border-radius: 0.3rem; background: #fee2e2; color: #991b1b; font-size: 1rem; line-height: 1; cursor: pointer; }
+.punctual-card__remove:disabled { opacity: 0.5; cursor: wait; }
+.punctual-card__value { margin: 0.5rem 0 0; color: var(--cd-blue-700, #0369a1); font-size: 1.2rem; font-weight: 780; font-variant-numeric: tabular-nums; }
+.punctual-card__detail { margin: 0.15rem 0 0; color: #64748b; font-size: 0.78rem; }
+.punctual-card__date { margin: 0.35rem 0 0; color: #94a3b8; font-size: 0.73rem; }
+
+.action-button--pay { background-color: var(--cd-success, #059669); }
+.action-button--reopen { background-color: #64748b; }
+.inline-error { margin: 0 0 1rem; padding: 0.6rem 0.8rem; border-radius: 0.45rem; background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); font-size: 0.83rem; font-weight: 600; }
 .manual-service-form { padding: 1rem; display: flex; flex-direction: column; gap: 1.5rem; }
 .form-group { display: flex; flex-direction: column; }
 .form-group label { margin-bottom: 0.5rem; font-weight: 500; color: #374151; }

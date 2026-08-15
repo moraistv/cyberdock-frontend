@@ -470,16 +470,34 @@
                 <h4 class="modal-subtitle">Serviços Existentes</h4>
                 <div class="table-wrapper-modal">
                 <table class="services-table-modal">
-                    <thead><tr><th>Serviço</th><th>Preço</th><th>Ações</th></tr></thead>
+                    <thead><tr><th>Serviço</th><th>Cobrança</th><th>Preço</th><th>Ações</th></tr></thead>
                     <tbody>
-                    <tr v-if="isLoadingServices"><td colspan="3" class="feedback-cell">Carregando...</td></tr>
-                    <tr v-else-if="availableServices.length === 0"><td colspan="3" class="feedback-cell">Nenhum serviço cadastrado.</td></tr>
+                    <tr v-if="isLoadingServices"><td colspan="4" class="feedback-cell">Carregando...</td></tr>
+                    <tr v-else-if="availableServices.length === 0"><td colspan="4" class="feedback-cell">Nenhum serviço cadastrado.</td></tr>
                     <tr v-for="service in availableServices" :key="service.id">
                         <td>
                         <div class="service-name">{{ service.name }}</div>
                         <div class="service-description">{{ service.description }}</div>
+                        <!-- Serviço sem tipo não entra em nenhum cálculo de fatura.
+                             O alerta existe porque foi assim que um armazenamento
+                             de R$ 397 ficou meses sem ser cobrado. -->
+                        <div v-if="!service.type" class="service-warning">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="13" height="13"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            Sem tipo de cobrança: não é faturado
+                        </div>
                         </td>
-                        <td>{{ formatCurrency(service.price) }}</td>
+                        <td>
+                        <span class="type-badge" :class="service.type ? 'is-set' : 'is-missing'">{{ serviceTypeLabel(service.type) }}</span>
+                        <div v-if="service.unit" class="service-unit">por {{ unitLabel(service.unit) }}</div>
+                        </td>
+                        <td>
+                        <template v-if="service.type === 'avulso_quantidade' && service.config?.tiers?.length">
+                            <div v-for="(tier, ti) in service.config.tiers" :key="ti" class="tier-line">
+                            {{ tierRangeLabel(tier) }}: <strong>{{ formatCurrency(tier.price) }}</strong>
+                            </div>
+                        </template>
+                        <template v-else>{{ formatCurrency(service.price) }}</template>
+                        </td>
                         <td>
                         <button @click="openServiceModal(service)" class="btn-action edit" title="Editar"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
                         <button @click="openDeleteServiceModal(service)" class="btn-action delete" title="Excluir"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
@@ -493,7 +511,48 @@
         <UniversalModal :title="isEditingService ? 'Editar Serviço' : 'Adicionar Novo Serviço'" :is-open="isServiceModalOpen" @close="closeServiceModal">
           <form v-if="currentService" @submit.prevent="handleSaveService" class="service-form">
             <div class="form-group"><label>Nome do Serviço</label><input type="text" v-model="currentService.name" required /></div>
-            <div class="form-group"><label>Preço (R$)</label><input type="number" v-model.number="currentService.price" min="0" step="0.01" required /></div>
+
+            <div class="form-group">
+              <label>Tipo de cobrança</label>
+              <select v-model="currentService.type" required>
+                <option disabled value="">Selecione como este serviço é cobrado</option>
+                <option v-for="opt in serviceTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+              <small class="field-hint">{{ selectedTypeHint }}</small>
+            </div>
+
+            <div class="form-group">
+              <label>Unidade de medida</label>
+              <select v-model="currentService.unit">
+                <option v-for="opt in unitOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </div>
+
+            <div class="form-group"><label>Descrição</label><input type="text" v-model="currentService.description" placeholder="Aparece no catálogo" /></div>
+
+            <!-- Preço único: para tudo que não é cobrado por faixa de quantidade -->
+            <div class="form-group" v-if="currentService.type !== 'avulso_quantidade'">
+              <label>Preço (R$)</label>
+              <input type="number" v-model.number="currentService.price" min="0" step="0.01" required />
+            </div>
+
+            <!-- Faixas por quantidade: o sistema escolhe a faixa sozinho na hora
+                 do lançamento, conforme a quantidade informada -->
+            <div class="tiers-block" v-else>
+              <div class="tiers-head">
+                <label>Faixas de preço por quantidade</label>
+                <button type="button" class="btn-tier-add" @click="addTier">+ Adicionar faixa</button>
+              </div>
+              <p class="field-hint">A faixa é escolhida automaticamente pela quantidade lançada. Deixe o campo "até" da última faixa vazio para cobrir qualquer quantidade acima.</p>
+              <div v-for="(tier, index) in currentService.config.tiers" :key="index" class="tier-row">
+                <div class="tier-field"><span>De</span><input type="number" v-model.number="tier.from" min="1" step="1" /></div>
+                <div class="tier-field"><span>até</span><input type="number" v-model.number="tier.to" min="1" step="1" placeholder="∞" /></div>
+                <div class="tier-field tier-price"><span>R$</span><input type="number" v-model.number="tier.price" min="0" step="0.01" /></div>
+                <button type="button" class="btn-tier-remove" @click="removeTier(index)" :disabled="currentService.config.tiers.length <= 1" title="Remover faixa">×</button>
+              </div>
+            </div>
+
+            <p v-if="serviceFormError" class="form-error">{{ serviceFormError }}</p>
           </form>
           <div class="modal-actions"><button @click="closeServiceModal" type="button" class="btn btn-secondary">Cancelar</button><button @click="handleSaveService" type="button" class="btn btn-primary">Salvar</button></div>
         </UniversalModal>
@@ -639,7 +698,9 @@ const {
   services: availableServices, isLoadingServices, isEditingService, currentService, isServiceModalOpen,
   isDeleteServiceModalOpen, serviceToDelete, openServiceModal, closeServiceModal, handleSaveService,
   openDeleteServiceModal, closeDeleteServiceModal, handleConfirmDeleteService, fetchServices, formatCurrency,
-  clientServices, isLoadingClientServices, addClientService, fetchClientServices, removeClientService
+  clientServices, isLoadingClientServices, addClientService, fetchClientServices, removeClientService,
+  serviceFormError, serviceTypeOptions, unitOptions, selectedTypeHint, addTier, removeTier,
+  serviceTypeLabel, unitLabel, tierRangeLabel
 } = useServices();
 
 const currentView = ref('users');
@@ -1528,6 +1589,26 @@ button, input, select, table { font-family: var(--font-sans); }
 .services-table-modal th { background-color: #f8fafc; color: #64748b; font-weight: 750; font-size: .7rem; letter-spacing: 0.04em; text-transform: uppercase; }
 .service-name { font-weight: 650; color: #0f172a; }
 .service-description { color: #94a3b8; font-size: 0.76rem; }
+.service-unit { margin-top: 0.2rem; color: #94a3b8; font-size: 0.72rem; }
+.service-warning { display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.3rem; padding: 0.15rem 0.4rem; border-radius: 0.3rem; background: var(--cd-warning-bg, #fff3cd); color: var(--cd-warning-ink, #9a5700); font-size: 0.7rem; font-weight: 650; }
+.type-badge { display: inline-block; padding: 0.2rem 0.45rem; border-radius: 0.35rem; font-size: 0.7rem; font-weight: 700; line-height: 1.3; }
+.type-badge.is-set { background: var(--cd-blue-50, #f0f9ff); color: var(--cd-blue-700, #0369a1); }
+.type-badge.is-missing { background: var(--cd-warning-bg, #fff3cd); color: var(--cd-warning-ink, #9a5700); }
+.tier-line { color: #475569; font-size: 0.76rem; line-height: 1.5; white-space: nowrap; }
+.field-hint { display: block; margin-top: 0.3rem; color: #64748b; font-size: 0.73rem; line-height: 1.4; }
+.form-error { margin: 0.5rem 0 0; padding: 0.5rem 0.65rem; border-radius: 0.4rem; background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); font-size: 0.78rem; font-weight: 600; }
+.tiers-block { margin-bottom: 1rem; padding: 0.75rem; border: 1px solid var(--cd-line, #dbe7f0); border-radius: 0.5rem; background: #f8fbfd; }
+.tiers-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.tiers-head label { color: #0f172a; font-size: 0.82rem; font-weight: 700; }
+.btn-tier-add { padding: 0.25rem 0.5rem; border: 1px solid var(--cd-blue-700, #0369a1); border-radius: 0.35rem; background: #fff; color: var(--cd-blue-700, #0369a1); font-size: 0.73rem; font-weight: 700; cursor: pointer; }
+.btn-tier-add:hover { background: var(--cd-blue-50, #f0f9ff); }
+.tier-row { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.5rem; }
+.tier-field { display: flex; align-items: center; gap: 0.3rem; min-width: 0; }
+.tier-field span { color: #64748b; font-size: 0.75rem; white-space: nowrap; }
+.tier-field input { width: 100%; min-width: 4rem; padding: 0.35rem 0.45rem; border: 1px solid #cbd5e1; border-radius: 0.35rem; font-size: 0.8rem; }
+.tier-price input { min-width: 5rem; }
+.btn-tier-remove { flex: 0 0 auto; width: 1.6rem; height: 1.6rem; border: none; border-radius: 0.3rem; background: #fee2e2; color: #991b1b; font-size: 1rem; line-height: 1; cursor: pointer; }
+.btn-tier-remove:disabled { opacity: 0.4; cursor: not-allowed; }
 .feedback-cell { text-align: center; color: #64748b; }
 .form-group { margin-bottom: 1rem; }
 .form-group label { display: block; font-size: .8rem; font-weight: 700; color: #334155; margin-bottom: .25rem; }
