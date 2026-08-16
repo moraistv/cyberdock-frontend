@@ -205,16 +205,34 @@ export function useAuth() {
             const userData = parseJwt(storedToken);
             if (userData && userData.exp * 1000 > Date.now()) {
                 setUserSession(storedToken);
-                await refreshUserData();
             } else {
                 setUserSession(null);
             }
         }
+
+        /* A sessão está pronta AQUI, e não depois de uma ida ao servidor.
+         *
+         * O token JWT já foi verificado (assinatura pelo backend em cada
+         * requisição, validade aqui) e já carrega uid, papel, nome e e-mail.
+         * Nada do que a tela precisa para começar a buscar depende de
+         * /auth/user.
+         *
+         * Antes `isAuthReady` só virava true depois de `await
+         * refreshUserData()`. Como as telas (tabela de vendas, dashboard) só
+         * disparam suas consultas quando isAuthReady fica true, a busca de
+         * vendas ficava SERIALIZADA atrás de uma requisição HTTP inteira: duas
+         * viagens em fila onde cabiam duas em paralelo. Era isso que fazia a
+         * tabela demorar a aparecer mesmo quando a consulta era rápida.
+         */
         isAuthReady.value = true;
 
-        // ✅ tenta carregar contas assim que possível
+        // Em paralelo e sem bloquear ninguém: refreshUserData só enriquece o
+        // usuário com o cadastro do banco (é reativo, a tela se atualiza quando
+        // chegar) e as contas alimentam os dropdowns de filtro, não a tabela.
         if (loggedInUser.value?.uid) {
-            await Promise.all([fetchMercadoLivreAccounts(), fetchShopeeAccounts()]);
+            refreshUserData();
+            fetchMercadoLivreAccounts();
+            fetchShopeeAccounts();
         }
     });
 
