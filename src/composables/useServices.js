@@ -44,6 +44,30 @@ export function tierRangeLabel(tier) {
 }
 
 /**
+ * Ícone de cada tipo de cobrança, para o catálogo ser lido de relance.
+ * SVG inline (o projeto não usa biblioteca de ícones), traço herdando a cor.
+ */
+const TYPE_ICONS = {
+    // Caixa: armazenamento
+    base_storage: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+    // Caixa cortada ao meio: metade do armazenamento
+    base_storage_50: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><line x1="12" y1="2.5" x2="12" y2="21.5"/><path d="M12 12l8.73-5.04"/>',
+    // Caixas empilhadas: m³ adicional
+    additional_storage: '<rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/><rect x="8" y="3" width="8" height="8" rx="1"/>',
+    // Caminhão: serviço avulso de preço fixo (coleta, transbordo)
+    avulso_simples: '<rect x="1" y="3" width="15" height="13" rx="1"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+    // Etiquetas em camadas: preço por faixa de quantidade
+    avulso_quantidade: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+    // Alerta: sem tipo, não é faturado
+    none: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+};
+
+export function serviceTypeIcon(type) {
+    const paths = TYPE_ICONS[type] || TYPE_ICONS.none;
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+}
+
+/**
  * Composable para gerenciar o catálogo de serviços/produtos e os serviços contratados pelos clientes.
  */
 export function useServices() {
@@ -261,6 +285,9 @@ export function useServices() {
         if (tiers && tiers.length > 1) tiers.splice(index, 1);
     };
 
+    /** Serviços que não entram em nenhuma fatura por não terem tipo. */
+    const untypedServicesCount = computed(() => services.value.filter((s) => !s.type).length);
+
     const selectedTypeHint = computed(() => {
         const type = currentService.value?.type;
         return SERVICE_TYPE_OPTIONS.find((o) => o.value === type)?.hint
@@ -310,6 +337,8 @@ export function useServices() {
         serviceTypeLabel,
         unitLabel,
         tierRangeLabel,
+        serviceTypeIcon,
+        untypedServicesCount,
 
         // Serviços do Cliente
         clientServices,

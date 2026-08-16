@@ -465,47 +465,64 @@
         </UniversalModal>
 
         <UniversalModal title="Gerenciar Catálogo de Serviços" :is-open="isServiceCatalogueOpen" @close="closeServiceCatalogueModal">
+            <!-- Cards no lugar da tabela: dentro do modal a tabela já estourava
+                 a largura e criava scroll horizontal, e com a coluna de cobrança
+                 ficaria pior. Cada serviço mostra ícone do tipo, unidade e as
+                 faixas de preço sem cortar nada. -->
             <div class="plan-manager-content">
-                <button @click="openServiceModal()" class="btn btn-primary btn-full-width">Adicionar Novo Serviço</button>
-                <h4 class="modal-subtitle">Serviços Existentes</h4>
-                <div class="table-wrapper-modal">
-                <table class="services-table-modal">
-                    <thead><tr><th>Serviço</th><th>Cobrança</th><th>Preço</th><th>Ações</th></tr></thead>
-                    <tbody>
-                    <tr v-if="isLoadingServices"><td colspan="4" class="feedback-cell">Carregando...</td></tr>
-                    <tr v-else-if="availableServices.length === 0"><td colspan="4" class="feedback-cell">Nenhum serviço cadastrado.</td></tr>
-                    <tr v-for="service in availableServices" :key="service.id">
-                        <td>
-                        <div class="service-name">{{ service.name }}</div>
-                        <div class="service-description">{{ service.description }}</div>
-                        <!-- Serviço sem tipo não entra em nenhum cálculo de fatura.
-                             O alerta existe porque foi assim que um armazenamento
-                             de R$ 397 ficou meses sem ser cobrado. -->
-                        <div v-if="!service.type" class="service-warning">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="13" height="13"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                            Sem tipo de cobrança: não é faturado
-                        </div>
-                        </td>
-                        <td>
-                        <span class="type-badge" :class="service.type ? 'is-set' : 'is-missing'">{{ serviceTypeLabel(service.type) }}</span>
-                        <div v-if="service.unit" class="service-unit">por {{ unitLabel(service.unit) }}</div>
-                        </td>
-                        <td>
-                        <template v-if="service.type === 'avulso_quantidade' && service.config?.tiers?.length">
-                            <div v-for="(tier, ti) in service.config.tiers" :key="ti" class="tier-line">
-                            {{ tierRangeLabel(tier) }}: <strong>{{ formatCurrency(tier.price) }}</strong>
-                            </div>
-                        </template>
-                        <template v-else>{{ formatCurrency(service.price) }}</template>
-                        </td>
-                        <td>
-                        <button @click="openServiceModal(service)" class="btn-action edit" title="Editar"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
-                        <button @click="openDeleteServiceModal(service)" class="btn-action delete" title="Excluir"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
+                <button @click="openServiceModal()" class="btn btn-primary btn-full-width btn-with-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Adicionar Novo Serviço
+                </button>
+
+                <div class="catalogue-head">
+                    <h4 class="modal-subtitle">Serviços Existentes</h4>
+                    <span v-if="!isLoadingServices" class="catalogue-count">{{ availableServices.length }}</span>
                 </div>
+
+                <p v-if="untypedServicesCount" class="catalogue-alert">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <span><strong>{{ untypedServicesCount }} serviço(s) sem tipo de cobrança.</strong> Eles não entram em nenhuma fatura. Edite e defina o tipo.</span>
+                </p>
+
+                <div v-if="isLoadingServices" class="catalogue-feedback">Carregando...</div>
+                <div v-else-if="availableServices.length === 0" class="catalogue-feedback">Nenhum serviço cadastrado.</div>
+
+                <ul v-else class="catalogue-list">
+                    <li v-for="service in availableServices" :key="service.id" class="catalogue-item" :class="{ 'is-untyped': !service.type }">
+                        <span class="catalogue-item__icon" :class="`icon--${service.type || 'none'}`" v-html="serviceTypeIcon(service.type)"></span>
+
+                        <div class="catalogue-item__body">
+                            <div class="catalogue-item__title">
+                                {{ service.name }}
+                                <span class="type-badge" :class="service.type ? 'is-set' : 'is-missing'">{{ serviceTypeLabel(service.type) }}</span>
+                            </div>
+                            <p v-if="service.description" class="catalogue-item__desc">{{ service.description }}</p>
+
+                            <!-- Faixas por quantidade: o sistema escolhe sozinho na hora do lançamento -->
+                            <div v-if="service.type === 'avulso_quantidade' && service.config?.tiers?.length" class="catalogue-tiers">
+                                <span v-for="(tier, ti) in service.config.tiers" :key="ti" class="tier-chip">
+                                    {{ tierRangeLabel(tier) }} · <strong>{{ formatCurrency(tier.price) }}</strong>
+                                </span>
+                            </div>
+                            <div v-else class="catalogue-item__price">
+                                {{ formatCurrency(service.price) }}
+                                <small v-if="service.unit">por {{ unitLabel(service.unit) }}</small>
+                            </div>
+
+                            <!-- Foi assim que um armazenamento de R$ 397 ficou meses sem ser cobrado -->
+                            <div v-if="!service.type" class="service-warning">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="13" height="13"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                Não é faturado
+                            </div>
+                        </div>
+
+                        <div class="catalogue-item__actions">
+                            <button @click="openServiceModal(service)" class="btn-action edit" title="Editar"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+                            <button @click="openDeleteServiceModal(service)" class="btn-action delete" title="Excluir"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+                        </div>
+                    </li>
+                </ul>
             </div>
         </UniversalModal>
         <UniversalModal :title="isEditingService ? 'Editar Serviço' : 'Adicionar Novo Serviço'" :is-open="isServiceModalOpen" @close="closeServiceModal">
@@ -700,7 +717,7 @@ const {
   openDeleteServiceModal, closeDeleteServiceModal, handleConfirmDeleteService, fetchServices, formatCurrency,
   clientServices, isLoadingClientServices, addClientService, fetchClientServices, removeClientService,
   serviceFormError, serviceTypeOptions, unitOptions, selectedTypeHint, addTier, removeTier,
-  serviceTypeLabel, unitLabel, tierRangeLabel
+  serviceTypeLabel, unitLabel, tierRangeLabel, serviceTypeIcon, untypedServicesCount
 } = useServices();
 
 const currentView = ref('users');
@@ -1590,6 +1607,35 @@ button, input, select, table { font-family: var(--font-sans); }
 .service-name { font-weight: 650; color: #0f172a; }
 .service-description { color: #94a3b8; font-size: 0.76rem; }
 .service-unit { margin-top: 0.2rem; color: #94a3b8; font-size: 0.72rem; }
+
+/* --- Catálogo de serviços em cards (antes tabela com scroll horizontal) --- */
+.btn-with-icon { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; }
+.catalogue-head { display: flex; align-items: center; gap: 0.5rem; margin: 1.25rem 0 0.65rem; }
+.catalogue-head .modal-subtitle { margin: 0; }
+.catalogue-count { padding: 0.1rem 0.45rem; border-radius: 999px; background: var(--cd-blue-50, #f0f9ff); color: var(--cd-blue-700, #0369a1); font-size: 0.72rem; font-weight: 750; }
+.catalogue-alert { display: flex; align-items: flex-start; gap: 0.45rem; margin: 0 0 0.75rem; padding: 0.55rem 0.7rem; border: 1px solid #f5d68a; border-radius: 0.5rem; background: var(--cd-warning-bg, #fff3cd); color: var(--cd-warning-ink, #9a5700); font-size: 0.78rem; line-height: 1.45; }
+.catalogue-alert svg { flex: 0 0 auto; margin-top: 0.12rem; }
+.catalogue-feedback { padding: 1.5rem; border: 1px dashed var(--cd-line, #dbe7f0); border-radius: 0.6rem; color: #64748b; font-size: 0.82rem; text-align: center; }
+
+.catalogue-list { display: flex; flex-direction: column; gap: 0.55rem; margin: 0; padding: 0; max-height: 26rem; overflow-y: auto; list-style: none; }
+.catalogue-item { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr) auto; align-items: flex-start; gap: 0.7rem; padding: 0.75rem; border: 1px solid var(--cd-line, #dbe7f0); border-radius: 0.65rem; background: #fff; transition: border-color 0.15s, box-shadow 0.15s; }
+.catalogue-item:hover { border-color: #b9d3e3; box-shadow: 0 4px 14px rgba(15, 71, 105, 0.07); }
+.catalogue-item.is-untyped { border-color: #f5d68a; background: #fffdf6; }
+
+.catalogue-item__icon { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2.4rem; border-radius: 0.55rem; background: var(--cd-blue-50, #f0f9ff); color: var(--cd-blue-700, #0369a1); }
+.catalogue-item__icon svg { width: 1.15rem; height: 1.15rem; }
+.catalogue-item__icon.icon--none { background: var(--cd-warning-bg, #fff3cd); color: var(--cd-warning-ink, #9a5700); }
+.catalogue-item__icon.icon--avulso_quantidade, .catalogue-item__icon.icon--avulso_simples { background: #eef6fb; color: var(--cd-blue-800, #075985); }
+
+.catalogue-item__body { min-width: 0; }
+.catalogue-item__title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; color: #0f172a; font-size: 0.86rem; font-weight: 700; line-height: 1.35; }
+.catalogue-item__desc { margin: 0.25rem 0 0; color: #94a3b8; font-size: 0.76rem; line-height: 1.45; }
+.catalogue-item__price { margin-top: 0.4rem; color: var(--cd-blue-700, #0369a1); font-size: 0.95rem; font-weight: 780; font-variant-numeric: tabular-nums; }
+.catalogue-item__price small { margin-left: 0.25rem; color: #94a3b8; font-size: 0.72rem; font-weight: 600; }
+.catalogue-tiers { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.45rem; }
+.tier-chip { padding: 0.18rem 0.45rem; border: 1px solid #cfe6f4; border-radius: 0.35rem; background: #f7fcff; color: #075985; font-size: 0.72rem; white-space: nowrap; }
+.tier-chip strong { font-variant-numeric: tabular-nums; }
+.catalogue-item__actions { display: flex; gap: 0.25rem; }
 .service-warning { display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.3rem; padding: 0.15rem 0.4rem; border-radius: 0.3rem; background: var(--cd-warning-bg, #fff3cd); color: var(--cd-warning-ink, #9a5700); font-size: 0.7rem; font-weight: 650; }
 .type-badge { display: inline-block; padding: 0.2rem 0.45rem; border-radius: 0.35rem; font-size: 0.7rem; font-weight: 700; line-height: 1.3; }
 .type-badge.is-set { background: var(--cd-blue-50, #f0f9ff); color: var(--cd-blue-700, #0369a1); }
