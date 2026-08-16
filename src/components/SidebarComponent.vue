@@ -105,7 +105,7 @@
             <button @click="handleRetry" class="retry-button">Tentar Novamente</button>
           </div>
           <ul v-else-if="allConnectedAccounts.length > 0" class="account-status-list">
-            <li v-for="account in allConnectedAccounts" :key="account.key" class="account-status-item" @mouseenter="showTooltip($event, account)" @mouseleave="hideTooltip" @contextmenu.prevent="showContextMenu($event, account)">
+            <li v-for="account in allConnectedAccounts" :key="account.key" class="account-status-item" @mouseenter="showTooltip($event, account)" @mouseleave="hideTooltip">
               <span class="status-dot" :class="account.status"></span>
               <img :src="account.logo" :alt="account.marketplace" class="account-mk-logo" />
               <span class="account-nickname">{{ account.nickname }}</span>
@@ -122,13 +122,12 @@
       </div>
     </div>
     
-    <div v-if="contextMenu.visible" class="context-menu" :style="{ top: contextMenu.top, left: contextMenu.left }">
-        <div class="context-menu-header">{{ contextMenu.account.nickname }}</div>
-        <button class="context-menu-item">Sincronizar Agora</button>
-        <button class="context-menu-item">Ver Detalhes</button>
-        <button class="context-menu-item danger">Desconectar</button>
-    </div>
-
+    <!--
+      O menu de contexto da conta (Sincronizar Agora / Ver Detalhes /
+      Desconectar) foi removido: os três botões nunca tiveram @click e as três
+      ações já existem, funcionando, na tela "Contas" (/contas). Manter um menu
+      que abre e não faz nada é pior do que não ter menu.
+    -->
     <div v-if="tooltip.visible" class="global-tooltip" :style="{ top: tooltip.top, left: tooltip.left }">
         <strong>{{ tooltip.account.nickname }}</strong>
         <span>Status: {{ getStatusText(tooltip.account.status) }}</span>
@@ -139,7 +138,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUpdate, onBeforeUnmount, watch, nextTick, computed } from 'vue';
+import { ref, onMounted, onBeforeUpdate, watch, nextTick, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { useAdminMode } from '@/composables/useAdminMode';
@@ -309,13 +308,7 @@ const getStatusText = (status) => {
   return map[status] || 'Inativa';
 };
 
-const contextMenu = ref({ visible: false, top: '0px', left: '0px', account: null });
 const tooltip = ref({ visible: false, top: '0px', left: '0px', account: null });
-
-const showContextMenu = (event, account) => {
-    contextMenu.value = { visible: true, top: `${event.clientY}px`, left: `${event.clientX}px`, account };
-};
-const hideContextMenu = () => { if (contextMenu.value.visible) contextMenu.value.visible = false; };
 
 const showTooltip = (event, account) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -329,12 +322,7 @@ const showTooltip = (event, account) => {
 const hideTooltip = () => { if (tooltip.value.visible) tooltip.value.visible = false; };
 
 onMounted(() => {
-  window.addEventListener('click', hideContextMenu);
   fetchAccounts();
-});
-
-onBeforeUnmount(() => {
-    window.removeEventListener('click', hideContextMenu);
 });
 
 watch(() => route.fullPath, (newPath) => {
@@ -607,22 +595,6 @@ watch(() => route.fullPath, (newPath) => {
   50% { opacity: 0.6; }
 }
 
-.context-menu {
-    position: fixed; z-index: 1000; background-color: var(--color-bg);
-    border: 1px solid var(--color-border); border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 0.5rem; min-width: 180px;
-    display: flex; flex-direction: column;
-}
-.context-menu-header {
-    padding: 0.5rem 0.75rem; font-weight: 600; font-size: 0.9rem;
-    border-bottom: 1px solid var(--color-border); margin-bottom: 0.5rem;
-}
-.context-menu-item {
-    background: none; border: none; text-align: left;
-    padding: 0.6rem 0.75rem; border-radius: 6px; font-size: 0.9rem; cursor: pointer;
-}
-.context-menu-item:hover { background-color: #f0f0f8; }
-.context-menu-item.danger:hover { background-color: #fee2e2; color: var(--color-danger); }
 .global-tooltip {
     position: fixed;
     transform: translateY(-50%);

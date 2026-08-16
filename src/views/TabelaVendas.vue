@@ -668,6 +668,9 @@ import { useShopeeSyncManager } from '@/composables/useShopeeSyncManager';
 import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
 import { useApi } from '@/composables/useApi';
+import { useNotification } from '@/composables/useNotification';
+
+const notify = useNotification();
 
 // ===== UTILITY FUNCTIONS FOR CUSTOMER DATA =====
 
@@ -805,47 +808,16 @@ async function copySaleId(saleId) {
 }
 
 /**
- * Exibe uma notificação toast simples
- * @param {string} message - Mensagem a ser exibida
- * @param {string} type - Tipo da notificação ('success', 'error', 'info')
+ * Notificação da tela.
+ *
+ * Antes esta função montava uma <div> à mão no body, com estilo inline e cor
+ * fixa — um terceiro sistema de toast convivendo com o ToastComponent e o
+ * ToastNotification. Agora delega ao canal único do sistema.
  */
 function showToast(message, type = 'info') {
-    // Implementação simples usando alert por enquanto
-    // TODO: Integrar com sistema de toast existente
-    if (type === 'error') {
-        console.error(message);
-    } else {
-        console.log(message);
-    }
-    
-    // Criar um toast visual simples
-    const toast = document.createElement('div');
-    toast.textContent = message;
-    toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#ef4444' : '#10b981'};
-        color: white;
-        padding: 12px 16px;
-        border-radius: 6px;
-        z-index: 9999;
-        font-size: 14px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        transition: opacity 0.3s ease;
-    `;
-    
-    document.body.appendChild(toast);
-    
-    // Remover após 3 segundos
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-            if (toast.parentNode) {
-                document.body.removeChild(toast);
-            }
-        }, 300);
-    }, 3000);
+    if (type === 'error') notify.error(message);
+    else if (type === 'success') notify.success(message);
+    else notify.info(message);
 }
 
 // ===== END UTILITY FUNCTIONS =====
@@ -890,7 +862,6 @@ const isSyncLiveOpen = ref(false);
 const syncTimeframe = ref('3');
 const { systemStatuses } = useSystemStatus();
 const { downloadLabel, downloadLabelsForSales, getLabelInfo: composableLabelInfo } = useLabels();
-const labelError = ref(null);
 const isProcessing = ref(false);
 const isPrinting = ref(false);
 const api = useApi();
@@ -935,12 +906,12 @@ function getLabelInfo(sale) {
 }
 
 async function handleDownloadLabel(shipmentId, sellerId, type) {
-    labelError.value = null;
     try {
         await downloadLabel(shipmentId, sellerId, type);
     } catch (err) {
-        labelError.value = err?.message || 'Não foi possível baixar a etiqueta.';
-        setTimeout(() => { labelError.value = null; }, 8000);
+        // O erro ia para uma ref que nunca era renderizada: a falha do download
+        // acontecia em silêncio. Agora vai para o toast global.
+        notify.fromError(err, 'Não foi possível baixar a etiqueta.');
     }
 }
 
@@ -1016,7 +987,6 @@ async function printSelectedLabels(type = 'pdf') {
     }
 
     isPrinting.value = true;
-    labelError.value = null;
     try {
         await downloadLabelsForSales(printable, type);
 
@@ -1095,7 +1065,7 @@ async function processSingleSale(sale) {
         sale.processed_at = new Date().toISOString();
     } catch (err) {
         console.error('Erro ao processar venda:', err);
-        alert(err?.data?.error || err?.message || 'Erro ao processar venda');
+        notify.fromError(err, 'Erro ao processar venda');
     } finally {
         isProcessing.value = false;
     }

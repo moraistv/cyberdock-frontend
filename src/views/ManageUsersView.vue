@@ -351,9 +351,8 @@
 
         <!-- Outras Visões (Renderização Condicional) -->
         <UserSalesTable v-if="currentView === 'sales' && selectedUser" :user-id="selectedUser.uid" />
-        <MasterStorageView v-if="currentView === 'storage' && selectedUser && isMaster" :user-id="selectedUser.uid" />
-        <UserStorageView v-if="currentView === 'storage' && selectedUser && !isMaster" :user-id="selectedUser.uid" />
-        <MasterResumoCobranca v-if="currentView === 'billing'" :user-id="selectedUser.uid" />
+        <UserStorageView v-if="currentView === 'storage' && selectedUser" :user-id="selectedUser.uid" />
+        <MasterResumoCobranca v-if="currentView === 'billing' && selectedUser" :user-id="selectedUser.uid" />
         <ServiceHistory v-if="currentView === 'history'" />
 
 
@@ -708,8 +707,15 @@ import { useGlobalStatuses } from '@/composables/useGlobalStatuses';
 import { usePackageTypes } from '@/composables/usePackageTypes';
 import { useServices } from '@/composables/useServices.js';
 import { useSyncManager } from '@/composables/useSyncManager';
+import { useNotification } from '@/composables/useNotification';
+import { useConfirm } from '@/composables/useConfirm';
 import { API_BASE_URL } from '@/config';
 
+const notify = useNotification();
+const { confirm } = useConfirm();
+
+/** Rótulos das permissões, para a confirmação falar a língua da tela. */
+const ROLE_LABELS = { cliente: 'Cliente', master: 'Master' };
 const { users, isLoading: isLoadingUsers, error: usersError, fetchUsers, updateUserRole, toggleUserActiveStatus, updateUserPassword, deleteUser } = useUsers();
 const { syncState } = useSyncManager();
 const {
@@ -900,20 +906,41 @@ const switchUserView = (view) => {
   currentView.value = view;
 };
 
+/**
+ * Troca a permissão do usuário depois de confirmação explícita.
+ *
+ * Ao cancelar, o <select> precisa voltar ao valor anterior. Como o campo é
+ * ligado por `:value="user.role"` e essa propriedade não mudou, o patch do Vue
+ * não tocaria no DOM já alterado pelo clique — por isso a propriedade reativa é
+ * movida para o novo valor e devolvida ao original no tick seguinte.
+ */
 const handleRoleChange = async (user, newRole) => {
-    const originalRole = user.role;
-    // Removendo o window.confirm para um ambiente sem browser-blocking popups
-    const confirmed = true; // Simular confirmação
-    if (confirmed) {
-        const result = await updateUserRole(user.uid, newRole);
-        if (!result.success) {
-            // Idealmente, usar um toast de notificação aqui
-            console.error(`Falha ao atualizar permissão: ${result.message}`);
-        }
-    } else {
-        const selectElement = event.target;
-        selectElement.value = originalRole;
-    }
+  const originalRole = user.role;
+  if (newRole === originalRole) return;
+
+  const confirmed = await confirm({
+    title: 'Alterar permissão do usuário',
+    message: `Alterar a permissão de ${user.name || user.mlNickname || user.email} de "${ROLE_LABELS[originalRole] || originalRole}" para "${ROLE_LABELS[newRole] || newRole}"?`,
+    detail: newRole === 'master'
+      ? 'Como Master, o usuário passa a ver e editar dados de todos os clientes.'
+      : 'Como Cliente, o usuário perde o acesso às telas de administração.',
+    confirmText: 'Alterar permissão',
+    tone: newRole === 'master' ? 'danger' : 'primary',
+  });
+
+  if (!confirmed) {
+    user.role = newRole;
+    await nextTick();
+    user.role = originalRole;
+    return;
+  }
+
+  const result = await updateUserRole(user.uid, newRole);
+  if (result.success) {
+    notify.success(`Permissão de ${user.name || user.email} alterada para ${ROLE_LABELS[newRole] || newRole}.`);
+  } else {
+    notify.error(`Falha ao atualizar permissão: ${result.message}`);
+  }
 };
 
 const toggleActionsMenu = async (user, event) => {
@@ -1034,7 +1061,7 @@ const handleToggleActive = async (user) => {
   activeMenu.value.user = null;
   const result = await toggleUserActiveStatus(user.uid, user.active);
   if (!result.success) {
-    alert(result.message || 'Erro ao alterar status do usuário.');
+    notify.error(result.message || 'Erro ao alterar status do usuário.');
   }
 };
 const closeSyncResultsModal = () => { isSyncResultsModalOpen.value = false; syncResults.value = {}; };
@@ -1067,7 +1094,7 @@ const handleSaveName = async () => {
     closeEditNameModal();
   } catch (error) {
     console.error('Erro ao salvar nome:', error);
-    alert('Erro ao salvar o nome. Tente novamente.');
+    notify.fromError(error, 'Erro ao salvar o nome. Tente novamente.');
   } finally {
     isSavingName.value = false;
   }
@@ -1118,16 +1145,27 @@ const handleSavePackageType = async () => {
     }
     cancelEditPackageType();
   } catch (err) {
-    alert("Erro ao salvar tipo de pacote: " + err.message);
+    notify.fromError(err, 'Erro ao salvar tipo de pacote.');
   }
 };
 const handleDeletePackageType = async (id) => {
-  if (confirm("Deseja mesmo excluir este tipo de pacote?")) {
-    try {
-      await deletePackageType(id);
-    } catch (err) {
-      alert("Erro ao excluir: " + err.message);
-    }
+  const target = allPackageTypes.value.find((pkg) => pkg.id === id);
+  const confirmed = await confirm({
+    title: 'Excluir tipo de pacote',
+    message: target
+      ? `Excluir o tipo de pacote "${target.name}"?`
+      : 'Excluir este tipo de pacote?',
+    detail: 'O custo de expedição deixa de ser aplicado aos SKUs que usavam este tipo.',
+    confirmText: 'Excluir tipo',
+    tone: 'danger',
+  });
+  if (!confirmed) return;
+
+  try {
+    await deletePackageType(id);
+    notify.success('Tipo de pacote excluído.');
+  } catch (err) {
+    notify.fromError(err, 'Erro ao excluir o tipo de pacote.');
   }
 };
 
@@ -1137,9 +1175,25 @@ const handleAddNewStatus = async () => {
   catch (e) { statusError.value = e.message; }
 };
 
-const handleDeleteStatus = (status) => {
-    // Idealmente, usar um modal de confirmação aqui em vez de window.confirm
-    deleteStatus(status);
+const handleDeleteStatus = async (status) => {
+  // O status é global: excluir afeta a expedição de todos os clientes, então a
+  // ação passou a exigir confirmação explícita.
+  const confirmed = await confirm({
+    title: 'Excluir status de venda',
+    message: `Excluir o status "${status.label}"?`,
+    detail: 'Ele deixa de aparecer nas telas de expedição de todos os clientes.',
+    confirmText: 'Excluir status',
+    tone: 'danger',
+  });
+  if (!confirmed) return;
+
+  try {
+    await deleteStatus(status);
+    notify.success('Status excluído.');
+  } catch (err) {
+    statusError.value = err.message;
+    notify.fromError(err, 'Não foi possível excluir o status.');
+  }
 };
 
 const startEditing = (status) => { editingStatus.value = status; editedStatusName.value = status.label; };

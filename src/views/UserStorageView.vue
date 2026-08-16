@@ -136,6 +136,7 @@ import { useUserStorage } from '@/composables/useUserStorage'
 import { useSalesForUser } from '@/composables/useSalesForUser'
 import { useKitManagement } from '@/composables/useKitManagement'
 import { useApi } from '@/composables/useApi'
+import { useConfirm } from '@/composables/useConfirm'
 
 import StatsCardGrid from '../components/StorageComponents/StatsCardGrid.vue'
 import SkuTable from '../components/StorageComponents/SkuTable.vue'
@@ -477,13 +478,21 @@ export default defineComponent({
     }
 
     const handleDeletePackageType = async (packageType) => {
-      if (confirm(`Tem certeza que deseja excluir o tipo "${packageType.name}"?`)) {
-        try {
-          await removePackageType(packageType.id)
-          toast('Tipo de pacote excluído.', 'success')
-        } catch (err) {
-          toast(`Erro ao excluir tipo de pacote: ${err.message}`, 'error', 4200)
-        }
+      const { confirm } = useConfirm()
+      const confirmed = await confirm({
+        title: 'Excluir tipo de pacote',
+        message: `Tem certeza que deseja excluir o tipo "${packageType.name}"?`,
+        detail: 'Esta ação não pode ser desfeita.',
+        confirmText: 'Excluir tipo',
+        tone: 'danger'
+      })
+      if (!confirmed) return
+
+      try {
+        await removePackageType(packageType.id)
+        toast('Tipo de pacote excluído.', 'success')
+      } catch (err) {
+        toast(`Erro ao excluir tipo de pacote: ${err.message}`, 'error', 4200)
       }
     }
     

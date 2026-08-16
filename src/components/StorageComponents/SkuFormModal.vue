@@ -96,7 +96,13 @@
         
         <div v-if="selectedKitsForConnection.length > 0" class="connection-summary">
           <div class="summary-header">
-            <span class="summary-icon">🎯</span>
+            <span class="summary-icon">
+              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <circle cx="12" cy="12" r="5" />
+                <circle cx="12" cy="12" r="1" />
+              </svg>
+            </span>
             <strong>Resumo das Conexões</strong>
           </div>
           <div class="summary-items">
@@ -760,7 +766,12 @@ export default defineComponent({
   color: #1e40af;
 }
 
-.summary-icon { font-size: 1.25rem; }
+.summary-icon {
+  font-size: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
 
 .summary-items {
   display: flex;

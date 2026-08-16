@@ -273,6 +273,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, defineProps } from 'vue';
 import { useBilling } from '@/composables/useBilling';
+import { useConfirm } from '@/composables/useConfirm';
 import UniversalModal from '@/components/UniversalModal.vue';
 
 const props = defineProps({
@@ -291,6 +292,8 @@ const {
   setInvoiceStatus,
   deleteManualItem
 } = useBilling();
+
+const { confirm } = useConfirm();
 
 /** Rótulos das seções da fatura, no lugar de "Storage"/"Shipment"/"Manual". */
 const ITEM_GROUPS = [
@@ -378,7 +381,13 @@ async function toggleInvoicePayment() {
   if (!currentInvoice.value || !targetUserId.value) return;
   const goingToPaid = !isCurrentInvoicePaid.value;
   const label = goingToPaid ? 'marcar como paga' : 'reabrir';
-  if (!window.confirm(`Confirma ${label} a fatura de ${currentInvoice.value.period}?`)) return;
+  const confirmed = await confirm({
+    title: goingToPaid ? 'Marcar fatura como paga' : 'Reabrir fatura',
+    message: `Confirma ${label} a fatura de ${currentInvoice.value.period}?`,
+    confirmText: goingToPaid ? 'Marcar como paga' : 'Reabrir fatura',
+    tone: 'primary',
+  });
+  if (!confirmed) return;
 
   statusError.value = '';
   isUpdatingStatus.value = true;
@@ -393,7 +402,15 @@ async function toggleInvoicePayment() {
 }
 
 async function removeManualItem(item) {
-  if (!window.confirm(`Remover o lançamento "${item.description}" desta fatura?`)) return;
+  const confirmed = await confirm({
+    title: 'Remover lançamento',
+    message: `Remover o lançamento "${item.description}" desta fatura?`,
+    detail: 'Esta ação não pode ser desfeita.',
+    confirmText: 'Remover lançamento',
+    tone: 'danger',
+  });
+  if (!confirmed) return;
+
   statusError.value = '';
   removingItemId.value = item.id;
   try {

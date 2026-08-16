@@ -1,6 +1,7 @@
 // composables/useServices.js
 import { computed, ref } from 'vue';
 import { useApi } from './useApi';
+import { useNotification } from './useNotification';
 
 /**
  * Tipos de cobrança reconhecidos pelo faturamento (espelha router/services.js).
@@ -72,6 +73,7 @@ export function serviceTypeIcon(type) {
  */
 export function useServices() {
     const api = useApi();
+    const notify = useNotification();
     
     // --- Estado do Catálogo de Serviços ---
     const services = ref([]);
@@ -192,7 +194,7 @@ export function useServices() {
             closeDeleteServiceModal();
         } catch (err) {
             console.error("Erro ao excluir serviço:", err);
-            alert(err.message || "Falha ao excluir o item.");
+            notify.fromError(err, "Falha ao excluir o item.");
         }
     }
 
@@ -226,7 +228,7 @@ export function useServices() {
             await fetchClientServices(uid); // Recarrega a lista do cliente
         } catch (err) {
             console.error("Erro ao adicionar serviço ao cliente:", err);
-            alert(err.message || "Falha ao adicionar serviço.");
+            notify.fromError(err, "Falha ao adicionar serviço.");
         }
     }
 
@@ -241,7 +243,7 @@ export function useServices() {
             await fetchClientServices(uid); // Recarrega a lista do cliente
         } catch (err) {
             console.error("Erro ao remover serviço do cliente:", err);
-            alert(err.message || "Falha ao remover serviço.");
+            notify.fromError(err, "Falha ao remover serviço.");
         }
     }
 

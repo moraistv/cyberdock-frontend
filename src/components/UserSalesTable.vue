@@ -551,6 +551,7 @@ import ToastNotification from './ToastNotification.vue';
 import { useUserAccounts } from '@/composables/useUserAccounts';
 import { useSyncManager } from '@/composables/useSyncManager';
 import { useAuth } from '@/composables/useAuth';
+import { useNotification } from '@/composables/useNotification';
 import { API_BASE_URL } from '@/config';
 
 
@@ -569,6 +570,7 @@ const { skus, loadStorageData } = useUserStorage(userIdRef);
 const { systemStatuses } = useSystemStatus();
 const { getLabelInfo, downloadLabel, checkLabelAvailability } = useLabels();
 const { userRole } = useAuth();
+const notify = useNotification();
 
 const salesTableBodyRef = ref(null);
 const tooltipRef = ref(null);
@@ -1625,6 +1627,11 @@ async function selectNewStatus(newStatus) {
     closeStatusModal();
 }
 
+// Ícones do resumo de processamento. O conteúdo do modal é injetado por v-html,
+// onde o CSS escopado não chega — por isso cor e alinhamento vão inline.
+const SUMMARY_ICON_SUCCESS = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:#16a34a;vertical-align:-0.15em;"><path d="M20 6 9 17l-5-5" /></svg>';
+const SUMMARY_ICON_FAILED = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:#dc2626;vertical-align:-0.15em;"><path d="M18 6 6 18" /><path d="M6 6l12 12" /></svg>';
+
 async function processAllSales() {
     isProcessing.value = true;
     try {
@@ -1647,12 +1654,12 @@ async function processAllSales() {
         summaryModalTitle.value = 'Resumo do Processamento';
         let contentHtml = '<p>O processamento em lote foi concluído.</p>';
         if (results.success?.length > 0) {
-            contentHtml += `<div class="summary-section success"><h4>✅ ${results.success.length} Vendas Processadas com Sucesso</h4><ul>`;
+            contentHtml += `<div class="summary-section success"><h4>${SUMMARY_ICON_SUCCESS} ${results.success.length} Vendas Processadas com Sucesso</h4><ul>`;
             results.success.forEach(s => { contentHtml += `<li>Venda #${s.saleId} (SKU: ${s.sku})</li>`; });
             contentHtml += `</ul></div>`;
         }
         if (results.failed?.length > 0) {
-            contentHtml += `<div class="summary-section failed"><h4>❌ ${results.failed.length} Vendas Falharam</h4><ul>`;
+            contentHtml += `<div class="summary-section failed"><h4>${SUMMARY_ICON_FAILED} ${results.failed.length} Vendas Falharam</h4><ul>`;
             results.failed.forEach(f => { contentHtml += `<li>Venda #${f.saleId} (SKU: ${f.sku}): <strong>${f.reason}</strong></li>`; });
             contentHtml += `</ul></div>`;
         }
@@ -2229,47 +2236,15 @@ async function copySaleId(saleId) {
 }
 
 /**
- * Exibe uma notificação toast simples
- * @param {string} message - Mensagem a ser exibida
- * @param {string} type - Tipo da notificação ('success', 'error', 'info')
+ * Notificação da tela, delegada ao canal único do sistema.
+ *
+ * Antes montava uma <div> à mão no body, com cor fixa e estilo inline, em
+ * paralelo ao ToastComponent — três sistemas de aviso convivendo.
  */
 function showToast(message, type = 'info') {
-    // Implementação simples usando alert por enquanto
-    // TODO: Integrar com sistema de toast existente
-    if (type === 'error') {
-        console.error(message);
-    } else {
-        console.log(message);
-    }
-
-    // Criar um toast visual simples
-    const toast = document.createElement('div');
-    toast.textContent = message;
-    toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#ef4444' : '#10b981'};
-        color: white;
-        padding: 12px 16px;
-        border-radius: 6px;
-        z-index: 9999;
-        font-size: 14px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        transition: opacity 0.3s ease;
-    `;
-
-    document.body.appendChild(toast);
-
-    // Remover após 3 segundos
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-            if (toast.parentNode) {
-                document.body.removeChild(toast);
-            }
-        }, 300);
-    }, 3000);
+    if (type === 'error') notify.error(message);
+    else if (type === 'success') notify.success(message);
+    else notify.info(message);
 }
 
 onUnmounted(() => {
@@ -3075,21 +3050,19 @@ onUnmounted(() => {
     opacity: 0.8;
 }
 
+/* Marca de canto para etiqueta com prazo expirado: ponto vermelho com anel
+   branco, sem emoji nem texto (o motivo já está no title do botão). */
 .btn-label-disabled[title*="expirou"]::after {
-    content: "⏰";
+    content: "";
     position: absolute;
     top: -2px;
     right: -2px;
-    font-size: 0.6rem;
     background-color: #dc2626;
-    color: white;
+    border: 2px solid #ffffff;
     border-radius: 50%;
-    width: 12px;
-    height: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
+    width: 8px;
+    height: 8px;
+    box-sizing: content-box;
 }
 
 .btn-label-disabled svg {
@@ -3130,19 +3103,18 @@ onUnmounted(() => {
     position: relative;
 }
 
+/* Mesma marca de canto do botão expirado, para o indicador de data. */
 .label-indicator.date-unavailable::before {
-    content: "📅";
+    content: "";
     position: absolute;
     top: -2px;
     right: -2px;
-    font-size: 8px;
-    background: white;
+    background: #ef4444;
+    border: 1px solid #ffffff;
     border-radius: 50%;
-    width: 12px;
-    height: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 8px;
+    height: 8px;
+    box-sizing: content-box;
 }
 
 .indicator-dot {

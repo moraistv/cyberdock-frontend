@@ -53,6 +53,9 @@
 
 <script setup>
 import { defineProps, defineEmits } from 'vue';
+import { useConfirm } from '@/composables/useConfirm';
+
+const { confirm } = useConfirm();
 
 const props = defineProps({
     movements: {
@@ -67,11 +70,18 @@ const props = defineProps({
 
 const emit = defineEmits(['delete']);
 
-const confirmDelete = (movement) => {
-    const msg = `Tem certeza que deseja excluir esta movimentação (${movement.movement_type} ${movement.quantity_change} ${movement.sku || ''})?`;
-    if (confirm(msg)) {
-        emit('delete', movement.id);
-    }
+const confirmDelete = async (movement) => {
+    const descricao = `${movement.movement_type} ${movement.quantity_change} ${movement.sku || ''}`.trim();
+    const confirmed = await confirm({
+        title: 'Excluir movimentação',
+        message: `Tem certeza que deseja excluir esta movimentação (${descricao})?`,
+        detail: 'Esta ação não pode ser desfeita.',
+        confirmText: 'Excluir movimentação',
+        tone: 'danger',
+    });
+    if (!confirmed) return;
+
+    emit('delete', movement.id);
 };
 
 const formatDate = (dateString) => {

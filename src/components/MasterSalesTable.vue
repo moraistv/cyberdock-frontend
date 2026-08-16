@@ -511,13 +511,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, reactive } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch, reactive, defineExpose } from 'vue';
 import { useMasterSales } from '@/composables/useMasterSales';
 import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
 import { API_BASE_URL } from '@/config';
 import { formatVariation } from '@/utils/variation';
+import { useNotification } from '@/composables/useNotification';
 import UniversalModal from './UniversalModal.vue';
+
+const notify = useNotification();
 
 // ===== UTILITY FUNCTIONS FOR CUSTOMER DATA =====
 
@@ -610,47 +613,15 @@ async function copySaleId(saleId) {
 }
 
 /**
- * Exibe uma notificação toast simples
- * @param {string} message - Mensagem a ser exibida
- * @param {string} type - Tipo da notificação ('success', 'error', 'info')
+ * Notificação da tela, delegada ao canal único do sistema.
+ *
+ * Antes montava uma <div> à mão no body, com cor fixa e estilo inline, em
+ * paralelo ao ToastComponent — três sistemas de aviso convivendo.
  */
 function showToast(message, type = 'info') {
-    // Implementação simples usando alert por enquanto
-    // TODO: Integrar com sistema de toast existente
-    if (type === 'error') {
-        console.error(message);
-    } else {
-        console.log(message);
-    }
-    
-    // Criar um toast visual simples
-    const toast = document.createElement('div');
-    toast.textContent = message;
-    toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#ef4444' : '#10b981'};
-        color: white;
-        padding: 12px 16px;
-        border-radius: 6px;
-        z-index: 9999;
-        font-size: 14px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        transition: opacity 0.3s ease;
-    `;
-    
-    document.body.appendChild(toast);
-    
-    // Remover após 3 segundos
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => {
-            if (toast.parentNode) {
-                document.body.removeChild(toast);
-            }
-        }, 300);
-    }, 3000);
+    if (type === 'error') notify.error(message);
+    else if (type === 'success') notify.success(message);
+    else notify.info(message);
 }
 
 // ===== END UTILITY FUNCTIONS =====
@@ -1344,11 +1315,26 @@ function getLabelInfo(sale) {
     return composableLabelInfo(saleWithShipping);
 }
 
+/**
+ * Recarrega o tabelão preservando os filtros e a página atuais.
+ *
+ * Exposto como `fetchSales` porque é isso que a tela de administração chama
+ * pelo ref depois da sincronização global. Chamar o `fetchSales` do composable
+ * direto ignoraria todos os filtros ativos.
+ */
+const reloadSales = () => triggerServerFetch(false);
+
+defineExpose({ fetchSales: reloadSales, reloadSales });
+
 onMounted(() => { 
     document.addEventListener('click', handleClickOutside); 
+    window.addEventListener('reload-master-sales', reloadSales);
     triggerServerFetch(false);
 });
-onUnmounted(() => { document.removeEventListener('click', handleClickOutside); });
+onUnmounted(() => {
+    document.removeEventListener('click', handleClickOutside);
+    window.removeEventListener('reload-master-sales', reloadSales);
+});
 
 // ML Data Helpers
 function getProductLink(sale) {

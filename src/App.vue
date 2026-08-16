@@ -22,11 +22,25 @@
     </keep-alive>
     <component v-else :is="Component" />
   </router-view>
+
+  <!--
+    Notificação e confirmação vivem AQUI, uma única vez.
+
+    Antes o ToastComponent só era montado na tela de login, então todo aviso
+    disparado pelas telas de SKU, estoque, kits e cobrança era descartado em
+    silêncio, inclusive os erros. E a confirmação de exclusão usava o confirm()
+    do navegador, que travava a aba e ignorava o visual do sistema.
+  -->
+  <ToastComponent />
+  <ConfirmDialog />
 </template>
 
 <script setup>
 import { onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+
+import ToastComponent from '@/components/ToastComponent.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 import { useAuth } from '@/composables/useAuth';
 

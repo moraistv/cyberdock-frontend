@@ -250,7 +250,10 @@ import { ref, onMounted, reactive, watch, computed } from 'vue';
 import { useServiceHistory } from '@/composables/useServiceHistory';
 import { useUsers } from '@/composables/useUsers';
 import { useServices } from '@/composables/useServices';
+import { useNotification } from '@/composables/useNotification';
 import UniversalModal from '@/components/UniversalModal.vue';
+
+const notify = useNotification();
 
 const {
   contractHistory,
@@ -433,7 +436,7 @@ const handleUpdateService = async () => {
   if (result.success) {
     closeEditModal();
   } else {
-    alert(`Erro ao atualizar: ${result.error}`);
+    notify.fromError(result.error, 'Erro ao atualizar o serviço.');
   }
 };
 
@@ -443,7 +446,7 @@ const handleConfirmDelete = async () => {
   if (result.success) {
     closeDeleteModal();
   } else {
-    alert(`Erro ao excluir: ${result.error}`);
+    notify.fromError(result.error, 'Erro ao excluir o serviço.');
   }
 };
 

@@ -466,6 +466,7 @@ import { useUserStorage } from '@/composables/useUserStorage';
 import { useApi } from '@/composables/useApi';
 import { useKitParent } from '@/composables/useKitParent';
 import { useKitManagement } from '@/composables/useKitManagement';
+import { useConfirm } from '@/composables/useConfirm';
 
 // Props para permitir que masters acessem armazenamento de outros usuários
 const props = defineProps({
@@ -515,6 +516,7 @@ const {
 } = useKitManagement(userId, { sourceSkus: skus });
 
 const { get } = useApi();
+const { confirm } = useConfirm();
 const expeditedSalesCount = ref(0);
 
 watch(userId, async (uid) => {
@@ -636,15 +638,20 @@ const openPackageSelect = (data) => {
 
 // Delete SKU function
 const deleteSku = async (sku) => {
-    const confirmMessage = `Tem certeza que deseja excluir o SKU "${sku.sku}"?\n\nEsta ação não pode ser desfeita.`;
-    
-    if (confirm(confirmMessage)) {
-        try {
-            await removeSku(sku.id);
-            showToast('SKU excluído com sucesso!', 'success');
-        } catch (error) {
-            showToast(error.message || 'Erro ao excluir SKU', 'error');
-        }
+    const confirmed = await confirm({
+        title: 'Excluir SKU',
+        message: `Tem certeza que deseja excluir o SKU "${sku.sku}"?`,
+        detail: 'Esta ação não pode ser desfeita.',
+        confirmText: 'Excluir SKU',
+        tone: 'danger',
+    });
+    if (!confirmed) return;
+
+    try {
+        await removeSku(sku.id);
+        showToast('SKU excluído com sucesso!', 'success');
+    } catch (error) {
+        showToast(error.message || 'Erro ao excluir SKU', 'error');
     }
 };
 
