@@ -321,7 +321,9 @@
       <div class="modal-panel">
         <div class="modal-header">
           <h3>Confirmar Exclusão</h3>
-          <button @click="cancelDelete" class="close-btn" aria-label="Fechar modal">&times;</button>
+          <button @click="cancelDelete" class="close-btn" aria-label="Fechar modal">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
         </div>
         <div class="modal-body">
           <p>Você tem certeza que deseja excluir a conta "<strong>{{ accountToDelete.nickname || accountToDelete.shop_name || accountToDelete.shop_id }}</strong>"? Esta ação não pode ser desfeita.</p>
@@ -984,14 +986,19 @@ onUnmounted(() => {
   font-weight: 600;
 }
 .close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
   background: none;
   border: none;
-  font-size: 2rem;
-  font-weight: 300;
+  border-radius: 0.4rem;
   line-height: 1;
   color: var(--muted);
   cursor: pointer;
 }
+.close-btn:hover { background: rgba(148, 163, 184, 0.16); color: var(--text); }
 .modal-body {
   padding: 1.5rem;
   color: var(--muted);

@@ -44,8 +44,12 @@
               </div>
             </div>
             <div class="actions">
+              <!-- SVG inline: o projeto nunca carregou o CSS do Font Awesome,
+                   então as tags <i class="fas ..."> daqui não desenhavam nada.
+                   O botão aparecia só com o texto e um espaço vazio na frente. -->
               <button @click="openManualServiceModal" class="action-button">
-                <i class="fas fa-plus-circle"></i> Lançar Serviço Avulso
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                Lançar Serviço Avulso
               </button>
               <!-- Baixa da fatura: exclusiva do master -->
               <button
@@ -55,7 +59,8 @@
                 :class="isCurrentInvoicePaid ? 'action-button--reopen' : 'action-button--pay'"
                 :disabled="isUpdatingStatus"
               >
-                <i :class="isCurrentInvoicePaid ? 'fas fa-rotate-left' : 'fas fa-circle-check'"></i>
+                <svg v-if="isCurrentInvoicePaid" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"></path><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path></svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
                 {{ isUpdatingStatus ? 'Salvando...' : (isCurrentInvoicePaid ? 'Reabrir fatura' : 'Marcar como paga') }}
               </button>
             </div>
@@ -115,7 +120,9 @@
                     :disabled="removingItemId === item.id"
                     title="Remover este lançamento"
                     @click="removeManualItem(item)"
-                  >×</button>
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  </button>
                 </header>
                 <p class="punctual-card__value">{{ formatCurrency(item.total_price) }}</p>
                 <p class="punctual-card__detail">
@@ -593,7 +600,7 @@ watch(() => props.userId, (newId) => {
 .punctual-card { position: relative; padding: 0.85rem; border: 1px solid var(--cd-line, #e5e7eb); border-radius: 0.7rem; background: #fff; box-shadow: 0 4px 14px rgba(15, 71, 105, 0.05); }
 .punctual-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
 .punctual-card__head h4 { margin: 0; color: var(--cd-ink, #111827); font-size: 0.85rem; font-weight: 700; line-height: 1.35; }
-.punctual-card__remove { flex: 0 0 auto; width: 1.5rem; height: 1.5rem; border: none; border-radius: 0.3rem; background: #fee2e2; color: #991b1b; font-size: 1rem; line-height: 1; cursor: pointer; }
+.punctual-card__remove { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 1.5rem; height: 1.5rem; border: none; border-radius: 0.3rem; background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); line-height: 1; cursor: pointer; }
 .punctual-card__remove:disabled { opacity: 0.5; cursor: wait; }
 .punctual-card__value { margin: 0.5rem 0 0; color: var(--cd-blue-700, #0369a1); font-size: 1.2rem; font-weight: 780; font-variant-numeric: tabular-nums; }
 .punctual-card__detail { margin: 0.15rem 0 0; color: #64748b; font-size: 0.78rem; }

@@ -564,7 +564,9 @@
                 <div class="tier-field"><span>De</span><input type="number" v-model.number="tier.from" min="1" step="1" /></div>
                 <div class="tier-field"><span>até</span><input type="number" v-model.number="tier.to" min="1" step="1" placeholder="∞" /></div>
                 <div class="tier-field tier-price"><span>R$</span><input type="number" v-model.number="tier.price" min="0" step="0.01" /></div>
-                <button type="button" class="btn-tier-remove" @click="removeTier(index)" :disabled="currentService.config.tiers.length <= 1" title="Remover faixa">×</button>
+                <button type="button" class="btn-tier-remove" @click="removeTier(index)" :disabled="currentService.config.tiers.length <= 1" title="Remover faixa">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
               </div>
             </div>
 
@@ -690,7 +692,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, onActivated, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { gsap } from 'gsap';
 
@@ -850,6 +852,16 @@ const VIEW_TO_TAB = { sales: 'vendas', storage: 'armazenamento', billing: 'cobra
 
 /** Aplica o que está na URL ao estado da tela. */
 const applyRoute = () => {
+  // Histórico de serviços é global: não pertence a um cliente e tem endereço
+  // próprio (/admin/history), mas roda DENTRO desta tela para herdar Sidebar e
+  // Topbar. Antes existia como rota solta para o componente embutido, e abria
+  // sem menu, sem barra do topo e sem nenhum caminho de volta.
+  if (route.name === 'ServiceHistory') {
+    currentView.value = 'history';
+    selectedUser.value = null;
+    return;
+  }
+
   const uid = route.params.uid;
   const view = TAB_TO_VIEW[route.params.tab];
 
@@ -867,7 +879,9 @@ const applyRoute = () => {
 };
 
 // Reage ao endereço: cobre F5, link colado e o botão voltar do navegador.
-watch(() => [route.params.uid, route.params.tab], applyRoute, { immediate: true });
+// `route.name` entra na lista porque /admin/users e /admin/history não diferem
+// em nenhum parâmetro — só no nome da rota.
+watch(() => [route.name, route.params.uid, route.params.tab], applyRoute, { immediate: true });
 
 // Quando a lista chega depois, completa nome e e-mail do cabeçalho.
 watch(users, (list) => {
@@ -886,6 +900,14 @@ const setView = (view) => {
     selectedUser.value = null;
     if (route.name !== 'ManageUsersView') router.push({ name: 'ManageUsersView' });
     nextTick(() => animateRows());
+    return;
+  }
+
+  // O histórico tem endereço próprio, então F5 e link compartilhado funcionam.
+  if (view === 'history') {
+    currentView.value = 'history';
+    selectedUser.value = null;
+    if (route.name !== 'ServiceHistory') router.push({ name: 'ServiceHistory' });
     return;
   }
 
@@ -1256,6 +1278,17 @@ onMounted(async () => {
   window.addEventListener('resize', closeActionsMenu);
   await fetchUsers();
   nextTick(() => animateRows());
+});
+
+/* Tela em keep-alive: sem isto, um usuário criado, desativado ou com serviço
+ * contratado em outra aba não aparecia ao voltar para a lista. */
+let usersActivated = false;
+onActivated(() => {
+  if (!usersActivated) {
+    usersActivated = true;
+    return;
+  }
+  fetchUsers();
 });
 
 onUnmounted(() => {
@@ -1771,7 +1804,7 @@ button, input, select, table { font-family: var(--font-sans); }
 .tier-field span { color: #64748b; font-size: 0.75rem; white-space: nowrap; }
 .tier-field input { width: 100%; min-width: 4rem; padding: 0.35rem 0.45rem; border: 1px solid #cbd5e1; border-radius: 0.35rem; font-size: 0.8rem; }
 .tier-price input { min-width: 5rem; }
-.btn-tier-remove { flex: 0 0 auto; width: 1.6rem; height: 1.6rem; border: none; border-radius: 0.3rem; background: #fee2e2; color: #991b1b; font-size: 1rem; line-height: 1; cursor: pointer; }
+.btn-tier-remove { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 1.6rem; height: 1.6rem; border: none; border-radius: 0.3rem; background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); line-height: 1; cursor: pointer; }
 .btn-tier-remove:disabled { opacity: 0.4; cursor: not-allowed; }
 .feedback-cell { text-align: center; color: #64748b; }
 .form-group { margin-bottom: 1rem; }

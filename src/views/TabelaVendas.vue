@@ -652,7 +652,7 @@
 
 <script setup>
 /* eslint-disable no-unused-vars */
-import { ref, onMounted, onUnmounted, computed, watch, nextTick, reactive } from 'vue';
+import { ref, onMounted, onUnmounted, onActivated, computed, watch, nextTick, reactive } from 'vue';
 import { API_BASE_URL } from '@/config';
 import SidebarComponent from '../components/SidebarComponent.vue';
 import TopbarComponent from '../components/TopbarComponent.vue';
@@ -1580,6 +1580,20 @@ onMounted(async () => {
         }
     });
     document.addEventListener('click', closeDropdownOnClickOutside);
+});
+
+/* keep-alive mantém esta tela montada, então voltar a ela não refaz o
+ * onMounted: a tabela mostrava a página buscada na visita anterior, sem as
+ * vendas que entraram desde então (e sem refletir o que foi processado em
+ * outra tela). A primeira ativação é ignorada porque ocorre junto com o
+ * onMounted, que já buscou. */
+let vendasActivated = false;
+onActivated(() => {
+    if (!vendasActivated) {
+        vendasActivated = true;
+        return;
+    }
+    if (isAuthReady.value && user.value) triggerServerFetch(false);
 });
 
 onUnmounted(() => {

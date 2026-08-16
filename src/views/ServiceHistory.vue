@@ -34,7 +34,10 @@
             <div class="filter-item">
               <label>Filtrar por Tipo</label>
               <div class="select-wrapper">
-                <select v-model="filters.serviceType" @change="applyFilters">
+                <!-- Sem @change: o watch de filters.serviceType já limpa o
+                     serviço escolhido e recarrega. Com os dois, cada troca de
+                     tipo disparava DUAS vezes as consultas de histórico. -->
+                <select v-model="filters.serviceType">
                   <option :value="null">Todos os Serviços</option>
                   <option value="contract">Apenas Contratados</option>
                   <option value="manual">Apenas Avulsos</option>
@@ -186,7 +189,10 @@
                     <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                       stroke-linejoin="round" width="18" height="18" viewBox="0 0 24 24">
                       <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2 2v2"></path>
+                      <!-- A tampa da lixeira estava truncada ("2 2v2" no lugar
+                           de "-2h4a2 2 0 0 1 2 2v2"), e o ícone saía com um
+                           traço solto atravessando o desenho. -->
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                     </svg>
                   </button>
                 </template>

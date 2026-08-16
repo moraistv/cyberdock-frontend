@@ -10,9 +10,11 @@ const KitParentView = () => import('../views/KitParentView.vue');
 const ResumoCobranca = () => import('../views/ResumoCobranca.vue');
 const AdminView = () => import('../views/AdminView.vue');
 const ManageUsersView = () => import('../views/ManageUsersView.vue');
-const MasterResumoCobranca = () => import('../views/MasterResumoCobranca.vue');
-const ServiceHistory = () => import('../views/ServiceHistory.vue');
 const ShopeeCallbackView = () => import('../views/ShopeeCallbackView.vue');
+// MasterResumoCobranca e ServiceHistory NÃO têm rota própria: são componentes
+// embutidos na tela de usuários, que é quem monta Sidebar e Topbar. Como rota
+// solta, abriam sem menu e sem caminho de volta — e o resumo de cobrança ainda
+// recebia userId nulo, então não carregava nada.
 
 const routes = [
   {
@@ -58,10 +60,11 @@ const routes = [
     meta: { requiresAuth: true, requiresMaster: true }
   },
   {
+    // Resumo de cobrança é sempre de UM cliente. Sem cliente escolhido não há
+    // fatura para mostrar, então o endereço leva à lista, onde a aba Cobrança
+    // de cada cliente abre este mesmo painel já com o uid.
     path: '/admin/billing-summary',
-    name: 'MasterResumoCobranca',
-    component: MasterResumoCobranca,
-    meta: { requiresAuth: true, requiresMaster: true }
+    redirect: { name: 'ManageUsersView' },
   },
   {
     path: '/contas',
@@ -110,9 +113,11 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    // Histórico de serviços renderizado DENTRO da tela de usuários, para herdar
+    // Sidebar e Topbar. Endereço próprio para F5 e link compartilhado.
     path: '/admin/history',
     name: 'ServiceHistory',
-    component: ServiceHistory,
+    component: ManageUsersView,
     meta: { requiresAuth: true, requiresMaster: true }
   },
   {

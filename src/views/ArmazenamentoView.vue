@@ -8,12 +8,16 @@
                     <div class="header-content">
                         <h1 class="dashboard-title">
                             Painel de Armazenamento
-                            <span v-if="props.userId && props.userId !== user?.value?.uid" class="user-indicator">
+                            <!-- No template o ref já vem desembrulhado: `user.value`
+                                 era sempre undefined, então a comparação dava
+                                 sempre "diferente" e o próprio dono da conta via
+                                 o aviso de "usuário selecionado" com o uid cru. -->
+                            <span v-if="props.userId && props.userId !== user?.uid" class="user-indicator">
                                 (Usuário: {{ props.userId }})
                             </span>
                         </h1>
                         <p class="dashboard-subtitle">
-                            <span v-if="props.userId && props.userId !== user?.value?.uid">
+                            <span v-if="props.userId && props.userId !== user?.uid">
                                 Acompanhando o consumo do espaço de armazenamento e gerenciando SKUs do usuário selecionado.
                             </span>
                             <span v-else>

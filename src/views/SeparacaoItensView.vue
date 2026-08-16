@@ -351,7 +351,11 @@
               </select>
             </div>
             <div class="pager">
-              <button class="pg-btn" :disabled="page <= 1" @click="goTo(page - 1)">‹</button>
+              <!-- Setas em SVG: os glifos ‹ › mudam de tamanho e de alinhamento
+                   conforme a fonte disponível no sistema. -->
+              <button class="pg-btn pg-btn--icon" :disabled="page <= 1" title="Página anterior" @click="goTo(page - 1)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
               <button
                 v-for="p in pagesToShow"
                 :key="p"
@@ -360,7 +364,9 @@
                 :disabled="p === '...'"
                 @click="p !== '...' && goTo(p)"
               >{{ p }}</button>
-              <button class="pg-btn" :disabled="page >= totalPages" @click="goTo(page + 1)">›</button>
+              <button class="pg-btn pg-btn--icon" :disabled="page >= totalPages" title="Próxima página" @click="goTo(page + 1)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
             </div>
           </div>
         </div>
@@ -384,16 +390,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue';
+import { ref, reactive, computed, onMounted, onActivated, nextTick } from 'vue';
 import SidebarComponent from '@/components/SidebarComponent.vue';
 import TopbarComponent from '@/components/TopbarComponent.vue';
 import SeparacaoReport from '@/components/SeparacaoReport.vue';
 import { useApi } from '@/composables/useApi';
 import { useAuth } from '@/composables/useAuth';
+import { useNotification } from '@/composables/useNotification';
 import { formatVariation } from '@/utils/variation';
 
 const api = useApi();
 const { user } = useAuth();
+const notify = useNotification();
 
 const modeOptions = ['FULL', 'FLEX', 'Correios', 'Agência', 'Coleta', 'Envio Padrão', 'Outros'];
 const accountOptions = ref([]);
@@ -795,7 +803,10 @@ async function exportCsv() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (e) {
-    error.value = e.message || 'Falha ao exportar';
+    // Falha ao exportar é aviso, não estado da tela. `error` é o que substitui
+    // a tabela por uma mensagem: usá-lo aqui apagava a lista inteira só porque
+    // o download não saiu, e não havia como voltar sem recarregar.
+    notify.fromError(e, 'Falha ao exportar a planilha.');
   } finally {
     isExporting.value = false;
   }
@@ -834,7 +845,7 @@ async function imprimirPdf() {
       isPrinting.value = false;
     }, 300);
   } catch (e) {
-    error.value = e.message || 'Falha ao gerar relatório';
+    notify.fromError(e, 'Falha ao gerar o relatório para impressão.');
     isPrinting.value = false;
   }
 }
@@ -846,6 +857,18 @@ onMounted(() => {
   filters.shippingLimitEnd = hoje;
   activePrazoPreset.value = 'hoje';
   fetchFilterOptions();
+  fetchData();
+});
+
+/* A fila de separação é o caso mais sensível a dado velho: pedido separado em
+ * outra aba, ou despachado por outra pessoa, continuava listado ao voltar para
+ * a tela, porque keep-alive não refaz o onMounted. */
+let separacaoActivated = false;
+onActivated(() => {
+  if (!separacaoActivated) {
+    separacaoActivated = true;
+    return;
+  }
   fetchData();
 });
 </script>
@@ -1089,6 +1112,8 @@ onMounted(() => {
 .pg-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .pg-btn--active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 .pg-btn--dots { border: none; background: none; cursor: default; }
+/* Botões de seta: o SVG precisa ficar centrado no quadrado de 32px. */
+.pg-btn--icon { display: inline-flex; align-items: center; justify-content: center; padding: 0; }
 
 @media (max-width: 768px) {
   .dashboard-content { padding: 1rem; }

@@ -413,7 +413,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, computed, watch } from 'vue'
 import SidebarComponent from '../components/SidebarComponent.vue'
 import TopbarComponent from '../components/TopbarComponent.vue'
 import VueApexCharts from 'vue3-apexcharts'
@@ -871,6 +871,22 @@ onMounted(async () => {
   if (isAuthReady.value && user.value) reload()
   watch(isAuthReady, (ready) => { if (ready && user.value) reload() })
   runEnterAnimations()
+})
+
+/* A tela fica em memória (keep-alive em App.vue), então voltar ao painel não
+ * dispara onMounted: os cards continuavam mostrando os números da última
+ * visita como se fossem atuais. A primeira ativação é ignorada porque acontece
+ * junto com o onMounted, que já buscou os dados.
+ *
+ * O custo é baixo: /dashboard-stats e /filter-facets respondem do cache do
+ * servidor dentro da janela de 60s. */
+let dashboardActivated = false
+onActivated(() => {
+  if (!dashboardActivated) {
+    dashboardActivated = true
+    return
+  }
+  if (isAuthReady.value && user.value) reload()
 })
 
 onUnmounted(() => {

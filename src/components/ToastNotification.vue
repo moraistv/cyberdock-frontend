@@ -26,7 +26,9 @@
         </div>
       </div>
 
-      <button class="close" aria-label="Fechar notificação" @click="$emit('close')">×</button>
+      <button class="close" aria-label="Fechar notificação" @click="$emit('close')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
     </div>
   </Transition>
 </template>
@@ -109,9 +111,11 @@ const iconSvg = computed(() => {
 
 .close {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: 0;
-  font-size: 18px;
   line-height: 1;
   padding: 2px 4px;
   color: var(--muted);
