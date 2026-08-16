@@ -1,5 +1,21 @@
 <template>
   <header class="topbar" role="banner">
+    <!-- Recolher no desktop, abrir a gaveta no mobile. No mobile é o único
+         caminho para o menu, que fica fora da tela. -->
+    <button
+      type="button"
+      class="menu-toggle"
+      :title="menuToggleLabel"
+      :aria-label="menuToggleLabel"
+      @click="toggleSidebar"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="19" height="19">
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="18" x2="21" y2="18" />
+      </svg>
+    </button>
+
     <nav class="breadcrumbs" aria-label="Breadcrumb">
       <router-link
         v-for="(crumb, index) in breadcrumbs"
@@ -13,22 +29,25 @@
     </nav>
 
     <div class="actions">
-      <!-- Admin -->
+      <!-- Modo admin: um botão só, que alterna e deixa claro o estado atual.
+           Antes eram dois botões de texto, sem indicar em que modo você está. -->
       <button
-        v-if="userRole === 'master' && !isAdminMode"
-        @click="enterAdminMode"
-        class="btn-ghost"
+        v-if="userRole === 'master'"
+        @click="isAdminMode ? exitAdminMode() : enterAdminMode()"
+        class="admin-switch"
+        :class="{ 'is-on': isAdminMode }"
         type="button"
+        :title="isAdminMode ? 'Voltar para a visão de cliente' : 'Entrar no modo administrador'"
       >
-        Painel Administrativo
-      </button>
-      <button
-        v-if="userRole === 'master' && isAdminMode"
-        @click="exitAdminMode"
-        class="btn-ghost danger"
-        type="button"
-      >
-        Sair do Modo Admin
+        <span class="admin-switch__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+            <path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1-8.5 15a12 12 0 0 1-8.5-15a12 12 0 0 0 8.5-3" />
+            <path d="M12 11m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0" />
+            <path d="M12 12l0 2.5" />
+          </svg>
+        </span>
+        <span class="admin-switch__text">{{ isAdminMode ? 'Modo Admin' : 'Admin' }}</span>
+        <span class="admin-switch__led" aria-hidden="true"></span>
       </button>
 
       <!-- Avatar -->
@@ -80,11 +99,18 @@ import { useRouter, useRoute } from 'vue-router';
 import { gsap } from 'gsap';
 import { useAuth } from '@/composables/useAuth';
 import { useAdminMode } from '@/composables/useAdminMode';
+import { useSidebar } from '@/composables/useSidebar';
 
 const router = useRouter();
 const route = useRoute();
 const { user, userRole, logout, refreshUserData } = useAuth();
 const { isAdminMode, setAdminMode } = useAdminMode();
+const { isMobile, isIconOnly, isMobileOpen, toggle: toggleSidebar } = useSidebar();
+
+const menuToggleLabel = computed(() => {
+  if (isMobile.value) return isMobileOpen.value ? 'Fechar menu' : 'Abrir menu';
+  return isIconOnly.value ? 'Expandir menu' : 'Recolher menu';
+});
 
 const isDropdownOpen = ref(false);
 const avatarWrap = ref(null);
@@ -219,6 +245,48 @@ const leave = (el, done) => { gsap.to(el, { opacity: 0, y: -6, scale: 0.98, dura
 .breadcrumb-text{ max-width: 22ch; overflow: hidden; text-overflow: ellipsis; }
 .breadcrumb-separator{ margin: 0 .5rem; color: #9ca3af; user-select: none; }
 .actions{ display:flex; align-items:center; gap:.5rem; }
+
+/* Botão do menu, à esquerda do breadcrumb */
+.menu-toggle{
+  display:inline-flex; align-items:center; justify-content:center;
+  flex:0 0 auto; width:34px; height:34px; margin-right:.15rem; padding:0;
+  color:#4b5563; border:1px solid var(--border); border-radius:.5rem;
+  background:#fff; cursor:pointer;
+  transition: color .2s ease, background .2s ease, border-color .2s ease;
+}
+.menu-toggle:hover{ color: var(--cd-blue-700, #0369a1); border-color:#b9d3e3; background: var(--cd-blue-50, #f0f9ff); }
+.menu-toggle:active{ transform: translateY(1px); }
+
+/* Interruptor do modo admin: um controle só, com estado visível */
+.admin-switch{
+  display:inline-flex; align-items:center; gap:.4rem;
+  height:32px; padding:0 .7rem; border-radius:999px;
+  border:1px solid var(--border); background:#fff; color:#4b5563;
+  font-size:.82rem; font-weight:650; cursor:pointer; white-space:nowrap;
+  transition: color .2s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.admin-switch:hover{ border-color:#c7d2fe; background:#f8faff; color:#111827; }
+.admin-switch__icon{ display:inline-flex; align-items:center; }
+.admin-switch__led{
+  width:7px; height:7px; border-radius:50%;
+  background:#cbd5e1; box-shadow:none;
+  transition: background .2s ease, box-shadow .2s ease;
+}
+/* Ligado: cor cheia e led aceso, para não haver dúvida do modo atual */
+.admin-switch.is-on{
+  color:#fff; border-color:transparent;
+  background: linear-gradient(140deg, #4338ca, #6366f1);
+  box-shadow: 0 4px 14px rgba(79, 70, 229, .28);
+}
+.admin-switch.is-on:hover{ background: linear-gradient(140deg, #3730a3, #4f46e5); color:#fff; }
+.admin-switch.is-on .admin-switch__led{ background:#a5f3fc; box-shadow:0 0 0 3px rgba(165,243,252,.28); }
+
+@media (max-width: 640px) {
+  /* Em tela estreita o rótulo sai e fica só o escudo com o led. */
+  .admin-switch__text{ display:none; }
+  .admin-switch{ padding:0 .5rem; }
+}
+
 .btn-ghost{
   height: 32px; padding: 0 .75rem; border-radius: 999px;
   border: 1px solid var(--border); background: #fff; color:#111827;

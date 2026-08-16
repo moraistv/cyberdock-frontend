@@ -1,8 +1,25 @@
 <template>
-  <div class="sidebar">
+  <!-- Fundo escurecido da gaveta no mobile. Só existe quando aberta, para não
+       ficar um overlay invisível capturando cliques. -->
+  <div v-if="isMobileOpen" class="sidebar-backdrop" @click="closeMobile"></div>
+
+  <div class="sidebar" :class="{ 'is-icon-only': isIconOnly, 'is-mobile-open': isMobileOpen }">
     <div>
       <div class="sidebar-header">
         <img src="@/assets/logo.png" alt="Logo" class="sidebar-logo" />
+        <!-- Recolher/expandir também a partir do próprio menu, além do topo -->
+        <button
+          type="button"
+          class="sidebar-toggle"
+          :title="isIconOnly ? 'Expandir menu' : 'Recolher menu'"
+          :aria-label="isIconOnly ? 'Expandir menu' : 'Recolher menu'"
+          @click="toggle"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17">
+            <path v-if="isIconOnly" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            <path v-else d="M11 19l-7-7 7-7M19 19l-7-7 7-7" />
+          </svg>
+        </button>
       </div>
 
       <nav class="sidebar-nav">
@@ -13,6 +30,7 @@
           :to="item.to"
           class="nav-link"
           :ref="el => { if (el) navLinksRef[index] = el.$el }"
+          :title="isIconOnly ? item.text : null"
           @click="handleNavLinkClick"
         >
           <span class="nav-icon">
@@ -21,13 +39,16 @@
               <g class="icon-solid" v-html="item.iconSolid"></g>
             </svg>
           </span>
-          <span>{{ item.text }}</span>
+          <span class="nav-text">{{ item.text }}</span>
+          <!-- Com o menu recolhido o nome só existe aqui, no hover -->
+          <span class="nav-tooltip">{{ item.text }}</span>
         </router-link>
       </nav>
     </div>
 
-    <!-- Container que renderiza condicionalmente a seção de admin ou de contas -->
-    <div class="sidebar-bottom-section">
+    <!-- Container que renderiza condicionalmente a seção de admin ou de contas.
+         Com o menu recolhido não há largura útil para listas e métricas. -->
+    <div v-if="!isIconOnly" class="sidebar-bottom-section">
       <!-- Seção de Métricas do Administrador (visível apenas no modo admin) -->
       <div v-if="isAdminMode" class="admin-metrics-wrapper">
         <div class="admin-metrics-header">
@@ -122,8 +143,10 @@ import { ref, onMounted, onBeforeUpdate, onBeforeUnmount, watch, nextTick, compu
 import { useRoute } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { useAdminMode } from '@/composables/useAdminMode';
+import { useSidebar } from '@/composables/useSidebar';
 
 const { user, userRole, fetchMercadoLivreAccounts, fetchShopeeAccounts } = useAuth();
+const { isIconOnly, isMobileOpen, isMobile, toggle, closeMobile } = useSidebar();
 
 const MK_LOGOS = {
   ML: '/img/ml-logo.svg',
@@ -177,6 +200,9 @@ const handleNavLinkClick = (event) => {
     icon.classList.add('pulse-animation');
     setTimeout(() => icon.classList.remove('pulse-animation'), 300);
   }
+  // No mobile a gaveta cobre o conteúdo: sem isso, ao tocar num item o usuário
+  // navega mas continua vendo o menu por cima da página.
+  if (isMobile.value) closeMobile();
 };
 
 watch(() => [route.path, navItems.value], () => { 
@@ -340,9 +366,63 @@ watch(() => route.fullPath, (newPath) => {
   transition: margin-left 0.3s ease;
   flex-shrink: 0;
 }
-.sidebar-header { padding: 1.5rem; display: flex; justify-content: center; align-items: center; border-bottom: 1px solid var(--color-border);; }
-.sidebar-logo { height: 40px; }
+.sidebar-header { padding: 1.5rem 1rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; border-bottom: 1px solid var(--color-border); }
+.sidebar-logo { height: 40px; min-width: 0; }
 .sidebar-nav { display: flex; flex-direction: column; padding: 0.5rem; position: relative; }
+
+/* Botão de recolher, dentro do próprio menu */
+.sidebar-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; width: 1.85rem; height: 1.85rem; padding: 0;
+  color: var(--color-text-secondary); border: 1px solid var(--color-border);
+  border-radius: 0.45rem; background: #fff; cursor: pointer;
+  transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+}
+.sidebar-toggle:hover { color: var(--cd-blue-700, #0369a1); border-color: #b9d3e3; background: var(--cd-blue-50, #f0f9ff); }
+
+/* ---------------- Menu recolhido (desktop): apenas ícones ---------------- */
+.sidebar { --sidebar-width-collapsed: 68px; transition: width 0.22s ease, margin-left 0.3s ease; }
+.sidebar.is-icon-only { width: var(--sidebar-width-collapsed); }
+.sidebar.is-icon-only .sidebar-header { justify-content: center; padding: 1.5rem 0.5rem; }
+/* A logo é larga; recolhido sobra espaço só para o botão. */
+.sidebar.is-icon-only .sidebar-logo { display: none; }
+.sidebar.is-icon-only .nav-link { justify-content: center; padding: 0.7rem 0; border-left-width: 0; }
+.sidebar.is-icon-only .nav-icon { margin-right: 0; }
+.sidebar.is-icon-only .nav-text { display: none; }
+.sidebar.is-icon-only .sliding-indicator { left: 0; }
+
+/* Nome do item no hover, já que o texto está oculto */
+.nav-tooltip { display: none; }
+.sidebar.is-icon-only .nav-link:hover .nav-tooltip {
+  display: block; position: absolute; left: calc(100% + 0.5rem); top: 50%;
+  z-index: 60; padding: 0.3rem 0.55rem; white-space: nowrap;
+  border-radius: 0.4rem; background: #1f2937; color: #fff;
+  font-size: 0.78rem; font-weight: 600; transform: translateY(-50%);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18); pointer-events: none;
+}
+
+/* ---------------- Gaveta no mobile ---------------- */
+.sidebar-backdrop { display: none; }
+@media (max-width: 1024px) {
+  .sidebar {
+    position: fixed; top: 0; left: 0; z-index: 50;
+    height: 100vh; width: var(--sidebar-width);
+    transform: translateX(-100%);
+    transition: transform 0.24s ease;
+    box-shadow: 0 0 40px rgba(15, 23, 42, 0.18);
+  }
+  .sidebar.is-mobile-open { transform: translateX(0); }
+  /* Numa tela estreita "só ícones" não ajuda: ou abre inteiro, ou fica fora. */
+  .sidebar.is-icon-only { width: var(--sidebar-width); }
+  .sidebar.is-icon-only .sidebar-logo { display: block; }
+  .sidebar.is-icon-only .nav-link { justify-content: flex-start; padding: 0.7rem 1rem; }
+  .sidebar.is-icon-only .nav-icon { margin-right: 0.75rem; }
+  .sidebar.is-icon-only .nav-text { display: inline; }
+  .sidebar-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 45;
+    background: rgba(15, 23, 42, 0.45);
+  }
+}
 .sliding-indicator {
   position: absolute; left: 0.5rem; width: 4px;
   background-color: var(--color-primary); border-radius: 4px;
