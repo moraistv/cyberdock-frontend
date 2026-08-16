@@ -180,12 +180,14 @@ const unifiedNewSalesCount = computed(() =>
     (syncState.value.newSalesCount || 0) + (shopeeSyncState.value.newSalesCount || 0)
 );
 
-// O toast segue o canal que está em atividade, para não sobrepor mensagens.
-const activeSyncState = computed(() =>
-    shopeeSyncState.value.isSyncing || shopeeSyncState.value.isVisible
-        ? shopeeSyncState.value
-        : syncState.value
-);
+// O toast segue um canal que AINDA está sincronizando. `isVisible` dura 8s
+// depois da conclusão; usá-lo como prioridade fazia o toast verde da Shopee
+// esconder o progresso ML enquanto as 30 contas ainda rodavam.
+const activeSyncState = computed(() => {
+    if (shopeeSyncState.value.isSyncing) return shopeeSyncState.value;
+    if (syncState.value.isSyncing) return syncState.value;
+    return shopeeSyncState.value.isVisible ? shopeeSyncState.value : syncState.value;
+});
 
 const masterTableRef = ref(null);
 const isFetchingAccounts = ref(false);

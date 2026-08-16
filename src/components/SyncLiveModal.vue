@@ -24,7 +24,10 @@
 
             <!-- Lista de contas com barra individual -->
             <div class="live-list">
-                <div class="live-account" v-for="acc in accounts" :key="acc.mlAccountId" :class="acc.status">
+                <!-- Chave inclui canal: lojas Shopee não têm mlAccountId e as
+                     duas recebiam key=undefined, fazendo o Vue reutilizar o
+                     DOM de uma loja na outra. -->
+                <div class="live-account" v-for="acc in accounts" :key="`${acc.marketplace || 'ML'}-${acc.mlAccountId ?? acc.shopId}`" :class="acc.status">
                     <div class="live-account-top">
                         <span class="live-status-icon" :class="acc.status">
                             <!-- pendente -->
@@ -79,15 +82,18 @@ const doneCount = computed(() =>
 const overallProgress = computed(() => {
     if (!props.accounts.length) return 0;
     if (doneCount.value === props.accounts.length) return 100;
+
+    // Uma conta concluída sempre representa trabalho concluído, mesmo quando o
+    // backend não informou workTotal (cooldown e Shopee). Antes 2/32 aparecia
+    // como 0%, exatamente como na captura do usuário.
+    const accountProgress = Math.round((doneCount.value / props.accounts.length) * 100);
     const knownWork = props.accounts.filter(a => Number(a.workTotal) > 0);
-    const allDiscovered = knownWork.length === props.accounts.length;
     const total = knownWork.reduce((sum, a) => sum + Number(a.workTotal || 0), 0);
     const completed = knownWork.reduce((sum, a) => sum + Math.min(Number(a.workCompleted || 0), Number(a.workTotal || 0)), 0);
-    if (!total) return 0;
-    const calculated = Math.round((completed / total) * 100);
-    // Until every account reports its workload, never imply the global job is
-    // almost done. All accounts are started together, so discovery is brief.
-    return allDiscovered ? Math.min(doneCount.value < props.accounts.length ? 99 : 100, calculated) : Math.min(90, calculated);
+    const workProgress = total ? Math.round((completed / total) * 100) : 0;
+
+    // Nunca anda para trás quando novas contas descobrem seu volume de trabalho.
+    return Math.min(99, Math.max(accountProgress, workProgress));
 });
 
 function fmtDuration(ms) {

@@ -45,63 +45,118 @@ export function useSyncManager() {
       // Sem histórico => primeira sincronização => completa.
       return !response || !response.lastSync;
     } catch (err) {
-      console.warn('Erro ao verificar última sincronização, forçando:', err);
-      return true;
+      // Falhar ao ler o carimbo não autoriza uma varredura de 180 dias. O
+      // backend já sabe escolher o cursor e o fallback seguro com force=false;
+      // transformar um erro transitório em backfill era multiplicar a falha.
+      console.warn('Erro ao verificar última sincronização; usando incremental seguro:', err);
+      return false;
     }
   };
 
-  // Núcleo de UMA sincronização, isolado e autossuficiente:
-  // cria o próprio clientId, abre o próprio EventSource e resolve/rejeita.
-  // NÃO mexe no lock global (state.isSyncing) — isso permite rodar várias
-  // em paralelo pelo syncAccountsBatch. onProgress recebe (data) por conta.
+  // Núcleo de UMA sincronização, isolado e autossuficiente.
+  //
+  // O fluxo antigo fazia POST primeiro e só depois abria o EventSource. Uma
+  // resposta rápida (especialmente o atalho de cooldown) podia terminar antes
+  // de o canal existir; uma conexão silenciosamente travada também deixava a
+  // Promise pendente para sempre e os 3 workers ML paravam de puxar contas — o
+  // painel ficava em 2/32, com todas as demais "Na fila".
+  //
+  // Agora usa o mesmo protocolo robusto da Shopee: SSE antes do POST, término
+  // idempotente, reconexão limitada e watchdog absoluto.
   const runSingleSync = (mlAccountId, accountNickname, clientUid = null, daysToSync = null, onProgress = null) => {
     return new Promise((resolve, reject) => {
+      const MAX_SSE_RETRIES = 10;
+      const WATCHDOG_MS = 15 * 60 * 1000;
+      const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+      const metrics = { newSalesCount: 0, updatedCount: 0, skippedCount: 0 };
       let es = null;
-      shouldForceSync(mlAccountId, clientUid)
-        .then((force) => {
-          const clientId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          api.post('/sales/sync-account', {
+      let settled = false;
+      let postStarted = false;
+      let retries = 0;
+      let reconnectTimer = null;
+      let watchdogTimer = null;
+
+      const cleanup = () => {
+        clearTimeout(reconnectTimer);
+        clearTimeout(watchdogTimer);
+        if (es) { es.close(); es = null; }
+      };
+
+      const finish = (error = null) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (error) reject(error);
+        else resolve({ ...metrics });
+      };
+
+      watchdogTimer = setTimeout(() => {
+        finish(new Error(`A sincronização de ${accountNickname} não concluiu em 15 minutos. A fila foi liberada para continuar.`));
+      }, WATCHDOG_MS);
+
+      const startBackendJob = async () => {
+        if (postStarted || settled) return;
+        postStarted = true;
+        try {
+          const force = await shouldForceSync(mlAccountId, clientUid);
+          if (settled) return;
+          await api.post('/sales/sync-account', {
             userId: mlAccountId,
             clientId,
             accountNickname,
             force,
-            backfill: force, // backfill só na primeira sincronização
+            backfill: force,
             clientUid,
-            daysToSync
-          })
-            .then(() => {
-              const sseUrl = `${API_BASE_URL}/sales/sync-status/${clientId}?token=${encodeURIComponent(token.value)}&mlAccountId=${encodeURIComponent(mlAccountId)}`;
-              es = new window.EventSource(sseUrl);
-              const metrics = { newSalesCount: 0, updatedCount: 0, skippedCount: 0 };
+            daysToSync,
+          });
+        } catch (error) {
+          finish(new Error(error.message || 'Não foi possível iniciar o processo de sincronização.'));
+        }
+      };
 
-              es.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                if (data.newSalesCount !== undefined) metrics.newSalesCount = data.newSalesCount;
-                if (data.updatedCount !== undefined) metrics.updatedCount = data.updatedCount;
-                if (data.skippedCount !== undefined) metrics.skippedCount = data.skippedCount;
-                if (typeof onProgress === 'function') {
-                  onProgress({ ...data, accountNickname, mlAccountId });
-                }
-                if (data.progress === 100) {
-                  if (es) es.close();
-                  if (data.type === 'error') reject(new Error(data.message));
-                  else resolve({ ...metrics });
-                }
-              };
+      const connect = () => {
+        if (settled) return;
+        const sseUrl = `${API_BASE_URL}/sales/sync-status/${clientId}?token=${encodeURIComponent(token.value)}&mlAccountId=${encodeURIComponent(mlAccountId)}`;
+        es = new window.EventSource(sseUrl);
 
-              es.onerror = () => {
-                if (es) es.close();
-                reject(new Error('A conexão com o servidor foi perdida durante a sincronização.'));
-              };
-            })
-            .catch((error) => {
-              if (es) es.close();
-              reject(new Error(error.message || 'Não foi possível iniciar o processo de sincronização.'));
+        // Abre o canal ANTES de iniciar o job: nenhum progresso 100 pode se
+        // perder entre o POST e a conexão do EventSource.
+        es.onopen = startBackendJob;
+
+        es.onmessage = (event) => {
+          let data;
+          try { data = JSON.parse(event.data); } catch { return; }
+          if (data.newSalesCount !== undefined) metrics.newSalesCount = data.newSalesCount;
+          if (data.updatedCount !== undefined) metrics.updatedCount = data.updatedCount;
+          if (data.skippedCount !== undefined) metrics.skippedCount = data.skippedCount;
+          if (typeof onProgress === 'function') {
+            onProgress({ ...data, accountNickname, mlAccountId });
+          }
+          if (data.progress === 100) {
+            if (data.type === 'error') finish(new Error(data.message || 'Erro na sincronização.'));
+            else finish();
+          }
+        };
+
+        es.onerror = () => {
+          if (settled) return;
+          if (es) { es.close(); es = null; }
+          if (retries >= MAX_SSE_RETRIES) {
+            finish(new Error('Não foi possível acompanhar a sincronização: conexão instável. A fila foi liberada.'));
+            return;
+          }
+          retries += 1;
+          if (typeof onProgress === 'function') {
+            onProgress({
+              message: `[${accountNickname}] Reconectando ao servidor (${retries}/${MAX_SSE_RETRIES})...`,
+              type: 'info', accountNickname, mlAccountId,
             });
-        })
-        .catch((error) => {
-          reject(new Error(error.message || 'Erro ao verificar status da sincronização'));
-        });
+          }
+          reconnectTimer = setTimeout(connect, Math.min(2000 * retries, 10000));
+        };
+      };
+
+      connect();
     });
   };
 
