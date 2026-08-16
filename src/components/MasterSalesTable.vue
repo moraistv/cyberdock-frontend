@@ -526,23 +526,42 @@ import UniversalModal from './UniversalModal.vue';
  * @param {Object} sale - Objeto da venda contendo raw_api_data
  * @returns {string} Nome do cliente ou 'N/A' se não disponível
  */
+/**
+ * A Shopee devolve o comprador mascarado ("****", "a*****z") em pedidos
+ * concluídos ou quando o app não tem escopo de dados pessoais. Exibir isso cru
+ * parece falha do sistema; então valor totalmente mascarado é descartado e
+ * tentamos o campo seguinte.
+ */
+function isMaskedName(value) {
+    if (!value) return true;
+    const text = String(value).trim();
+    if (!text) return true;
+    // Só asteriscos, ou nada além de asteriscos e pontuação.
+    return /^[*\s.\-_]+$/.test(text);
+}
+
 function getCustomerName(sale) {
     try {
-        // Use flat buyer fields from server-side extraction
-        if (sale.buyer_first_name && sale.buyer_last_name) {
-            return `${sale.buyer_first_name} ${sale.buyer_last_name}`.trim();
+        const candidates = [
+            sale.buyer_first_name && sale.buyer_last_name
+                ? `${sale.buyer_first_name} ${sale.buyer_last_name}`
+                : sale.buyer_first_name,
+            sale.buyer_nickname,
+            sale?.raw_api_data?.buyer?.first_name && sale?.raw_api_data?.buyer?.last_name
+                ? `${sale.raw_api_data.buyer.first_name} ${sale.raw_api_data.buyer.last_name}`
+                : sale?.raw_api_data?.buyer?.first_name,
+            sale?.raw_api_data?.buyer?.nickname,
+        ];
+
+        for (const candidate of candidates) {
+            if (candidate && !isMaskedName(candidate)) return String(candidate).trim();
         }
-        if (sale.buyer_first_name) return sale.buyer_first_name.trim();
-        if (sale.buyer_nickname) return sale.buyer_nickname.trim();
-        
-        // Fallback to raw_api_data if available
-        const buyer = sale?.raw_api_data?.buyer;
-        if (buyer?.first_name && buyer?.last_name) {
-            return `${buyer.first_name} ${buyer.last_name}`.trim();
-        }
-        if (buyer?.nickname) return buyer.nickname.trim();
-        if (buyer?.id) return `Cliente #${buyer.id}`;
-        
+
+        const buyerId = sale?.raw_api_data?.buyer?.id;
+        if (buyerId) return `Cliente #${buyerId}`;
+
+        // Distingue "a plataforma não informa" de "não temos o dado".
+        if (sale.marketplace === 'Shopee') return 'Não informado pela Shopee';
         return 'N/A';
     } catch (error) {
         return 'N/A';
