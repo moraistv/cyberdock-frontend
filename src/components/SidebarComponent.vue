@@ -145,7 +145,10 @@ import { useAuth } from '@/composables/useAuth';
 import { useAdminMode } from '@/composables/useAdminMode';
 import { useSidebar } from '@/composables/useSidebar';
 
-const { user, userRole, fetchMercadoLivreAccounts, fetchShopeeAccounts } = useAuth();
+const {
+  user, userRole, fetchMercadoLivreAccounts, fetchShopeeAccounts,
+  mlAccounts, shopeeAccounts,
+} = useAuth();
 const { isIconOnly, isMobileOpen, isMobile, toggle, closeMobile } = useSidebar();
 
 const MK_LOGOS = {
@@ -261,7 +264,11 @@ async function fetchAccounts() {
     isLoadingAccounts.value = false;
     return;
   }
-  isLoadingAccounts.value = true;
+  // As contas já vêm de um cache compartilhado no useAuth. Sem esta guarda o
+  // skeleton reaparecia em toda navegação, porque o Sidebar é remontado a cada
+  // troca de página — o menu "piscava" mesmo sem nenhuma requisição nova.
+  const hasCachedAccounts = mlAccounts.value.length > 0 || shopeeAccounts.value.length > 0;
+  isLoadingAccounts.value = !hasCachedAccounts;
   accountsError.value = null;
   try {
     const [accountsData, shopeeData] = await Promise.all([

@@ -21,10 +21,12 @@ const routes = [
     component: PaginaInicial,
   },
   {
+    // noCache: o login precisa do ciclo de vida limpo a cada visita, para não
+    // reexibir estado (erros, campos) de uma tentativa anterior.
     path: '/auth',
     name: 'Auth',
     component: AuthComponent,
-    meta: { guest: true }
+    meta: { guest: true, noCache: true }
   },
   {
     path: '/dashboard',
@@ -41,6 +43,17 @@ const routes = [
   {
     path: '/admin/users',
     name: 'ManageUsersView',
+    component: ManageUsersView,
+    meta: { requiresAuth: true, requiresMaster: true }
+  },
+  {
+    // Cada aba de um cliente tem endereço próprio, então o link pode ser
+    // compartilhado, o F5 mantém onde você estava e o botão voltar do navegador
+    // funciona. Antes tudo isso vivia em estado interno de /admin/users e
+    // qualquer recarga jogava o usuário de volta para a lista.
+    // `tab` é validado no componente; valor inválido cai na lista.
+    path: '/admin/users/:uid/:tab(vendas|armazenamento|cobranca)',
+    name: 'ManageUserDetail',
     component: ManageUsersView,
     meta: { requiresAuth: true, requiresMaster: true }
   },
@@ -62,7 +75,9 @@ const routes = [
     path: '/shopee/callback',
     name: 'ShopeeCallback',
     component: ShopeeCallbackView,
-    meta: { requiresAuth: true }
+    // noCache: processa o retorno do OAuth no onMounted, o que exige uma
+    // montagem nova a cada visita.
+    meta: { requiresAuth: true, noCache: true }
   },
   {
     path: '/tabela-vendas',

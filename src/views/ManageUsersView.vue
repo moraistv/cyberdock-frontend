@@ -692,6 +692,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { gsap } from 'gsap';
 
 import SidebarComponent from '../components/SidebarComponent.vue';
@@ -719,6 +720,9 @@ const {
   serviceFormError, serviceTypeOptions, unitOptions, selectedTypeHint, addTier, removeTier,
   serviceTypeLabel, unitLabel, tierRangeLabel, serviceTypeIcon, untypedServicesCount
 } = useServices();
+
+const route = useRoute();
+const router = useRouter();
 
 const currentView = ref('users');
 const selectedUser = ref(null);
@@ -831,15 +835,67 @@ const formatDate = (timestamp, isDateString = false) => {
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
+/**
+ * A aba de um cliente vive na URL (/admin/users/:uid/vendas). Estes mapas
+ * traduzem entre o segmento da URL, legível, e o nome interno da visão.
+ */
+const TAB_TO_VIEW = { vendas: 'sales', armazenamento: 'storage', cobranca: 'billing' };
+const VIEW_TO_TAB = { sales: 'vendas', storage: 'armazenamento', billing: 'cobranca' };
+
+/** Aplica o que está na URL ao estado da tela. */
+const applyRoute = () => {
+  const uid = route.params.uid;
+  const view = TAB_TO_VIEW[route.params.tab];
+
+  if (!uid || !view) {
+    currentView.value = 'users';
+    selectedUser.value = null;
+    return;
+  }
+
+  // A lista pode ainda não ter carregado (link aberto direto ou F5). Nesse
+  // caso guarda o uid e o watch de `users` conclui quando os dados chegarem.
+  const found = users.value.find((u) => u.uid === uid);
+  selectedUser.value = found || { uid, email: uid, name: null, mlNickname: null };
+  currentView.value = view;
+};
+
+// Reage ao endereço: cobre F5, link colado e o botão voltar do navegador.
+watch(() => [route.params.uid, route.params.tab], applyRoute, { immediate: true });
+
+// Quando a lista chega depois, completa nome e e-mail do cabeçalho.
+watch(users, (list) => {
+  const uid = route.params.uid;
+  if (!uid || !list?.length) return;
+  const found = list.find((u) => u.uid === uid);
+  if (found) selectedUser.value = found;
+});
+
 const setView = (view) => {
   activeMenu.value.user = null;
+
+  // Voltar para a lista é voltar para /admin/users.
+  if (view === 'users') {
+    currentView.value = 'users';
+    selectedUser.value = null;
+    if (route.name !== 'ManageUsersView') router.push({ name: 'ManageUsersView' });
+    nextTick(() => animateRows());
+    return;
+  }
+
   currentView.value = view;
-  if (view === 'users') selectedUser.value = null;
   nextTick(() => animateRows());
 };
 
+/** Troca de aba do cliente navegando, para o endereço acompanhar. */
 const switchUserView = (view) => {
   if (!selectedUser.value) return;
+  const tab = VIEW_TO_TAB[view];
+  if (tab && route.params.tab !== tab) {
+    activeMenu.value.user = null;
+    router.push({ name: 'ManageUserDetail', params: { uid: selectedUser.value.uid, tab } });
+    return;
+  }
   activeMenu.value.user = null;
   currentView.value = view;
 };
@@ -960,9 +1016,17 @@ const handleSavePassword = async () => {
   }
 };
 
-const editUserSales = (user) => { selectedUser.value = user; setView('sales'); };
-const editUserStorage = (user) => { selectedUser.value = user; setView('storage'); };
-const editUserBilling = (user) => { selectedUser.value = user; setView('billing'); };
+/** Abrir um cliente é navegar até a URL dele; o watch de rota faz o resto. */
+const openUserTab = (user, view) => {
+  if (!user?.uid) return;
+  activeMenu.value.user = null;
+  selectedUser.value = user;
+  router.push({ name: 'ManageUserDetail', params: { uid: user.uid, tab: VIEW_TO_TAB[view] } });
+};
+
+const editUserSales = (user) => openUserTab(user, 'sales');
+const editUserStorage = (user) => openUserTab(user, 'storage');
+const editUserBilling = (user) => openUserTab(user, 'billing');
 const openDeleteUserModal = (user) => { userToDelete.value = user; isDeleteUserModalOpen.value = true; activeMenu.value.user = null; };
 const closeDeleteUserModal = () => { isDeleteUserModalOpen.value = false; userToDelete.value = null; };
 

@@ -20,6 +20,11 @@ let authBootStarted = false;
 let authWatcherStarted = false;
 let mlAccountsRequest = null;
 let shopeeAccountsRequest = null;
+// Dados do usuário: o Topbar remonta a cada navegação e pedia /auth/user de
+// novo toda vez. Uma janela curta elimina a repetição sem deixar o dado velho.
+let userDataRequest = null;
+let lastUserDataFetch = 0;
+const USER_DATA_TTL_MS = 60_000;
 
 export function useAuth() {
     const router = useRouter();
@@ -55,21 +60,41 @@ export function useAuth() {
         }
     };
 
-    const refreshUserData = async () => {
+    /**
+     * Recarrega os dados do usuário logado.
+     *
+     * O Topbar chama isto ao montar, e o Topbar é montado de novo em CADA
+     * navegação — o que gerava uma requisição a /auth/user por troca de página,
+     * atrasando a pintura da tela nova sem necessidade.
+     *
+     * Agora o resultado é reaproveitado por um curto período e chamadas
+     * simultâneas compartilham a mesma requisição. Passe `force` quando o dado
+     * realmente mudou (após editar o perfil, por exemplo).
+     */
+    const refreshUserData = async (force = false) => {
         if (!loggedInUser.value?.uid) return;
-        try {
-            const response = await fetch(`${API_BASE_URL}/auth/user?uid=${loggedInUser.value.uid}`, {
-                headers: { 'Authorization': `Bearer ${token.value}` }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                if (data.user) {
-                    loggedInUser.value = { ...loggedInUser.value, ...data.user };
+        if (!force && userDataRequest) return userDataRequest;
+        if (!force && Date.now() - lastUserDataFetch < USER_DATA_TTL_MS) return;
+
+        userDataRequest = (async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/user?uid=${loggedInUser.value.uid}`, {
+                    headers: { 'Authorization': `Bearer ${token.value}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.user) {
+                        loggedInUser.value = { ...loggedInUser.value, ...data.user };
+                    }
                 }
+                lastUserDataFetch = Date.now();
+            } catch (error) {
+                console.error('Erro ao atualizar dados do usuário:', error);
+            } finally {
+                userDataRequest = null;
             }
-        } catch (error) {
-            console.error('Erro ao atualizar dados do usuário:', error);
-        }
+        })();
+        return userDataRequest;
     };
 
     const login = async (email, password) => {
