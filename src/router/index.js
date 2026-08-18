@@ -158,7 +158,14 @@ router.beforeEach(async (to, from, next) => {
   if (to.path === '/') {
     next(isAuthenticated ? '/dashboard' : '/auth');
   } else if (requiresAuth && !isAuthenticated) {
-    next('/auth');
+    /* Guarda o destino COMPLETO, com query string.
+     *
+     * O retorno do OAuth da Shopee carrega `code` e `shop_id` apenas na URL, e
+     * o `code` é de uso único. Mandar só '/auth' descartava a autorização
+     * inteira sem erro e sem rastro: a loja aparecia como autorizada na Shopee
+     * e simplesmente não existia aqui. Guardando o destino, o login retoma o
+     * callback e conclui a conexão. */
+    next({ path: '/auth', query: { redirect: to.fullPath } });
   } else if (requiresMaster && userRole !== 'master') {
     next('/dashboard'); // Redireciona se não for master
   } else if (isGuestRoute && isAuthenticated) {

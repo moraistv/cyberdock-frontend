@@ -54,6 +54,12 @@ onMounted(async () => {
     const success = result?.message || 'Loja Shopee conectada com sucesso!';
     router.replace({ path: '/contas', query: { success } });
   } catch (err) {
+    // Sessão vencida no meio do retorno: manda para o login preservando esta
+    // URL, para o `code` ser usado depois de autenticar em vez de descartado.
+    if (err?.status === 401 || err?.status === 403) {
+      router.replace({ path: '/auth', query: { redirect: route.fullPath } });
+      return;
+    }
     state.value = 'error';
     message.value = err?.data?.error || err?.message || 'Erro desconhecido ao conectar a loja.';
   }

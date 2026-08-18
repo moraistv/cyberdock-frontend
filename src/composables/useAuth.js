@@ -111,7 +111,12 @@ export function useAuth() {
         // As duas listas são compartilhadas por toda a aplicação.
         await Promise.all([fetchMercadoLivreAccounts(true), fetchShopeeAccounts(true)]);
 
-        if (router) await router.push('/dashboard');
+        // Retoma o destino que exigiu o login (ex.: o callback do OAuth da
+        // Shopee, que sem isso perderia o `code` de uso único). Só caminhos
+        // internos são aceitos, para não virar redirecionamento aberto.
+        const pending = router?.currentRoute?.value?.query?.redirect;
+        const safeTarget = typeof pending === 'string' && /^\/(?!\/)/.test(pending) ? pending : '/dashboard';
+        if (router) await router.push(safeTarget);
     };
 
     const register = async (name, email, password) => {
