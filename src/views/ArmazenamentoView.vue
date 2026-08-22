@@ -88,6 +88,32 @@
                     <div class="table-container">
                         <div class="table-header-row">
                             <h2 class="table-title">Seus SKUs Armazenados</h2>
+                            <div class="stock-filter-group sku-type-filter-group" role="group" aria-label="Filtrar por tipo de SKU">
+                                <button
+                                    type="button"
+                                    class="filter-btn"
+                                    :class="{ active: skuTypeFilter === 'all' }"
+                                    @click="skuTypeFilter = 'all'"
+                                >
+                                    Todos os tipos
+                                </button>
+                                <button
+                                    type="button"
+                                    class="filter-btn"
+                                    :class="{ active: skuTypeFilter === 'parent' }"
+                                    @click="skuTypeFilter = 'parent'"
+                                >
+                                    Somente pai
+                                </button>
+                                <button
+                                    type="button"
+                                    class="filter-btn"
+                                    :class="{ active: skuTypeFilter === 'child' }"
+                                    @click="skuTypeFilter = 'child'"
+                                >
+                                    Somente filho
+                                </button>
+                            </div>
                             <div class="stock-filter-group">
                                 <button 
                                     type="button" 
@@ -137,7 +163,7 @@
                                     <td>{{ calcularVolumePorSku(sku).toFixed(4) }}</td>
                                 </tr>
                                 <tr v-if="allItemsForDisplay.length === 0">
-                                    <td colspan="5" class="empty-state">Nenhum SKU em estoque para exibir.</td>
+                                    <td colspan="5" class="empty-state">Nenhum SKU corresponde aos filtros selecionados.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -550,6 +576,7 @@ const isKitManagementModalOpen = ref(false);
 const isAdjustStockModalOpen = ref(false);
 const skuToAdjust = ref(null);
 const stockFilter = ref('all'); // 'all', 'with', 'without'
+const skuTypeFilter = ref('all'); // 'all', 'parent', 'child'
 
 // Kit Management Modal Methods
 const openKitManagementModal = async () => {
@@ -813,6 +840,18 @@ const allItemsForDisplay = computed(() => {
         quantidade: kit.available_quantity || 0,
         is_kit: true
     })) || []
+
+    // O tipo é independente do estoque: pai é um kit composto; filho é um
+    // SKU comum vinculado como componente a pelo menos um kit. SKUs simples
+    // continuam disponíveis em "Todos os tipos".
+    if (skuTypeFilter.value === 'parent') {
+        individualSkus = []
+    } else if (skuTypeFilter.value === 'child') {
+        individualSkus = individualSkus.filter(
+            sku => Array.isArray(sku.used_in_kits) && sku.used_in_kits.length > 0
+        )
+        activeKitsForDisplay = []
+    }
     
     // Filtrar com base no filtro selecionado
     if (stockFilter.value === 'with') {
@@ -896,8 +935,8 @@ const allItemsForDisplay = computed(() => {
 .package-quantity { font-weight: 600; color: #111827; }
 
 .table-container { background-color: #ffffff; border-radius: 0.75rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); }
-.table-header-row { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
-.table-header-row .table-title { padding: 0; border-bottom: none; margin: 0; }
+.table-header-row { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 0.75rem; padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
+.table-header-row .table-title { padding: 0; border-bottom: none; margin: 0 auto 0 0; }
 .stock-filter-group { display: flex; gap: 0.25rem; background-color: #f3f4f6; padding: 0.25rem; border-radius: 0.5rem; border: 1px solid #e5e7eb; }
 .filter-btn { border: none; background: none; padding: 0.375rem 0.75rem; font-size: 0.813rem; font-weight: 500; color: #4b5563; border-radius: 0.375rem; cursor: pointer; transition: all 0.2s ease; }
 .filter-btn:hover { color: #1f2937; }

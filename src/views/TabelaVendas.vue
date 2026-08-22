@@ -859,7 +859,6 @@ const activeSyncState = computed(() =>
         : syncState.value
 );
 const isSyncLiveOpen = ref(false);
-const syncTimeframe = ref('3');
 const { systemStatuses } = useSystemStatus();
 const { downloadLabel, downloadLabelsForSales, getLabelInfo: composableLabelInfo } = useLabels();
 const isProcessing = ref(false);
@@ -2769,8 +2768,6 @@ function hideTooltip() {
     align-items: center;
     justify-content: center;
 }
-.sync-time-select { padding: 0.5rem 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background-color: #ffffff; color: #475569; font-size: 0.875rem; font-weight: 500; outline: none; transition: border-color 0.2s; }
-.sync-time-select:focus { border-color: #3b82f6; }
 .sale-card__thumb-img { width: 100%; height: 100%; object-fit: cover; }
 .sale-card__thumb-placeholder { color: #cbd5e1; }
 
