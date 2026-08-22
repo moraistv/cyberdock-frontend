@@ -353,7 +353,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onActivated, onUnmounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import gsap from 'gsap';
 
@@ -462,12 +462,12 @@ const addExtraProperties = (acc) => ({
   showRefreshToken: false,
 });
 
-const fetchAllAccounts = async () => {
+const fetchAllAccounts = async (force = false) => {
   isLoading.value = true;
   try {
     const [mlData, shopeeData] = await Promise.all([
-      fetchAccountsFromAuth(),
-      fetchShopeeAccountsFromAuth(),
+      fetchAccountsFromAuth(force),
+      fetchShopeeAccountsFromAuth(force),
     ]);
 
     if (mlData && mlData.error) {
@@ -495,7 +495,7 @@ const fetchAllAccounts = async () => {
 const handleSyncShopee = async (account) => {
   try {
     await syncShopeeAccount(account.shop_id, account.shop_name || account.shop_id);
-    await fetchAllAccounts();
+    await fetchAllAccounts(true);
   } catch (error) {
     showSimpleNotification('Erro', error.message || 'Não foi possível sincronizar a loja.', 'error');
   }
@@ -504,7 +504,7 @@ const handleSyncShopee = async (account) => {
 const handleSyncMl = async (account) => {
   try {
     await syncMlAccount(account.user_id, account.nickname);
-    await fetchAllAccounts();
+    await fetchAllAccounts(true);
   } catch (error) {
     showSimpleNotification('Erro', error.message || 'Não foi possível sincronizar a conta.', 'error');
   }
@@ -560,7 +560,7 @@ const confirmDelete = async () => {
   try {
     await api.delete(endpoint);
     showSimpleNotification('Sucesso!', `A conta "${label}" foi excluída.`);
-    await fetchAllAccounts();
+    await fetchAllAccounts(true);
   } catch (error) {
     const errorMessage = error.data?.error || 'Não foi possível excluir a conta.';
     showSimpleNotification('Erro', errorMessage);
@@ -642,6 +642,29 @@ const getStatusText = (status) => {
   return map[status] || 'Inativa';
 };
 
+let lastRouteFeedback = '';
+const showRouteFeedback = () => {
+  const rawMessage = route.query.success || route.query.error;
+  if (!rawMessage) return;
+
+  const type = route.query.success ? 'success' : 'error';
+  const feedbackKey = `${type}:${String(rawMessage)}`;
+  if (feedbackKey !== lastRouteFeedback) {
+    lastRouteFeedback = feedbackKey;
+    showSimpleNotification(
+      type === 'success' ? 'Sucesso!' : 'Ocorreu um Erro',
+      String(rawMessage),
+      type
+    );
+  }
+  // Suprime apenas chamadas duplicadas desta mesma ativação. Depois que a
+  // query é consumida, uma nova conexão com a mesma mensagem deve exibir o
+  // feedback novamente.
+  router.replace({ query: {} }).finally(() => {
+    if (lastRouteFeedback === feedbackKey) lastRouteFeedback = '';
+  });
+};
+
 onMounted(() => {
   ctx = gsap.context(() => {
     if (headerRef.value) {
@@ -657,17 +680,11 @@ onMounted(() => {
     async (ready) => {
       if (!ready) return;
       if (user.value) {
-        await fetchAllAccounts();
-        if (route.query.success || route.query.error) {
-          const message = route.query.success
-            ? decodeURIComponent(route.query.success)
-            : decodeURIComponent(route.query.error);
-          const title = route.query.success ? 'Sucesso!' : 'Ocorreu um Erro';
-          showSimpleNotification(title, message);
-          router.replace({ query: {} });
-        }
+        await fetchAllAccounts(true);
+        showRouteFeedback();
       } else {
         accounts.value.mercadoLivre = [];
+        accounts.value.shopee = [];
         isLoading.value = false;
       }
     },
@@ -687,9 +704,17 @@ onMounted(() => {
   // Watch for sync completion to refresh accounts
   watch(() => syncState.value.isSyncing, (isSyncing, wasSyncing) => {
     if (wasSyncing && !isSyncing && syncState.value.progress === 100 && syncState.value.type !== 'error') {
-      fetchAllAccounts();
+      fetchAllAccounts(true);
     }
   });
+});
+
+// A tela permanece em keep-alive. Ao voltar do OAuth, onMounted não roda de
+// novo; onActivated força a leitura do banco e substitui a cópia local antiga.
+onActivated(async () => {
+  if (!isAuthReady.value || !user.value) return;
+  await fetchAllAccounts(true);
+  showRouteFeedback();
 });
 
 onUnmounted(() => {

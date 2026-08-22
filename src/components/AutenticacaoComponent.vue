@@ -95,33 +95,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, reactive } from 'vue';
 import { gsap } from 'gsap';
 import AlertService from '../services/AlertService';
 import Toast from './ToastComponent.vue';
 import { useAuth } from '@/composables/useAuth';
 
 const { loggedInUser, login, register, logout: authLogout } = useAuth();
-const router = useRouter();
 const isLoginView = ref(true);
 const isLoading = ref(false);
 const showPassword = ref(false);
 const formData = reactive({ name: '', email: '', password: '' });
-
-// Redireciona para o dashboard sempre que loggedInUser for preenchido
-onMounted(() => {
-  if (loggedInUser.value) {
-    router.push('/dashboard');
-  }
-});
-
-// Observa mudanças em loggedInUser para redirecionar imediatamente após login/registro
-watch(() => loggedInUser.value, (val) => {
-  if (val) {
-    router.push('/dashboard');
-  }
-});
 
 const clearForms = () => {
     formData.name = '';

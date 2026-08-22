@@ -73,14 +73,16 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    // Retorno da autorização da Shopee. Precisa estar sob o domínio do
-    // frontend porque é o domínio declarado no console do parceiro Shopee.
+    // Retorno da autorização da Shopee. A página é pública porque o JWT pode
+    // vencer durante a ida ao provedor; o backend só conclui usando a tentativa
+    // opaca, curta e de uso único criada no início do OAuth. Depois, /contas
+    // exige login.
     path: '/shopee/callback',
     name: 'ShopeeCallback',
     component: ShopeeCallbackView,
     // noCache: processa o retorno do OAuth no onMounted, o que exige uma
     // montagem nova a cada visita.
-    meta: { requiresAuth: true, noCache: true }
+    meta: { noCache: true }
   },
   {
     path: '/tabela-vendas',

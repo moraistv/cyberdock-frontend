@@ -98,6 +98,16 @@ export function useAuth() {
     };
 
     const login = async (email, password) => {
+        // Captura o destino ANTES de preencher loggedInUser. Assim nenhum
+        // efeito reativo consegue apagar o callback OAuth durante o login.
+        const pending = router?.currentRoute?.value?.query?.redirect;
+        const safeTarget = typeof pending === 'string' && /^\/(?!\/)/.test(pending) ? pending : '/dashboard';
+        const isShopeeResume = safeTarget.startsWith('/shopee/callback') ||
+            (safeTarget.startsWith('/contas') && safeTarget.includes('success='));
+        const expectedShopeeUid = isShopeeResume
+            ? sessionStorage.getItem('shopeeOAuthExpectedUid')
+            : null;
+
         const response = await fetch(`${API_BASE_URL}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -106,16 +116,22 @@ export function useAuth() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Falha no login');
 
+        const authenticatedUser = parseJwt(data.token);
+        if (expectedShopeeUid && authenticatedUser?.uid !== expectedShopeeUid) {
+            throw new Error('Esta conexão Shopee foi iniciada por outro usuário. Entre com o usuário correto.');
+        }
+
         setUserSession(data.token);
         await refreshUserData();
         // As duas listas são compartilhadas por toda a aplicação.
         await Promise.all([fetchMercadoLivreAccounts(true), fetchShopeeAccounts(true)]);
 
-        // Retoma o destino que exigiu o login (ex.: o callback do OAuth da
-        // Shopee, que sem isso perderia o `code` de uso único). Só caminhos
-        // internos são aceitos, para não virar redirecionamento aberto.
-        const pending = router?.currentRoute?.value?.query?.redirect;
-        const safeTarget = typeof pending === 'string' && /^\/(?!\/)/.test(pending) ? pending : '/dashboard';
+        if (isShopeeResume && safeTarget.startsWith('/contas')) {
+            sessionStorage.removeItem('shopeeOAuthExpectedUid');
+        } else if (!isShopeeResume) {
+            sessionStorage.removeItem('shopeeOAuthAttempt');
+            sessionStorage.removeItem('shopeeOAuthExpectedUid');
+        }
         if (router) await router.push(safeTarget);
     };
 
@@ -178,9 +194,13 @@ export function useAuth() {
 
         shopeeAccountsRequest = (async () => {
             try {
-                const response = await fetch(`${API_BASE_URL}/shopee/contas/${uid}`, {
-                    headers: { 'Authorization': `Bearer ${token.value}` }
-                });
+                // O backend novo deriva o dono do JWT; durante rollout, cai
+                // uma vez na rota legada se a instância ainda não foi atualizada.
+                const headers = { 'Authorization': `Bearer ${token.value}` };
+                let response = await fetch(`${API_BASE_URL}/shopee/contas`, { headers });
+                if (response.status === 404) {
+                    response = await fetch(`${API_BASE_URL}/shopee/contas/${uid}`, { headers });
+                }
                 const data = await response.json();
                 if (!response.ok) throw new Error(data?.error || 'Erro ao buscar lojas Shopee');
                 shopeeAccounts.value = Array.isArray(data) ? data : [];
