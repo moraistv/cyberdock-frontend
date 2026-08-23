@@ -10,6 +10,37 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,400..800&amp;display=swap" rel="stylesheet">
     <title>CyberDock | Gestão de fulfillment</title>
+    <script>
+      /*
+        Retorno da autorização da Shopee.
+
+        A Shopee só aceita redirecionar para o domínio do site, mas quem grava a
+        loja é a API. Esta etapa ficava a cargo do aplicativo Vue, e por isso
+        falhava calada: bastava o pacote em cache estar velho (o servidor chegou
+        a devolver HTML no lugar de .js) ou o armazenamento da aba não existir
+        mais, e a loja era autorizada na Shopee sem nunca chegar ao sistema.
+
+        Este trecho roda direto no HTML, antes de qualquer pacote, então não
+        depende do aplicativo carregar. A API reconhece a tentativa pelo cookie
+        criado no início da conexão, grava a conta e volta para /contas.
+
+        `handoff=1` marca o retorno que a própria API já devolveu para cá, o que
+        impede os dois lados de ficarem se empurrando o mesmo endereço.
+      */
+      (function () {
+        try {
+          if (window.location.pathname !== '/shopee/callback') return;
+          var query = window.location.search || '';
+          if (!query || query.indexOf('handoff=1') !== -1) return;
+          var api = window.location.hostname === 'localhost'
+            ? 'http://localhost:3001/api'
+            : 'https://api.cyberdock.com.br/api';
+          window.location.replace(api + '/shopee/callback' + query);
+        } catch (error) {
+          /* Qualquer imprevisto aqui deixa o aplicativo tentar do jeito antigo. */
+        }
+      })();
+    </script>
   </head>
   <body>
     <noscript>
