@@ -501,12 +501,31 @@
                                         Pend
                                     </span>
 
-                                    <button v-if="getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
+                                    <!-- Shopee: a etiqueta é gerada pela própria Shopee, então o botão
+                                         só dispara o pedido e a mensagem vem de lá (por exemplo, nota
+                                         fiscal ainda não emitida). O master imprime em nome do dono
+                                         da venda. -->
+                                    <template v-if="isShopeeSale(sale)">
+                                        <button @click="handleShopeeLabel(sale, 'pdf')" class="btn-label pdf"
+                                                :disabled="shopeeLabelBusy === shopeeLabelKey(sale)"
+                                                title="Etiqueta Shopee (A4)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                            {{ shopeeLabelBusy === shopeeLabelKey(sale) ? 'Gerando...' : 'PDF' }}
+                                        </button>
+                                        <button @click="handleShopeeLabel(sale, 'thermal')" class="btn-label zpl"
+                                                :disabled="shopeeLabelBusy === shopeeLabelKey(sale)"
+                                                title="Etiqueta Shopee (térmica)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
+                                            Térmica
+                                        </button>
+                                    </template>
+
+                                    <button v-if="!isShopeeSale(sale) && getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                                         PDF
                                     </button>
                                     
-                                    <button v-if="getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
+                                    <button v-if="!isShopeeSale(sale) && getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
                                         ZPL
                                     </button>
@@ -541,6 +560,8 @@ import { useMasterSales } from '@/composables/useMasterSales';
 import { useSalesFilterFacets } from '@/composables/useSalesFilterFacets';
 import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
+import { useApi } from '@/composables/useApi';
+import { useAuth } from '@/composables/useAuth';
 import { API_BASE_URL } from '@/config';
 import { formatVariation } from '@/utils/variation';
 import { useNotification } from '@/composables/useNotification';
@@ -732,6 +753,8 @@ const formattedTotalPages = computed(() =>
 
 const { systemStatuses } = useSystemStatus();
 const { downloadLabel, downloadLabelsForSales, getLabelInfo: composableLabelInfo } = useLabels();
+const api = useApi();
+const { token } = useAuth();
 const labelError = ref(null);
 const isPrinting = ref(false);
 
@@ -742,6 +765,76 @@ async function handleDownloadLabel(shipmentId, sellerId, type) {
     } catch (err) {
         labelError.value = err?.message || 'Não foi possível baixar a etiqueta. Tente novamente.';
         setTimeout(() => { labelError.value = null; }, 8000);
+    }
+}
+
+/* ----------------------------- Etiqueta Shopee -----------------------------
+ *
+ * Mesmo fluxo do tabelão do usuário: o backend cria o documento na Shopee,
+ * espera ficar pronto e devolve o PDF. A diferença aqui é que o tabelão master
+ * lista vendas de todos os clientes, então mandamos `ownerUid` para o servidor
+ * carregar o token da loja do DONO da venda — e não do master. A rota só aceita
+ * esse parâmetro de quem tem papel master, o que preserva o isolamento.
+ */
+const shopeeLabelBusy = ref(null);
+
+const isShopeeSale = (sale) => saleMarketplace(sale) === 'Shopee';
+const shopeeLabelKey = (sale) => `${sale?.id}-${sale?.sku}`;
+
+async function handleShopeeLabel(sale, type = 'pdf') {
+    if (shopeeLabelBusy.value) return;
+
+    const orderSn = sale?.id;
+    const shopId = sale?.seller_id ?? sale?.account_id;
+    if (!orderSn || !shopId) {
+        notify.error('Este pedido não tem identificação da loja Shopee para gerar etiqueta.');
+        return;
+    }
+
+    const query = new URLSearchParams({ orderSn: String(orderSn), shopId: String(shopId), type });
+    // Sem uid na venda a rota cai no UID do token (o master), que não tem a
+    // loja: melhor mandar só quando existe e deixar o backend responder.
+    if (sale?.uid) query.set('ownerUid', String(sale.uid));
+
+    shopeeLabelBusy.value = shopeeLabelKey(sale);
+    try {
+        // Checa antes: assim o operador recebe o motivo em vez de um download vazio.
+        const info = await api.get(`/shopee/label-info?${query.toString()}`);
+        if (info && info.canPrint === false) {
+            // NF pendente e envio não agendado são situações de espera, não erro
+            // do sistema: alguém precisa agir na Shopee.
+            if (info.requiresInvoice || info.awaitingShipment) notify.warning(info.reason);
+            else notify.error(info.reason || 'A Shopee não liberou a etiqueta deste pedido.');
+            return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/shopee/download-label?${query.toString()}`, {
+            headers: { Authorization: `Bearer ${token.value}` },
+        });
+
+        if (!response.ok) {
+            let detail = null;
+            try { detail = await response.json(); } catch { /* resposta sem JSON */ }
+            const message = detail?.error || 'Não foi possível gerar a etiqueta na Shopee.';
+            if (detail?.requiresInvoice || detail?.awaitingShipment) notify.warning(message);
+            else notify.error(message);
+            return;
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `shopee-${type === 'thermal' ? 'termica' : 'etiqueta'}-${orderSn}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        notify.success('Etiqueta Shopee gerada.');
+    } catch (error) {
+        notify.error(error?.data?.error || error?.data?.reason || error?.message || 'Falha ao gerar a etiqueta Shopee.');
+    } finally {
+        shopeeLabelBusy.value = null;
     }
 }
 
@@ -767,6 +860,14 @@ async function printSelectedLabels(type = 'pdf') {
     const printable = [];
     const skipped = [];
     for (const sale of selected) {
+        /* A Shopee não tem endpoint de etiqueta em lote como o do ML: cada
+         * pedido exige criar o documento, esperar e baixar. Cair aqui pelo
+         * caminho do ML devolvia "ID de envio não encontrado", que não diz nada
+         * ao operador — então explicamos onde está o botão certo. */
+        if (isShopeeSale(sale)) {
+            skipped.push({ sku: sale.sku || sale.id, reason: 'Etiqueta Shopee: use o botão PDF/Térmica da própria linha' });
+            continue;
+        }
         const info = getLabelInfo(sale);
         if (info.canPrint && info.shipmentId && info.sellerId) {
             printable.push({ seller_id: info.sellerId, shipment_id: info.shipmentId, sku: sale.sku, account_nickname: sale.account_nickname });

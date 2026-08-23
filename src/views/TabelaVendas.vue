@@ -1007,7 +1007,8 @@ async function handleShopeeLabel(sale, type = 'pdf') {
         URL.revokeObjectURL(url);
         notify.success('Etiqueta Shopee gerada.');
     } catch (error) {
-        notify.error(error?.data?.error || error?.message || 'Falha ao gerar a etiqueta Shopee.');
+        // `reason` cobre o 404 de loja não conectada, que responde sem `error`.
+        notify.error(error?.data?.error || error?.data?.reason || error?.message || 'Falha ao gerar a etiqueta Shopee.');
     } finally {
         shopeeLabelBusy.value = null;
     }
