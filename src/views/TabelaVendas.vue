@@ -975,7 +975,9 @@ async function handleShopeeLabel(sale, type = 'pdf') {
             `/shopee/label-info?orderSn=${encodeURIComponent(orderSn)}&shopId=${encodeURIComponent(shopId)}&type=${type}`
         );
         if (info && info.canPrint === false) {
-            if (info.requiresInvoice) notify.warning(info.reason);
+            // NF pendente e envio não agendado são situações de espera, não erro
+            // do sistema: o operador precisa agir na Shopee.
+            if (info.requiresInvoice || info.awaitingShipment) notify.warning(info.reason);
             else notify.error(info.reason || 'A Shopee não liberou a etiqueta deste pedido.');
             return;
         }
@@ -989,7 +991,7 @@ async function handleShopeeLabel(sale, type = 'pdf') {
             let detail = null;
             try { detail = await response.json(); } catch { /* resposta sem JSON */ }
             const message = detail?.error || 'Não foi possível gerar a etiqueta na Shopee.';
-            if (detail?.requiresInvoice) notify.warning(message);
+            if (detail?.requiresInvoice || detail?.awaitingShipment) notify.warning(message);
             else notify.error(message);
             return;
         }
