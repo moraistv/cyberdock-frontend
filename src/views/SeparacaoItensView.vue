@@ -52,8 +52,9 @@
               <span class="filters-bar__label">Canal</span>
               <select class="filters-bar__select" v-model="filters.marketplace" @change="aplicarFiltros">
                 <option value="">Todos</option>
-                <option value="ML">Mercado Livre</option>
-                <option value="Shopee">Shopee</option>
+                <option v-for="mk in marketplaceOptions" :key="mk.value" :value="mk.value">
+                  {{ mk.label }} ({{ mk.count }})
+                </option>
               </select>
             </div>
 
@@ -103,21 +104,29 @@
                 <label class="filter-label">Modalidade de Envio</label>
                 <select v-model="filters.shippingMode">
                   <option value="">Todas</option>
-                  <option v-for="m in modeOptions" :key="m" :value="m">{{ m }}</option>
+                  <option v-for="m in modeOptions" :key="m.value" :value="m.value">
+                    {{ m.label }} ({{ m.count }})
+                  </option>
                 </select>
               </div>
               <div class="filter-block">
                 <label class="filter-label">Conta</label>
                 <select v-model="filters.account">
                   <option value="">Todas as contas</option>
-                  <option v-for="acc in accountOptions" :key="acc" :value="acc">{{ acc }}</option>
+                  <!-- O rótulo traz o canal porque a mesma loja costuma usar o
+                       mesmo nome no Mercado Livre e na Shopee. -->
+                  <option v-for="acc in accountOptions" :key="acc.value" :value="acc.value">
+                    {{ acc.label }} · {{ acc.marketplace === 'Shopee' ? 'Shopee' : 'Mercado Livre' }} ({{ acc.count }})
+                  </option>
                 </select>
               </div>
               <div class="filter-block">
                 <label class="filter-label">Usuário</label>
                 <select v-model="filters.userNickname">
                   <option value="">Todos os usuários</option>
-                  <option v-for="usr in userOptions" :key="usr" :value="usr">{{ usr }}</option>
+                  <option v-for="usr in userOptions" :key="usr.value" :value="usr.value">
+                    {{ usr.label }} ({{ usr.count }})
+                  </option>
                 </select>
               </div>
             </div>
@@ -403,9 +412,17 @@ const api = useApi();
 const { user } = useAuth();
 const notify = useNotification();
 
-const modeOptions = ['FULL', 'FLEX', 'Correios', 'Agência', 'Coleta', 'Envio Padrão', 'Outros'];
-const accountOptions = ref([]);
-const userOptions = ref([]);
+/* Filtro inteligente da fila.
+ *
+ * As modalidades eram uma lista fixa no código e as contas/clientes vinham
+ * completas do sistema, então escolher um valor podia devolver fila vazia.
+ * Agora cada lista vem do backend já cruzada com os outros filtros ativos e com
+ * as mesmas regras da fila (sem FULL, sem cancelado, situação de despacho). */
+const facets = ref({ marketplaces: [], shippingModes: [], accounts: [], users: [] });
+const modeOptions = computed(() => facets.value.shippingModes);
+const marketplaceOptions = computed(() => facets.value.marketplaces);
+const accountOptions = computed(() => facets.value.accounts);
+const userOptions = computed(() => facets.value.users);
 
 const filters = reactive({
   saleDateStart: '',
@@ -590,17 +607,35 @@ async function fetchData() {
 
 async function fetchFilterOptions() {
   try {
-    const data = await api.get('sales/filter-options');
-    accountOptions.value = data.accounts || [];
-    userOptions.value = data.users || [];
+    // Mesmo recorte da fila: as opções precisam prever exatamente os pacotes
+    // que a listagem vai trazer.
+    const data = await api.get(`sales/separacao-facets?${buildQuery()}`);
+    facets.value = {
+      marketplaces: data.marketplaces || [],
+      shippingModes: data.shippingModes || [],
+      accounts: data.accounts || [],
+      users: data.users || [],
+    };
+    dropImpossibleFilters();
   } catch (e) {
-    // silencioso: filtros continuam usáveis por texto padrão
+    // Silencioso: uma falha aqui não deve travar a fila, que continua listando.
   }
+}
+
+/** Descarta filtro que deixou de existir, para a tela não ficar sem resultado. */
+function dropImpossibleFilters() {
+  const stillThere = (list, value) => !value || list.some((o) => String(o.value) === String(value));
+  if (!stillThere(facets.value.marketplaces, filters.marketplace)) filters.marketplace = '';
+  if (!stillThere(facets.value.shippingModes, filters.shippingMode)) filters.shippingMode = '';
+  if (!stillThere(facets.value.accounts, filters.account)) filters.account = '';
+  if (!stillThere(facets.value.users, filters.userNickname)) filters.userNickname = '';
 }
 
 function aplicarFiltros() {
   page.value = 1;
   fetchData();
+  // Opções e fila saem do mesmo recorte, então são relidas juntas.
+  fetchFilterOptions();
 }
 
 function limparFiltros() {

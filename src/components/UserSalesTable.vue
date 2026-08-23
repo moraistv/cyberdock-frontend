@@ -58,11 +58,15 @@
                                 <li @click="applyStatusFilter(null)">
                                     <span :class="{ 'font-bold': !selectedStatusFilter }">Todos</span>
                                 </li>
-                                <li v-for="status in systemStatuses" :key="status.value"
+                                <li v-for="status in shippingStatusOptions" :key="status.value"
                                     @click="applyStatusFilter(status.value)">
                                     <span :class="{ 'font-bold': selectedStatusFilter === status.value }">{{
                                         status.label
                                     }}</span>
+                                    <small class="filter-popover__count">{{ status.count }}</small>
+                                </li>
+                                <li v-if="!shippingStatusOptions.length" class="filter-popover__empty">
+                                    Nenhuma expedição com venda neste filtro.
                                 </li>
                             </ul>
                         </div>
@@ -103,10 +107,14 @@
                                     <span :class="{ 'font-bold': !selectedAccountFilterId }">Todas as Contas</span>
                                 </li>
                                 <li v-if="isLoadingAccounts">Carregando...</li>
-                                <li v-for="account in mlAccounts" :key="account.user_id"
-                                    @click="applyAccountFilter(account.user_id)">
-                                    <span :class="{ 'font-bold': selectedAccountFilterId === account.user_id }">{{
-                                        account.nickname }}</span>
+                                <li v-for="account in accountFilterOptions" :key="account.value"
+                                    @click="applyAccountFilter(account.value)">
+                                    <span :class="{ 'font-bold': String(selectedAccountFilterId) === account.value }">{{
+                                        account.label }}</span>
+                                    <small class="filter-popover__count">{{ account.count }}</small>
+                                </li>
+                                <li v-if="!accountFilterOptions.length" class="filter-popover__empty">
+                                    Nenhuma conta com venda neste filtro.
                                 </li>
                             </ul>
                         </div>
@@ -158,8 +166,8 @@
                         <label for="conta-ml-filter">Conta ML</label>
                         <select id="conta-ml-filter" v-model="filters.accountId" :disabled="isLoadingAccounts">
                             <option :value="null">Todas as Contas</option>
-                            <option v-for="account in mlAccounts" :key="account.user_id" :value="account.user_id">
-                                {{ account.nickname }}
+                            <option v-for="account in accountFilterOptions" :key="account.value" :value="account.value">
+                                {{ account.label }} ({{ account.count }})
                             </option>
                         </select>
                     </div>
@@ -774,91 +782,110 @@ const selectedAccountNickname = computed(() => {
 });
 
 const filteredUserSales = computed(() => {
-    let tempSales = sales.value;
+    return applySaleFilters(saleFilterPredicates.value);
+});
+
+const saleOf = (sale) => sale?.raw_api_data?.status || sale?.sale_status || null;
+const limitOf = (sale) => sale?.raw_api_data?.sla_data?.expected_date || sale?.shipping_limit_date;
+
+/**
+ * Filtros ativos como predicados nomeados.
+ *
+ * Nomear cada um permite montar as opções de um filtro sobre as vendas que
+ * passam por TODOS OS OUTROS. Antes as listas vinham de tudo que havia sido
+ * carregado, então ofereciam valor que, junto com o filtro em uso, não trazia
+ * nenhuma venda.
+ */
+const saleFilterPredicates = computed(() => {
+    const predicates = [];
+    const add = (field, test) => predicates.push({ field, test });
 
     if (selectedStatusFilter.value) {
-        tempSales = tempSales.filter(s => s.shipping_status === selectedStatusFilter.value);
+        add('shippingStatusQuick', (s) => s.shipping_status === selectedStatusFilter.value);
     }
-
     if (selectedSaleStatusFilter.value) {
-        tempSales = tempSales.filter(s => {
-            const saleStatus = s?.raw_api_data?.status || s?.sale_status || null;
-            return saleStatus === selectedSaleStatusFilter.value;
-        });
+        add('saleStatusQuick', (s) => saleOf(s) === selectedSaleStatusFilter.value);
     }
-
     // Filtro de PROCESSADO / NÃO PROCESSADO (abatimento de estoque).
     if (selectedProcessedFilter.value === 'yes') {
-        tempSales = tempSales.filter(s => !!s.processed_at);
+        add('processed', (s) => !!s.processed_at);
     } else if (selectedProcessedFilter.value === 'no') {
-        tempSales = tempSales.filter(s => !s.processed_at);
+        add('processed', (s) => !s.processed_at);
     }
-
     if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase();
-        tempSales = tempSales.filter(s =>
+        add('search', (s) =>
             (s.product_title?.toLowerCase().includes(query)) ||
             (s.sku_descricao?.toLowerCase().includes(query)) ||
             (s.sku?.toLowerCase().includes(query)) ||
             (s.account_nickname?.toLowerCase().includes(query))
         );
     }
-
     if (selectedAccountFilterId.value) {
-        const sel = normalizeId(selectedAccountFilterId.value);
-        tempSales = tempSales.filter(s => normalizeId(getSaleAccountId(s)) === sel);
+        const selected = normalizeId(selectedAccountFilterId.value);
+        add('account', (s) => normalizeId(getSaleAccountId(s)) === selected);
     }
-
     if (filters.saleDateStart) {
         const start = parseFlexibleDate(filters.saleDateStart);
-        tempSales = tempSales.filter(s => {
+        add('saleDate', (s) => {
             const saleDate = parseFlexibleDate(s.sale_date);
-            return saleDate && start && saleDate >= start;
+            return Boolean(saleDate && start && saleDate >= start);
         });
     }
     if (filters.saleDateEnd) {
         const end = parseFlexibleDate(filters.saleDateEnd, { endOfDay: true });
-        tempSales = tempSales.filter(s => {
+        add('saleDate', (s) => {
             const saleDate = parseFlexibleDate(s.sale_date);
-            return saleDate && end && saleDate <= end;
+            return Boolean(saleDate && end && saleDate <= end);
         });
     }
-
     if (filters.shippingLimitStart) {
         const start = parseFlexibleDate(filters.shippingLimitStart);
-        tempSales = tempSales.filter(s => {
-            const raw = s.raw_api_data?.sla_data?.expected_date || s.shipping_limit_date;
-            const limitDate = parseFlexibleDate(raw);
-            return limitDate && start && limitDate >= start;
+        add('shippingLimit', (s) => {
+            const limitDate = parseFlexibleDate(limitOf(s));
+            return Boolean(limitDate && start && limitDate >= start);
         });
     }
     if (filters.shippingLimitEnd) {
         const end = parseFlexibleDate(filters.shippingLimitEnd, { endOfDay: true });
-        tempSales = tempSales.filter(s => {
-            const raw = s.raw_api_data?.sla_data?.expected_date || s.shipping_limit_date;
-            const limitDate = parseFlexibleDate(raw);
-            return limitDate && end && limitDate <= end;
+        add('shippingLimit', (s) => {
+            const limitDate = parseFlexibleDate(limitOf(s));
+            return Boolean(limitDate && end && limitDate <= end);
         });
     }
-
-    // Novos filtros avançados
     if (filters.saleStatus) {
-        tempSales = tempSales.filter(s => {
-            const saleStatus = s?.raw_api_data?.status || s?.sale_status || null;
-            return saleStatus === filters.saleStatus;
-        });
+        add('saleStatus', (s) => saleOf(s) === filters.saleStatus);
     }
-
     if (filters.shippingType) {
-        tempSales = tempSales.filter(s => s?.shipping_mode === filters.shippingType);
+        add('shippingType', (s) => s?.shipping_mode === filters.shippingType);
     }
-
     if (filters.shippingStatus) {
-        tempSales = tempSales.filter(s => s.shipping_status === filters.shippingStatus);
+        add('shippingStatus', (s) => s.shipping_status === filters.shippingStatus);
     }
 
-    return tempSales;
+    return predicates;
 });
+
+const applySaleFilters = (predicates) =>
+    (sales.value || []).filter((sale) => predicates.every((predicate) => predicate.test(sale)));
+
+/** Vendas que passam por todos os filtros, menos os campos informados. */
+const rowsExcept = (...fields) =>
+    applySaleFilters(saleFilterPredicates.value.filter((p) => !fields.includes(p.field)));
+
+/** Opções a partir das vendas restantes, com a contagem de cada valor. */
+const optionsFrom = (rows, pick, label) => {
+    const totals = new Map();
+    for (const sale of rows) {
+        const value = pick(sale);
+        if (value === null || value === undefined || value === '') continue;
+        const key = String(value);
+        totals.set(key, (totals.get(key) || 0) + 1);
+    }
+    return [...totals.entries()]
+        .map(([value, count]) => ({ value, label: label(value), count }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+};
 
 const salesTotalPages = computed(() => Math.ceil(filteredUserSales.value.length / salesItemsPerPage.value) || 1);
 const paginatedUserSales = computed(() => {
@@ -1458,28 +1485,33 @@ function getRecommendation(scenario) {
 
 
 
-// Opções de Status da Venda (API) e mapeador de rótulos
-const saleStatusOptions = computed(() => {
-    const set = new Set();
-    (sales.value || []).forEach(s => {
-        const v = s?.raw_api_data?.status || s?.sale_status || null;
-        if (v) set.add(String(v));
-    });
-    return Array.from(set)
-        .map(value => ({ value, label: getSaleStatusLabel(value) }))
-        .sort((a, b) => a.label.localeCompare(b.label));
-});
+/* Opções cruzadas: cada lista nasce das vendas que passam pelos outros filtros,
+ * então nenhuma escolha leva a "nenhuma venda encontrada". */
+const saleStatusOptions = computed(() =>
+    optionsFrom(rowsExcept('saleStatusQuick', 'saleStatus'), saleOf, getSaleStatusLabel)
+);
 
-// Opções de Tipos de Expedição
-const shippingTypeOptions = computed(() => {
-    const set = new Set();
-    (sales.value || []).forEach(s => {
-        const v = s?.shipping_mode || null;
-        if (v) set.add(String(v));
-    });
-    return Array.from(set)
-        .map(value => ({ value, label: getShippingTypeLabel(value) }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+const shippingTypeOptions = computed(() =>
+    optionsFrom(rowsExcept('shippingType'), (s) => s?.shipping_mode, getShippingTypeLabel)
+);
+
+const shippingStatusOptions = computed(() =>
+    optionsFrom(
+        rowsExcept('shippingStatusQuick', 'shippingStatus'),
+        (s) => s?.shipping_status,
+        getStatusLabel
+    )
+);
+
+/** Contas com venda no recorte atual, rotuladas pelo apelido da própria venda. */
+const accountFilterOptions = computed(() => {
+    const rows = rowsExcept('account');
+    const labels = new Map();
+    for (const sale of rows) {
+        const id = normalizeId(getSaleAccountId(sale));
+        if (id && !labels.has(id)) labels.set(id, sale.account_nickname || id);
+    }
+    return optionsFrom(rows, (s) => normalizeId(getSaleAccountId(s)), (value) => labels.get(value) || value);
 });
 
 function getSaleStatusLabel(statusValue) {
@@ -2346,6 +2378,23 @@ onUnmounted(() => {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Quantidade por opção: mostra o que cada filtro traria antes de clicar. */
+.filter-popover__count {
+    margin-left: auto;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.filter-popover__empty {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    cursor: default;
 }
 
 .filter-popover-list {
