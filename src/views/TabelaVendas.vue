@@ -521,12 +521,30 @@
                                                 Pend
                                             </span>
 
-                                            <button v-if="getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
+                                            <!-- Shopee: a etiqueta é gerada pela própria Shopee, então o
+                                                 botão só dispara o pedido e a mensagem vem de lá (por
+                                                 exemplo, nota fiscal ainda não emitida). -->
+                                            <template v-if="isShopeeSale(sale)">
+                                                <button @click="handleShopeeLabel(sale, 'pdf')" class="btn-label pdf"
+                                                        :disabled="shopeeLabelBusy === shopeeLabelKey(sale)"
+                                                        title="Etiqueta Shopee (A4)">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                                    {{ shopeeLabelBusy === shopeeLabelKey(sale) ? 'Gerando...' : 'PDF' }}
+                                                </button>
+                                                <button @click="handleShopeeLabel(sale, 'thermal')" class="btn-label zpl"
+                                                        :disabled="shopeeLabelBusy === shopeeLabelKey(sale)"
+                                                        title="Etiqueta Shopee (térmica)">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
+                                                    Térmica
+                                                </button>
+                                            </template>
+
+                                            <button v-if="!isShopeeSale(sale) && getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                                                 PDF
                                             </button>
 
-                                            <button v-if="getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
+                                            <button v-if="!isShopeeSale(sale) && getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
                                                 ZPL
                                             </button>
@@ -840,7 +858,7 @@ function showToast(message, type = 'info') {
 // ===== END UTILITY FUNCTIONS =====
 
 const {
-    user, userRole, isAuthReady,
+    user, userRole, isAuthReady, token,
     mlAccounts, fetchMercadoLivreAccounts,
     shopeeAccounts, fetchShopeeAccounts,
 } = useAuth();
@@ -925,6 +943,72 @@ function isLate(dateString) {
 
 function getLabelInfo(sale) {
     return composableLabelInfo(sale);
+}
+
+/* ----------------------------- Etiqueta Shopee -----------------------------
+ *
+ * O Mercado Livre entrega a etiqueta direto; a Shopee exige gerar o documento,
+ * esperar ficar pronto e só então baixar. Todo esse encadeamento fica no
+ * backend, então aqui só disparamos e mostramos o que a Shopee respondeu — em
+ * especial quando a nota fiscal ainda não saiu, que é o bloqueio mais comum.
+ */
+const shopeeLabelBusy = ref(null);
+
+const isShopeeSale = (sale) => saleMarketplace(sale) === 'Shopee';
+const shopeeLabelKey = (sale) => `${sale?.id}-${sale?.sku}`;
+
+async function handleShopeeLabel(sale, type = 'pdf') {
+    const key = shopeeLabelKey(sale);
+    if (shopeeLabelBusy.value) return;
+
+    const orderSn = sale?.id;
+    const shopId = sale?.seller_id ?? sale?.account_id;
+    if (!orderSn || !shopId) {
+        notify.error('Este pedido não tem identificação da loja Shopee para gerar etiqueta.');
+        return;
+    }
+
+    shopeeLabelBusy.value = key;
+    try {
+        // Checa antes: assim o operador recebe o motivo em vez de um download vazio.
+        const info = await api.get(
+            `/shopee/label-info?orderSn=${encodeURIComponent(orderSn)}&shopId=${encodeURIComponent(shopId)}&type=${type}`
+        );
+        if (info && info.canPrint === false) {
+            if (info.requiresInvoice) notify.warning(info.reason);
+            else notify.error(info.reason || 'A Shopee não liberou a etiqueta deste pedido.');
+            return;
+        }
+
+        const params = new URLSearchParams({ orderSn: String(orderSn), shopId: String(shopId), type });
+        const response = await fetch(`${API_BASE_URL}/shopee/download-label?${params.toString()}`, {
+            headers: { Authorization: `Bearer ${token.value}` },
+        });
+
+        if (!response.ok) {
+            let detail = null;
+            try { detail = await response.json(); } catch { /* resposta sem JSON */ }
+            const message = detail?.error || 'Não foi possível gerar a etiqueta na Shopee.';
+            if (detail?.requiresInvoice) notify.warning(message);
+            else notify.error(message);
+            return;
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `shopee-${type === 'thermal' ? 'termica' : 'etiqueta'}-${orderSn}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        notify.success('Etiqueta Shopee gerada.');
+    } catch (error) {
+        notify.error(error?.data?.error || error?.message || 'Falha ao gerar a etiqueta Shopee.');
+    } finally {
+        shopeeLabelBusy.value = null;
+    }
 }
 
 async function handleDownloadLabel(shipmentId, sellerId, type) {
