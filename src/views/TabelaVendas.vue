@@ -91,6 +91,10 @@
                                             <svg v-if="selectedStatuses.includes(status.value)" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                                         </span>
                                         {{ status.label }}
+                                        <small class="filter-dropdown__count">{{ status.count }}</small>
+                                    </li>
+                                    <li v-if="!statusOptions.length" class="filter-dropdown__empty">
+                                        Nenhum status com venda neste filtro.
                                     </li>
                                 </ul>
                             </div>
@@ -125,7 +129,7 @@
                                         </span>
                                         Todos os Canais
                                     </li>
-                                    <li v-for="mk in marketplaceOptions" :key="mk.value"
+                                    <li v-for="mk in marketplaceFilterOptions" :key="mk.value"
                                         :class="{ 'is-checked': selectedMarketplaces.includes(mk.value) }"
                                         @click="toggleInList(selectedMarketplaces, mk.value)">
                                         <span class="checkbox" :class="{ 'is-checked': selectedMarketplaces.includes(mk.value) }">
@@ -133,6 +137,10 @@
                                         </span>
                                         <img :src="mk.logo" alt="" class="filter-dropdown__logo" />
                                         {{ mk.label }}
+                                        <small class="filter-dropdown__count">{{ mk.count }}</small>
+                                    </li>
+                                    <li v-if="!marketplaceFilterOptions.length" class="filter-dropdown__empty">
+                                        Nenhum canal com venda neste filtro.
                                     </li>
                                 </ul>
                             </div>
@@ -163,7 +171,7 @@
                                         </span>
                                         Todas as Contas
                                     </li>
-                                    <li v-for="account in allAccountOptions" :key="account.key"
+                                    <li v-for="account in accountFilterOptions" :key="account.key"
                                         :class="{ 'is-checked': selectedAccountIds.includes(account.value) }"
                                         @click="toggleInList(selectedAccountIds, account.value)">
                                         <span class="checkbox" :class="{ 'is-checked': selectedAccountIds.includes(account.value) }">
@@ -172,6 +180,10 @@
                                         <img :src="account.logo" alt="" class="filter-dropdown__logo" />
                                         {{ account.label }}
                                         <small style="color:#6b7280">({{ account.id }})</small>
+                                        <small class="filter-dropdown__count">{{ account.count }}</small>
+                                    </li>
+                                    <li v-if="!accountFilterOptions.length" class="filter-dropdown__empty">
+                                        Nenhuma conta com venda neste filtro.
                                     </li>
                                 </ul>
                             </div>
@@ -204,13 +216,17 @@
                                         </span>
                                         Todos os Modos
                                     </li>
-                                    <li v-for="mode in availableShippingModes" :key="mode"
-                                        :class="{ 'is-checked': selectedShippingModes.includes(mode) }"
-                                        @click="toggleInList(selectedShippingModes, mode)">
-                                        <span class="checkbox" :class="{ 'is-checked': selectedShippingModes.includes(mode) }">
-                                            <svg v-if="selectedShippingModes.includes(mode)" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                    <li v-for="mode in availableShippingModes" :key="mode.value"
+                                        :class="{ 'is-checked': selectedShippingModes.includes(mode.value) }"
+                                        @click="toggleInList(selectedShippingModes, mode.value)">
+                                        <span class="checkbox" :class="{ 'is-checked': selectedShippingModes.includes(mode.value) }">
+                                            <svg v-if="selectedShippingModes.includes(mode.value)" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                                         </span>
-                                        {{ mode }}
+                                        {{ mode.value }}
+                                        <small class="filter-dropdown__count">{{ mode.count }}</small>
+                                    </li>
+                                    <li v-if="!availableShippingModes.length" class="filter-dropdown__empty">
+                                        Nenhuma modalidade com venda neste filtro.
                                     </li>
                                 </ul>
                             </div>
@@ -662,6 +678,7 @@ import ToastNotification from '../components/ToastNotification.vue';
 import gsap from 'gsap';
 import { useAuth } from '@/composables/useAuth';
 import { useSales } from '@/composables/useSales';
+import { useSalesFilterFacets } from '@/composables/useSalesFilterFacets';
 import { useStatusesForUser } from '@/composables/useStatusesForUser';
 import { useSyncManager } from '@/composables/useSyncManager';
 import { useShopeeSyncManager } from '@/composables/useShopeeSyncManager';
@@ -837,6 +854,12 @@ const formattedTotalSales = computed(() =>
 const formattedTotalPages = computed(() =>
     `${totalPages.value}${totalIsExact.value ? '' : '+'}`
 );
+/* Filtro inteligente: as opções de cada dropdown vêm do backend já cruzadas
+ * entre si. Cada faceta aplica todos os outros filtros ativos e ignora apenas
+ * o próprio campo, então a lista só oferece valor que realmente tem venda no
+ * recorte atual — nunca uma combinação que devolveria a tabela vazia. */
+const { facets, fetchFacets, cancelFacets, pruneSelection } = useSalesFilterFacets();
+
 const userUid = computed(() => user.value?.uid);
 const { allStatuses: customStatuses } = useStatusesForUser(userUid);
 const { syncState, liveAccounts, syncAccountsBatch } = useSyncManager();
@@ -1162,44 +1185,79 @@ const shippingModeFilterSummary = computed(() => {
     return `${list.length} modos`;
 });
 
-// --- INÍCIO DAS ALTERAÇÕES ---
+// Rótulo amigável de um status. Vem da configuração do usuário, não das opções
+// do filtro: a linha da tabela precisa do nome correto mesmo quando o valor não
+// está entre as opções oferecidas no momento.
+const statusLabelMap = computed(() => {
+    const map = new Map();
+    (customStatuses.value || []).forEach((s) => {
+        if (s.value) map.set(String(s.value).toLowerCase(), s.label);
+    });
+    if (!map.has('cancelled')) map.set('cancelled', 'Cancelado');
+    return map;
+});
 
-// 1. Cria um status unificado para cada venda, priorizando 'cancelled' da API.
-// 2. Cria uma lista de opções de status para o filtro, garantindo que 'Cancelado' esteja sempre presente.
+const getStatusLabel = (statusValue) => {
+    if (!statusValue) return 'Pendente';
+    const key = String(statusValue).toLowerCase();
+    return statusLabelMap.value.get(key)
+        || (String(statusValue).charAt(0).toUpperCase() + String(statusValue).slice(1).replace(/_/g, ' '));
+};
+
+/**
+ * Status oferecidos no filtro: só os que têm venda no recorte atual.
+ *
+ * Antes a lista juntava todos os status configurados com os vistos na página,
+ * então oferecia opção que devolvia tabela vazia. "Cancelado" continua na
+ * lista, mas vem da faceta de status do PEDIDO, porque cancelamento não é um
+ * estado de expedição.
+ */
 const statusOptions = computed(() => {
     const options = new Map();
 
-    // Adiciona os status customizados do usuário
-    (customStatuses.value || []).forEach(s => {
-        if (s.value) options.set(s.value, s.label);
+    (facets.value.shippingStatuses || []).forEach((facet) => {
+        const key = String(facet.value).toLowerCase();
+        options.set(key, { value: facet.value, label: getStatusLabel(facet.value), count: facet.count });
     });
 
-    // Garante que o status 'cancelled' exista na lista
-    if (!options.has('cancelled')) {
-        options.set('cancelled', 'Cancelado');
+    const cancelled = (facets.value.saleStatuses || [])
+        .find((facet) => String(facet.value).toLowerCase() === 'cancelled');
+    if (cancelled) {
+        const previous = options.get('cancelled');
+        options.set('cancelled', {
+            value: 'cancelled',
+            label: getStatusLabel('cancelled'),
+            count: Math.max(cancelled.count || 0, previous?.count || 0),
+        });
     }
 
-    // Adiciona dinamicamente outros status encontrados nos dados atuais
-    (sales.value || []).forEach(sale => {
-        const unified = sale.raw_api_data?.status === 'cancelled' ? 'cancelled' : (sale.shipping_status || 'pendente');
-        if (unified && !options.has(unified)) {
-            const label = unified.charAt(0).toUpperCase() + unified.slice(1).replace(/_/g, ' ');
-            options.set(unified, label);
-        }
-    });
-
-    // Retorna a lista de opções ordenada alfabeticamente
-    return Array.from(options, ([value, label]) => ({ value, label }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+    return [...options.values()].sort((a, b) => a.label.localeCompare(b.label));
 });
 
-// 3. Atualiza a função que obtém o rótulo do status para usar a nova lista de opções.
-const getStatusLabel = (statusValue) => {
-    if (!statusValue) return 'Pendente';
-    const option = statusOptions.value.find(opt => opt.value === statusValue);
-    // Retorna o rótulo encontrado ou formata o valor do status como fallback
-    return option?.label || (String(statusValue).charAt(0).toUpperCase() + String(statusValue).slice(1).replace(/_/g, ' '));
-};
+/** Contas oferecidas no filtro: apenas as que têm venda no recorte atual. */
+const accountFilterOptions = computed(() => {
+    const connected = new Map(allAccountOptions.value.map((account) => [account.value, account]));
+    return (facets.value.accounts || []).map((facet) => {
+        const value = String(facet.value);
+        const known = connected.get(value);
+        return {
+            key: `facet-${value}`,
+            id: known?.id ?? (value.includes(':') ? value.split(':')[1] : value),
+            value,
+            label: known?.label || facet.label || value,
+            logo: MK_LOGOS[facet.marketplace] || known?.logo || MK_LOGOS.ML,
+            count: facet.count,
+        };
+    });
+});
+
+/** Canais oferecidos no filtro: apenas os que têm venda no recorte atual. */
+const marketplaceFilterOptions = computed(() => {
+    const counts = new Map((facets.value.marketplaces || []).map((facet) => [String(facet.value), facet.count]));
+    return marketplaceOptions
+        .filter((option) => counts.has(option.value))
+        .map((option) => ({ ...option, count: counts.get(option.value) }));
+});
 
 const statusFilterSummary = computed(() => {
     const list = selectedStatuses.value;
@@ -1294,21 +1352,42 @@ const activeFilterChips = computed(() => {
     return chips;
 });
 
-// As opções vêm das vendas carregadas, mas a listagem é filtrada no servidor:
-// se derivássemos apenas da página atual, marcar um modo faria os outros
-// desaparecerem do dropdown. Por isso os modos já vistos são acumulados.
-const knownShippingModes = ref([]);
-watch(sales, (list) => {
-    const set = new Set(knownShippingModes.value);
-    (list || []).forEach((s) => { if (s.shipping_mode) set.add(s.shipping_mode); });
-    if (set.size !== knownShippingModes.value.length) {
-        knownShippingModes.value = [...set].sort();
-    }
-}, { immediate: true });
+/**
+ * Modalidades oferecidas no filtro: apenas as que têm venda no recorte atual.
+ *
+ * Antes as opções eram acumuladas das páginas já vistas, o que mantinha na
+ * lista modalidade de um canal que nem estava selecionado — escolhê-la
+ * devolvia tabela vazia. A faceta ignora só a própria modalidade, então a
+ * seleção múltipla continua funcionando.
+ */
+const availableShippingModes = computed(() =>
+    (facets.value.shippingModes || []).map((facet) => ({ value: facet.value, count: facet.count }))
+);
 
-const availableShippingModes = computed(() => {
-    const set = new Set([...knownShippingModes.value, ...selectedShippingModes.value]);
-    return [...set].sort();
+/* Quando um filtro ativo deixa de existir nas opções (por exemplo, a
+ * modalidade do Mercado Livre depois de escolher apenas uma loja Shopee), ele é
+ * descartado em vez de deixar a tela presa num filtro sem resultado.
+ * pruneSelection devolve a mesma referência quando nada muda, o que evita laço
+ * reativo. */
+watch(statusOptions, (options) => {
+    // Comparação sem caixa: o status configurado pelo usuário e o gravado na
+    // venda podem divergir em maiúsculas/minúsculas, e a listagem casa os dois.
+    if (!selectedStatuses.value.length || !options.length) return;
+    const allowed = new Set(options.map((option) => String(option.value).toLowerCase()));
+    const kept = selectedStatuses.value.filter((value) => allowed.has(String(value).toLowerCase()));
+    if (kept.length !== selectedStatuses.value.length) selectedStatuses.value = kept;
+});
+watch(accountFilterOptions, (options) => {
+    const kept = pruneSelection(selectedAccountIds.value, options);
+    if (kept !== selectedAccountIds.value) selectedAccountIds.value = kept;
+});
+watch(marketplaceFilterOptions, (options) => {
+    const kept = pruneSelection(selectedMarketplaces.value, options);
+    if (kept !== selectedMarketplaces.value) selectedMarketplaces.value = kept;
+});
+watch(availableShippingModes, (options) => {
+    const kept = pruneSelection(selectedShippingModes.value, options);
+    if (kept !== selectedShippingModes.value) selectedShippingModes.value = kept;
 });
 
 const handleUnifiedSync = async () => {
@@ -1530,6 +1609,27 @@ const triggerServerFetch = (resetPage = false) => {
     return fetchSales(params);
 };
 
+/**
+ * Mesmo recorte enviado à listagem, com os nomes que /filter-facets espera.
+ * As opções precisam nascer do filtro atual; senão voltam a oferecer valor que
+ * a tabela não traria. A paginação fica de fora porque não muda as opções.
+ */
+const buildFacetParams = () => {
+    const params = {};
+    if (searchQuery.value) params.search = searchQuery.value;
+    if (selectedStatuses.value.length) params.shippingStatus = selectedStatuses.value.join(',');
+    if (selectedAccountIds.value.length) params.account = selectedAccountIds.value.join(',');
+    if (selectedMarketplaces.value.length) params.marketplace = selectedMarketplaces.value.join(',');
+    if (selectedShippingModes.value.length) params.shippingMode = selectedShippingModes.value.join(',');
+    if (filters.saleDateStart) params.from = toLocalDateInputValue(filters.saleDateStart);
+    if (filters.saleDateEnd) params.to = toLocalDateInputValue(filters.saleDateEnd);
+    if (filters.shippingLimitStart) params.shipFrom = toLocalDateInputValue(filters.shippingLimitStart);
+    if (filters.shippingLimitEnd) params.shipTo = toLocalDateInputValue(filters.shippingLimitEnd);
+    return params;
+};
+
+const refreshFacets = () => fetchFacets(buildFacetParams());
+
 // Um único debounce cobre busca, chips e datas. O Vue agrupa mutações do mesmo
 // clique e o AbortController de useSales cancela qualquer resposta superada.
 let filtersFetchTimeout;
@@ -1537,7 +1637,11 @@ watch(
     [searchQuery, selectedStatuses, selectedAccountIds, selectedMarketplaces, selectedShippingModes, filters],
     () => {
         clearTimeout(filtersFetchTimeout);
-        filtersFetchTimeout = setTimeout(() => triggerServerFetch(true), 280);
+        filtersFetchTimeout = setTimeout(() => {
+            triggerServerFetch(true);
+            // Linhas e opções saem do mesmo recorte, então andam juntas.
+            refreshFacets();
+        }, 280);
     },
     { deep: true }
 );
@@ -1572,10 +1676,12 @@ onMounted(async () => {
 
     if (isAuthReady.value && user.value) {
         triggerServerFetch(false);
+        refreshFacets();
     }
     watch(isAuthReady, async (ready) => {
         if (ready && user.value) {
             triggerServerFetch(false);
+            refreshFacets();
         }
     });
     document.addEventListener('click', closeDropdownOnClickOutside);
@@ -1592,11 +1698,17 @@ onActivated(() => {
         vendasActivated = true;
         return;
     }
-    if (isAuthReady.value && user.value) triggerServerFetch(false);
+    if (isAuthReady.value && user.value) {
+        triggerServerFetch(false);
+        // Vendas novas (ou processadas em outra tela) mudam o que cada filtro
+        // deve oferecer, então as opções são relidas junto com a lista.
+        refreshFacets();
+    }
 });
 
 onUnmounted(() => {
     clearTimeout(filtersFetchTimeout);
+    cancelFacets();
     document.removeEventListener('click', closeDropdownOnClickOutside);
 });
 
@@ -2061,6 +2173,25 @@ function hideTooltip() {
 .filter-dropdown__clear:hover { text-decoration: underline; }
 
 .filter-dropdown__all { border-bottom: 1px solid #f1f5f9; }
+
+/* Quantidade de vendas por opção: deixa explícito o que cada filtro traria. */
+.filter-dropdown__count {
+    margin-left: auto;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.filter-dropdown li.is-checked .filter-dropdown__count { background: #dbeafe; color: #1d4ed8; }
+.filter-dropdown__empty {
+    color: #94a3b8;
+    font-size: 0.78rem;
+    cursor: default;
+}
+.filter-dropdown__empty:hover { background-color: transparent; }
 
 .filter-dropdown .checkbox {
     display: inline-grid;

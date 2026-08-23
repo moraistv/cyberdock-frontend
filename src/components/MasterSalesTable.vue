@@ -43,9 +43,13 @@
                                 <li @click="selectedMarketplaces = []">
                                     <span :class="{'font-bold': !selectedMarketplaces.length}">Todos os Canais</span>
                                 </li>
-                                <li v-for="mk in marketplaceOptions" :key="mk.value" @click="toggleMarketplace(mk.value)">
+                                <li v-for="mk in marketplaceFilterOptions" :key="mk.value" @click="toggleMarketplace(mk.value)">
                                     <img :src="mk.logo" alt="" class="filter-popover__logo" />
                                     <span :class="{'font-bold': selectedMarketplaces.includes(mk.value)}">{{ mk.label }}</span>
+                                    <small class="filter-popover__count">{{ mk.count }}</small>
+                                </li>
+                                <li v-if="!marketplaceFilterOptions.length" class="filter-popover__empty">
+                                    Nenhum canal com venda neste filtro.
                                 </li>
                             </ul>
                         </div>
@@ -66,6 +70,10 @@
                                 </li>
                                 <li v-for="status in saleStatusOptions" :key="status.value" @click="applySaleStatusFilter(status.value)">
                                      <span :class="{'font-bold': selectedSaleStatusFilter === status.value}">{{ status.label }}</span>
+                                     <small class="filter-popover__count">{{ status.count }}</small>
+                                </li>
+                                <li v-if="!saleStatusOptions.length" class="filter-popover__empty">
+                                    Nenhum status com venda neste filtro.
                                 </li>
                             </ul>
                         </div>
@@ -84,8 +92,12 @@
                                 <li @click="applyStatusFilter(null)">
                                     <span :class="{'font-bold': !selectedStatusFilter}">Todos</span>
                                 </li>
-                                <li v-for="status in systemStatuses" :key="status.value" @click="applyStatusFilter(status.value)">
+                                <li v-for="status in shippingStatusOptions" :key="status.value" @click="applyStatusFilter(status.value)">
                                     <span :class="{'font-bold': selectedStatusFilter === status.value}">{{ status.label }}</span>
+                                    <small class="filter-popover__count">{{ status.count }}</small>
+                                </li>
+                                <li v-if="!shippingStatusOptions.length" class="filter-popover__empty">
+                                    Nenhuma expedição com venda neste filtro.
                                 </li>
                             </ul>
                         </div>
@@ -111,7 +123,7 @@
                     <!-- Filtro de Conta -->
                     <div class="filter-container" ref="accountFilterContainerRef">
                         <button @click="isAccountDropdownOpen = !isAccountDropdownOpen" :class="['btn', 'btn-outline', { 'btn-outline--active': selectedAccountFilter }]">
-                            <span class="truncate pr-2">{{ selectedAccountFilter ? `Conta: ${selectedAccountFilter}` : 'Conta' }}</span>
+                            <span class="truncate pr-2">{{ selectedAccountFilter ? `Conta: ${selectedAccountLabel}` : 'Conta' }}</span>
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0 opacity-50">
                                 <path d="m6 9 6 6 6-6"></path>
                             </svg>
@@ -124,9 +136,13 @@
                                 <li @click="applyAccountFilter(null)">
                                     <span :class="{'font-bold': !selectedAccountFilter}">Todas</span>
                                 </li>
-                                <li v-for="acc in filteredAccountOptions" :key="acc" @click="applyAccountFilter(acc)">
-                                    <img v-if="accountLogoByLabel.get(acc)" :src="accountLogoByLabel.get(acc)" alt="" class="filter-popover__logo" />
-                                    <span :class="{'font-bold': selectedAccountFilter === acc}">{{ acc }}</span>
+                                <li v-for="acc in accountFilterOptions" :key="acc.value" @click="applyAccountFilter(acc.value)">
+                                    <img v-if="acc.logo" :src="acc.logo" alt="" class="filter-popover__logo" />
+                                    <span :class="{'font-bold': selectedAccountFilter === acc.value}">{{ acc.label }}</span>
+                                    <small class="filter-popover__count">{{ acc.count }}</small>
+                                </li>
+                                <li v-if="!accountFilterOptions.length" class="filter-popover__empty">
+                                    Nenhuma conta com venda neste filtro.
                                 </li>
                             </ul>
                         </div>
@@ -148,8 +164,12 @@
                                 <li @click="applyUserFilter(null)">
                                     <span :class="{'font-bold': !selectedUserFilter}">Todos</span>
                                 </li>
-                                <li v-for="usr in filteredUserOptions" :key="usr" @click="applyUserFilter(usr)">
-                                    <span :class="{'font-bold': selectedUserFilter === usr}">{{ usr }}</span>
+                                <li v-for="usr in filteredUserOptions" :key="usr.value" @click="applyUserFilter(usr.value)">
+                                    <span :class="{'font-bold': selectedUserFilter === usr.value}">{{ usr.label }}</span>
+                                    <small class="filter-popover__count">{{ usr.count }}</small>
+                                </li>
+                                <li v-if="!filteredUserOptions.length" class="filter-popover__empty">
+                                    Nenhum cliente com venda neste filtro.
                                 </li>
                             </ul>
                         </div>
@@ -196,8 +216,11 @@
                             <button v-for="opt in shippingModeOptions" :key="opt.value"
                                 @click="toggleShippingMode(opt.value)"
                                 :class="['quick-btn', { 'quick-btn--active': selectedShippingModes.includes(opt.value) }]">
-                                {{ opt.label }}
+                                {{ opt.label }} <small class="quick-btn__count">{{ opt.count }}</small>
                             </button>
+                            <span v-if="!shippingModeOptions.length" class="filter-empty-hint">
+                                Nenhuma modalidade com venda neste filtro.
+                            </span>
                         </div>
                     </div>
 
@@ -515,6 +538,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, reactive, defineExpose } from 'vue';
 import { useMasterSales } from '@/composables/useMasterSales';
+import { useSalesFilterFacets } from '@/composables/useSalesFilterFacets';
 import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
 import { API_BASE_URL } from '@/config';
@@ -631,8 +655,15 @@ function showToast(message, type = 'info') {
 const {
     sales, isLoading, error, totalSales, totalIsExact, hasNextPage, currentPage, totalPages,
     fetchSales, processSales: processSalesApi,
-    globalAccountOptions, globalAccountsDetailed, globalUserOptions, fetchFilterOptions
+    globalAccountOptions, fetchFilterOptions
 } = useMasterSales();
+
+/* Filtro inteligente do painel admin: as opções vêm do backend já cruzadas
+ * entre si (`scope=all`), cada faceta ignorando apenas o próprio campo. Antes a
+ * tela oferecia todos os status, todas as contas e todos os clientes do sistema,
+ * mesmo os que não têm venda no recorte — e escolher um deles devolvia lista
+ * vazia. */
+const { facets, fetchFacets, cancelFacets, pruneSelection } = useSalesFilterFacets();
 
 // Logos oficiais dos canais, iguais aos da tela do usuário.
 const MK_LOGOS = {
@@ -682,15 +713,6 @@ const selectedMarketplaceLabel = computed(() => {
 const selectedMarketplaceLogo = computed(() =>
     selectedMarketplaces.value.length === 1 ? MK_LOGOS[selectedMarketplaces.value[0]] : null
 );
-
-/** Logo da conta no dropdown, conforme o canal informado pelo backend. */
-const accountLogoByLabel = computed(() => {
-    const map = new Map();
-    for (const account of globalAccountsDetailed.value || []) {
-        map.set(account.label, MK_LOGOS[account.marketplace] || MK_LOGOS.ML);
-    }
-    return map;
-});
 
 const formattedTotalSales = computed(() =>
     `${Number(totalSales.value || 0).toLocaleString('pt-BR')}${totalIsExact.value ? '' : '+'}`
@@ -989,33 +1011,20 @@ const activeShipDatePreset = ref(null);
 const selectedShippingModes = ref([]);
 // Modalidades reais dos DOIS canais. Antes só havia as do Mercado Livre, então
 // nenhum chip desta linha alcançava uma venda da Shopee.
-const shippingModeOptions = computed(() => {
-    const base = [
-        { value: 'FULL', label: 'FULL' },
-        { value: 'FLEX', label: 'FLEX' },
-        { value: 'Correios', label: 'Correios' },
-        { value: 'Agência', label: 'Agência' },
-        { value: 'Coleta', label: 'Coleta' },
-        { value: 'Envio Padrão', label: 'Envio Padrão' },
-    ];
-    // A modalidade da Shopee é a transportadora do pacote, que varia por loja;
-    // acumular o que já apareceu evita oferecer opção inexistente.
-    const seen = new Set(base.map((o) => o.value));
-    for (const sale of sales.value || []) {
-        const mode = sale.shipping_mode;
-        if (mode && !seen.has(mode)) {
-            seen.add(mode);
-            base.push({ value: mode, label: mode });
-        }
-    }
-    for (const mode of selectedShippingModes.value) {
-        if (!seen.has(mode)) {
-            seen.add(mode);
-            base.push({ value: mode, label: mode });
-        }
-    }
-    return base;
-});
+/**
+ * Modalidades existentes no recorte atual.
+ *
+ * A base era fixa (FULL/FLEX/Correios/Agência/Coleta/Envio Padrão) somada ao que
+ * tinha aparecido na página carregada. Como a modalidade da Shopee é a
+ * transportadora e varia por loja, a lista oferecia chip sem nenhuma venda.
+ */
+const shippingModeOptions = computed(() =>
+    (facets.value.shippingModes || []).map((facet) => ({
+        value: facet.value,
+        label: facet.value,
+        count: facet.count,
+    }))
+);
 
 function toggleShippingMode(mode) {
     const idx = selectedShippingModes.value.indexOf(mode);
@@ -1034,16 +1043,42 @@ const filters = reactive({
     shippingLimitEnd: '',
 });
 
-const filteredAccountOptions = computed(() => {
-    const q = accountSearchText.value.toLowerCase();
-    if (!q) return globalAccountOptions.value;
-    return globalAccountOptions.value.filter(a => a.toLowerCase().includes(q));
+/**
+ * Contas e clientes com venda no recorte atual.
+ *
+ * `/sales/filter-options` devolvia TODAS as contas ativas e TODOS os clientes do
+ * sistema, então era comum escolher um e receber lista vazia. O valor da conta
+ * agora é a chave com canal (ML:123 / Shopee:456), que o backend aceita junto
+ * dos formatos antigos.
+ */
+const accountFilterOptions = computed(() => {
+    const query = accountSearchText.value.trim().toLowerCase();
+    const options = (facets.value.accounts || []).map((facet) => ({
+        value: String(facet.value),
+        label: facet.label || String(facet.value),
+        logo: MK_LOGOS[facet.marketplace] || MK_LOGOS.ML,
+        count: facet.count,
+    }));
+    if (!query) return options;
+    return options.filter((option) => option.label.toLowerCase().includes(query));
+});
+
+const selectedAccountLabel = computed(() => {
+    if (!selectedAccountFilter.value) return '';
+    const found = (facets.value.accounts || [])
+        .find((facet) => String(facet.value) === String(selectedAccountFilter.value));
+    return found?.label || String(selectedAccountFilter.value);
 });
 
 const filteredUserOptions = computed(() => {
-    const q = userSearchText.value.toLowerCase();
-    if (!q) return globalUserOptions.value;
-    return globalUserOptions.value.filter(u => u.toLowerCase().includes(q));
+    const query = userSearchText.value.trim().toLowerCase();
+    const options = (facets.value.users || []).map((facet) => ({
+        value: String(facet.value),
+        label: facet.label || String(facet.value),
+        count: facet.count,
+    }));
+    if (!query) return options;
+    return options.filter((option) => option.label.toLowerCase().includes(query));
 });
 
 function applyAccountFilter(acc) {
@@ -1137,6 +1172,32 @@ function triggerServerFetch(resetPage = true) {
         // A janela é resolvida no backend; data manual preenchida tem precedência.
         window: salesWindow.value,
     });
+    // Opções e linhas saem do mesmo recorte, então são buscadas juntas.
+    refreshFacets();
+}
+
+/**
+ * Mesmo recorte da listagem, com os nomes que /filter-facets espera.
+ * `scope=all` é o que dá ao master a visão global; o backend só aceita esse
+ * escopo de quem tem papel master, e ignora o parâmetro para os demais.
+ */
+function refreshFacets() {
+    return fetchFacets({
+        scope: 'all',
+        search: searchQuery.value || undefined,
+        shippingStatus: selectedStatusFilter.value || undefined,
+        saleStatus: selectedSaleStatusFilter.value || undefined,
+        from: filters.saleDateStart || undefined,
+        to: filters.saleDateEnd || undefined,
+        shipFrom: filters.shippingLimitStart || undefined,
+        shipTo: filters.shippingLimitEnd || undefined,
+        account: selectedAccountFilter.value || undefined,
+        shippingMode: selectedShippingModes.value.length > 0 ? selectedShippingModes.value.join(',') : undefined,
+        userNickname: selectedUserFilter.value || undefined,
+        processed: selectedProcessedFilter.value || undefined,
+        marketplace: selectedMarketplaces.value.length > 0 ? selectedMarketplaces.value.join(',') : undefined,
+        window: salesWindow.value,
+    });
 }
 
 watch(searchQuery, () => {
@@ -1157,14 +1218,65 @@ function goToPage(page) {
     triggerServerFetch(false);
 }
 
-const saleStatusOptions = computed(() => {
-    return [
-        { value: 'paid', label: 'Pago' },
-        { value: 'ready_to_ship', label: 'Pronto para Envio' },
-        { value: 'shipped', label: 'Enviado' },
-        { value: 'delivered', label: 'Entregue' },
-        { value: 'cancelled', label: 'Cancelado' },
-    ];
+/**
+ * Status da venda existentes no recorte atual. A lista era fixa (Pago, Pronto
+ * para Envio, Enviado, Entregue, Cancelado) e oferecia estado sem nenhuma venda.
+ * `sem_status` fica fora porque não é um valor filtrável.
+ */
+const saleStatusOptions = computed(() =>
+    (facets.value.saleStatuses || [])
+        .filter((facet) => facet.value && facet.value !== 'sem_status')
+        .map((facet) => ({
+            value: facet.value,
+            label: getSaleStatusLabel(facet.value),
+            count: facet.count,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+);
+
+/** Status de expedição existentes no recorte atual (antes: todos os configurados). */
+const shippingStatusOptions = computed(() =>
+    (facets.value.shippingStatuses || [])
+        .map((facet) => ({
+            value: facet.value,
+            label: getStatusLabel(facet.value),
+            count: facet.count,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+);
+
+/** Canais com venda no recorte atual. */
+const marketplaceFilterOptions = computed(() => {
+    const counts = new Map((facets.value.marketplaces || []).map((facet) => [String(facet.value), facet.count]));
+    return marketplaceOptions
+        .filter((option) => counts.has(option.value))
+        .map((option) => ({ ...option, count: counts.get(option.value) }));
+});
+
+/* Descarta o filtro que deixou de existir nas opções, para a tela não ficar
+ * presa num recorte sem resultado. A comparação usa a faceta crua, não a lista
+ * já filtrada pela busca do dropdown. */
+function dropIfMissing(selectedRef, options) {
+    if (!selectedRef.value || !options.length) return;
+    if (!options.some((option) => String(option.value) === String(selectedRef.value))) {
+        selectedRef.value = null;
+    }
+}
+
+watch(shippingStatusOptions, (options) => dropIfMissing(selectedStatusFilter, options));
+watch(saleStatusOptions, (options) => dropIfMissing(selectedSaleStatusFilter, options));
+watch(() => facets.value.accounts, (options) => dropIfMissing(selectedAccountFilter, options || []));
+watch(() => facets.value.users, (options) => dropIfMissing(selectedUserFilter, options || []));
+watch(marketplaceFilterOptions, (options) => {
+    const kept = pruneSelection(selectedMarketplaces.value, options);
+    if (kept !== selectedMarketplaces.value) selectedMarketplaces.value = kept;
+});
+watch(shippingModeOptions, (options) => {
+    const kept = pruneSelection(selectedShippingModes.value, options);
+    if (kept !== selectedShippingModes.value) {
+        selectedShippingModes.value = kept;
+        triggerServerFetch(true);
+    }
 });
 
 function isLate(dateString) {
@@ -1334,6 +1446,7 @@ onMounted(() => {
     triggerServerFetch(false);
 });
 onUnmounted(() => {
+    cancelFacets();
     document.removeEventListener('click', handleClickOutside);
     window.removeEventListener('reload-master-sales', reloadSales);
 });
@@ -1993,6 +2106,34 @@ function getThumbUrl(sale) {
     display: flex;
     align-items: center;
 }
+
+/* Quantidade por opção: deixa explícito o que cada filtro traria. */
+.filter-popover__count {
+    margin-left: auto;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.filter-popover__empty {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    cursor: default;
+}
+.filter-popover-list li.filter-popover__empty:hover { background-color: transparent; }
+.quick-btn__count {
+    margin-left: 0.3rem;
+    color: #94a3b8;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.quick-btn--active .quick-btn__count { color: inherit; opacity: 0.75; }
+.filter-empty-hint { color: #94a3b8; font-size: 0.8rem; }
+
 .desc-origin__img {
     width: 14px;
     height: 14px;
