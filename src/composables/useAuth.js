@@ -104,8 +104,24 @@ export function useAuth() {
         const safeTarget = typeof pending === 'string' && /^\/(?!\/)/.test(pending) ? pending : '/dashboard';
         const isShopeeResume = safeTarget.startsWith('/shopee/callback') ||
             (safeTarget.startsWith('/contas') && safeTarget.includes('success='));
+        // A tentativa Shopee passou a viver em localStorage (o retorno pode
+        // abrir outra aba); sessionStorage segue sendo lido para não invalidar
+        // uma conexão iniciada antes desta versão.
+        const readShopeeKey = (key) => {
+            try {
+                return localStorage.getItem(key) || sessionStorage.getItem(key);
+            } catch {
+                return null;
+            }
+        };
+        const forgetShopeeKeys = (...keys) => {
+            for (const key of keys) {
+                try { localStorage.removeItem(key); } catch { /* indisponível */ }
+                try { sessionStorage.removeItem(key); } catch { /* indisponível */ }
+            }
+        };
         const expectedShopeeUid = isShopeeResume
-            ? sessionStorage.getItem('shopeeOAuthExpectedUid')
+            ? readShopeeKey('shopeeOAuthExpectedUid')
             : null;
 
         const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -127,10 +143,9 @@ export function useAuth() {
         await Promise.all([fetchMercadoLivreAccounts(true), fetchShopeeAccounts(true)]);
 
         if (isShopeeResume && safeTarget.startsWith('/contas')) {
-            sessionStorage.removeItem('shopeeOAuthExpectedUid');
+            forgetShopeeKeys('shopeeOAuthExpectedUid');
         } else if (!isShopeeResume) {
-            sessionStorage.removeItem('shopeeOAuthAttempt');
-            sessionStorage.removeItem('shopeeOAuthExpectedUid');
+            forgetShopeeKeys('shopeeOAuthAttempt', 'shopeeOAuthExpectedUid');
         }
         if (router) await router.push(safeTarget);
     };

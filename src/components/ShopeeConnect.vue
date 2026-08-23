@@ -32,6 +32,27 @@ const SHOPEE_OAUTH_EXPECTED_UID_KEY = 'shopeeOAuthExpectedUid';
 const { loggedInUser } = useAuth();
 const api = useApi();
 
+/* localStorage, não sessionStorage: o retorno da Shopee pode abrir outra aba, e
+ * sessionStorage é por aba — a tentativa se perdia justamente na volta. O valor
+ * é opaco, de uso único e validado no servidor, então guardá-lo aqui não
+ * afrouxa nada. O backend ainda mantém uma cópia em cookie para o caso de o
+ * armazenamento estar bloqueado. */
+const rememberAttempt = (state, uid) => {
+  try {
+    localStorage.setItem(SHOPEE_OAUTH_ATTEMPT_KEY, state);
+    localStorage.setItem(SHOPEE_OAUTH_EXPECTED_UID_KEY, uid);
+  } catch {
+    // Modo privado pode recusar escrita; o cookie do backend cobre esse caso.
+  }
+};
+
+const forgetAttempt = () => {
+  try {
+    localStorage.removeItem(SHOPEE_OAUTH_ATTEMPT_KEY);
+    localStorage.removeItem(SHOPEE_OAUTH_EXPECTED_UID_KEY);
+  } catch { /* nada a limpar */ }
+};
+
 const isModalOpen = ref(false);
 const isConnecting = ref(false);
 const connectError = ref('');
@@ -55,17 +76,18 @@ const connectShopee = async () => {
 
   isConnecting.value = true;
   connectError.value = '';
-  sessionStorage.removeItem(SHOPEE_OAUTH_ATTEMPT_KEY);
-  sessionStorage.setItem(SHOPEE_OAUTH_EXPECTED_UID_KEY, loggedInUser.value.uid);
+  forgetAttempt();
   try {
-    const result = await api.post('/shopee/auth', {});
+    // `credentials: 'include'` para o navegador aceitar o cookie da tentativa
+    // criado pelo backend.
+    const result = await api.post('/shopee/auth', {}, { credentials: 'include' });
     if (!result?.authUrl || !result?.oauthState) {
       throw new Error('O servidor não devolveu uma autorização Shopee válida.');
     }
 
-    // A Shopee recebe um redirect fixo e limpo. Esta aba guarda somente o
+    // A Shopee recebe um redirect fixo e limpo. O navegador guarda somente o
     // identificador opaco da tentativa, cuja autoridade fica no PostgreSQL.
-    sessionStorage.setItem(SHOPEE_OAUTH_ATTEMPT_KEY, result.oauthState);
+    rememberAttempt(result.oauthState, loggedInUser.value.uid);
     window.location.assign(result.authUrl);
   } catch (error) {
     // Durante rollout, uma instância antiga pode ainda não oferecer o POST.
@@ -76,7 +98,7 @@ const connectShopee = async () => {
       return;
     }
 
-    sessionStorage.removeItem(SHOPEE_OAUTH_EXPECTED_UID_KEY);
+    forgetAttempt();
     connectError.value = error?.data?.error || error?.message || 'Não foi possível abrir a autorização da Shopee.';
     isConnecting.value = false;
   }

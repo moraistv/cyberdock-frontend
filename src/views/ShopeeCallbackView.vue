@@ -32,13 +32,14 @@ import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useApi } from '@/composables/useApi';
 import { useAuth } from '@/composables/useAuth';
+import { API_BASE_URL } from '@/config.js';
 
 const SHOPEE_OAUTH_ATTEMPT_KEY = 'shopeeOAuthAttempt';
 const SHOPEE_OAUTH_EXPECTED_UID_KEY = 'shopeeOAuthExpectedUid';
 const route = useRoute();
 const router = useRouter();
 const api = useApi();
-const { loggedInUser, fetchShopeeAccounts } = useAuth();
+const { fetchShopeeAccounts } = useAuth();
 
 const state = ref('loading');
 const message = ref('');
@@ -54,48 +55,73 @@ const redirectToLogin = (target) => {
   window.location.replace(authLocation.href);
 };
 
+const readStoredAttempt = (key) => {
+  try {
+    // sessionStorage continua sendo lido para não perder uma conexão iniciada
+    // antes desta versão, quando a tentativa ficava só na aba.
+    return localStorage.getItem(key) || sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const clearStoredAttempt = () => {
+  for (const key of [SHOPEE_OAUTH_ATTEMPT_KEY, SHOPEE_OAUTH_EXPECTED_UID_KEY]) {
+    try { localStorage.removeItem(key); } catch { /* indisponível */ }
+    try { sessionStorage.removeItem(key); } catch { /* indisponível */ }
+  }
+};
+
+/**
+ * Entrega a conclusão ao backend por navegação comum.
+ *
+ * É a rede de segurança para quando esta página não consegue concluir: o
+ * backend reencontra a tentativa pelo cookie (ou pelo state na URL), grava a
+ * conta e devolve o resultado em /contas. Sem isso, qualquer falha aqui deixava
+ * a loja autorizada na Shopee e ausente no sistema.
+ */
+const handOffToBackend = (code, shopId, oauthState) => {
+  const apiBase = API_BASE_URL.replace(/\/$/, '');
+  const target = new URL(`${apiBase}/shopee/callback`);
+  target.searchParams.set('code', code);
+  target.searchParams.set('shop_id', shopId);
+  if (oauthState) target.searchParams.set('state', oauthState);
+  window.location.replace(target.toString());
+};
+
 onMounted(async () => {
   const code = firstQueryValue(route.query.code);
   const shopId = firstQueryValue(route.query.shop_id || route.query.shopid);
-  const oauthState = sessionStorage.getItem(SHOPEE_OAUTH_ATTEMPT_KEY);
-  const expectedUid = sessionStorage.getItem(SHOPEE_OAUTH_EXPECTED_UID_KEY);
+  const oauthState = readStoredAttempt(SHOPEE_OAUTH_ATTEMPT_KEY);
+  const expectedUid = readStoredAttempt(SHOPEE_OAUTH_EXPECTED_UID_KEY);
+  // O backend marca o retorno que ele já devolveu para cá; sem esta marca os
+  // dois lados poderiam ficar se empurrando o mesmo callback.
+  const alreadyHandedOff = firstQueryValue(route.query.handoff) === '1';
 
   if (!code || !shopId) {
-    sessionStorage.removeItem(SHOPEE_OAUTH_ATTEMPT_KEY);
-    sessionStorage.removeItem(SHOPEE_OAUTH_EXPECTED_UID_KEY);
+    clearStoredAttempt();
     state.value = 'error';
     message.value = 'A Shopee não retornou os dados da autorização. Tente conectar novamente.';
     return;
   }
 
-  // O fallback de rollout para GET /auth não cria uma tentativa no banco. Ele
-  // só é seguro se a sessão atual ainda for exatamente a que iniciou o OAuth;
-  // valide antes de enviar o code, pois depois da troca a loja já estaria
-  // persistida sob o usuário errado.
-  if (!oauthState) {
-    if (!expectedUid) {
-      state.value = 'error';
-      message.value = 'Esta autorização não está vinculada a uma sessão CyberDock. Volte para Contas e conecte novamente.';
-      return;
-    }
-    if (loggedInUser.value?.uid !== expectedUid) {
-      redirectToLogin(route.fullPath);
-      return;
-    }
-  }
-
   try {
-    const result = await api.post('/shopee/connect', { code, shopId, oauthState });
-    sessionStorage.removeItem(SHOPEE_OAUTH_ATTEMPT_KEY);
+    const result = await api.post(
+      '/shopee/connect',
+      { code, shopId, oauthState },
+      { credentials: 'include' }
+    );
+    clearStoredAttempt();
 
     if (expectedUid && result?.ownerUid && expectedUid !== result.ownerUid) {
-      sessionStorage.removeItem(SHOPEE_OAUTH_EXPECTED_UID_KEY);
       state.value = 'error';
       message.value = 'A loja foi vinculada a outra sessão. Entre com o usuário que iniciou a conexão.';
       return;
     }
+    // Guarda o dono confirmado pelo servidor: é o que valida o login seguinte
+    // quando a sessão venceu durante a autorização.
     if (result?.ownerUid) {
-      sessionStorage.setItem(SHOPEE_OAUTH_EXPECTED_UID_KEY, result.ownerUid);
+      try { localStorage.setItem(SHOPEE_OAUTH_EXPECTED_UID_KEY, result.ownerUid); } catch { /* indisponível */ }
     }
 
     const success = result?.message || 'Loja Shopee conectada com sucesso!';
@@ -109,22 +135,33 @@ onMounted(async () => {
       return;
     }
 
-    sessionStorage.removeItem(SHOPEE_OAUTH_EXPECTED_UID_KEY);
+    clearStoredAttempt();
     // Invalida a lista compartilhada antes de voltar. ContasView também força
     // nova leitura ao ser reativada, cobrindo telas mantidas em keep-alive.
     await fetchShopeeAccounts(true);
     await router.replace({ path: '/contas', query: { success } });
   } catch (err) {
-    // O connect rejeita 401/403 antes de trocar o code. Depois de limpar o JWT,
-    // o login retoma esta URL completa e tenta novamente sem perder o retorno.
-    if (err?.status === 401 || err?.status === 403) {
+    const status = err?.status;
+
+    /* Antes de desistir, deixa o backend concluir.
+     *
+     * Falha de rede, sessão recusada ou erro interno aqui não significam que a
+     * autorização foi perdida: o backend tem a tentativa (cookie ou state) e
+     * consegue gravar a conta sozinho. Só não insistimos se este retorno já
+     * veio de lá, para não ficar em vaivém. */
+    if (!alreadyHandedOff && (!status || status === 401 || status === 403 || status >= 500)) {
+      handOffToBackend(code, shopId, oauthState);
+      return;
+    }
+
+    // Sem tentativa e com sessão recusada, o login retoma esta URL completa.
+    if (status === 401 || status === 403) {
       redirectToLogin(route.fullPath);
       return;
     }
 
-    if (err?.status === 400 || err?.data?.restartRequired) {
-      sessionStorage.removeItem(SHOPEE_OAUTH_ATTEMPT_KEY);
-      sessionStorage.removeItem(SHOPEE_OAUTH_EXPECTED_UID_KEY);
+    if (status === 400 || err?.data?.restartRequired) {
+      clearStoredAttempt();
     }
     state.value = 'error';
     const detail = err?.data?.error || err?.message || 'Erro desconhecido ao conectar a loja.';
