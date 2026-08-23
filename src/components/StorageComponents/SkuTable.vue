@@ -48,6 +48,35 @@
             >
                 Sem estoque
             </button>
+        </div>
+
+        <!-- Tipo de SKU. O mesmo controle da tela do cliente, porque o master
+             precisa da mesma leitura ao entrar no armazenamento de cada um. -->
+        <div class="stock-filter-group" role="group" aria-label="Filtrar por tipo de SKU">
+            <button
+                type="button"
+                class="filter-btn"
+                :class="{ active: skuTypeFilter === 'all' }"
+                @click="skuTypeFilter = 'all'"
+            >
+                Todos os tipos
+            </button>
+            <button
+                type="button"
+                class="filter-btn"
+                :class="{ active: skuTypeFilter === 'parent' }"
+                @click="skuTypeFilter = 'parent'"
+            >
+                Somente pai
+            </button>
+            <button
+                type="button"
+                class="filter-btn"
+                :class="{ active: skuTypeFilter === 'child' }"
+                @click="skuTypeFilter = 'child'"
+            >
+                Somente filho
+            </button>
         </div>        <div class="actions">
           <button @click="$emit('open-package-manager')" class="btn ghost">Gerenciar pacotes</button>
           <button @click="$emit('open-kit-manager')" class="btn ghost kit-manager">
@@ -188,8 +217,10 @@
               </td>
             </tr>
             
-            <!-- SKU Individual (Órfão) -->
-            <tr v-if="item.type === 'orphan'" class="orphan-sku-row">
+            <!-- SKU Individual (Órfão) e, em "Somente filho", o componente
+                 listado como linha própria: fora do modo filho ele aparece
+                 aninhado sob o kit, e nunca como linha solta. -->
+            <tr v-if="item.type === 'orphan' || item.type === 'child'" class="orphan-sku-row">
               <td data-label="Hierarquia" class="hierarchy-col">
                 <div class="orphan-sku-item">
                   <span class="hierarchy-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/><path d="M12 12L4 7.5"/></svg></span>
@@ -198,7 +229,8 @@
               </td>
               <td data-label="Descrição" class="ellipsis">{{ item.descricao }}</td>
               <td data-label="Tipo">
-                <span class="orphan-badge">Individual</span>
+                <span v-if="item.type === 'child'" class="child-badge" :title="item.parent_label">SKU FILHO</span>
+                <span v-else class="orphan-badge">Individual</span>
               </td>
               <td data-label="Tipo de Pacote">
                 <span v-if="item.package_type_name" :class="['badge', getPackageTypeClass(item.package_type_name)]">
@@ -284,6 +316,7 @@ export default defineComponent({
     const query = ref('')
     const pkgFilter = ref('')
     const stockFilter = ref('all') // 'all', 'with', 'without'
+    const skuTypeFilter = ref('all') // 'all', 'parent', 'child'
     const tbodyEl = ref(null)
     
     // Estado para controlar a expansão dos kits
@@ -365,6 +398,35 @@ export default defineComponent({
         return true;
       };
 
+      /* "Somente filho": os componentes viram linhas próprias.
+       *
+       * Fora deste modo eles aparecem apenas aninhados sob o kit, então listar
+       * só os pais deixaria a tela sem os filhos e vice-versa. Um componente
+       * usado em mais de um kit aparece uma única vez, com os pais no título. */
+      if (skuTypeFilter.value === 'child') {
+        const parentsBySku = new Map();
+        kits.forEach(kit => {
+          (kit.kit_components || []).forEach(comp => {
+            const list = parentsBySku.get(comp.child_sku_id) || [];
+            list.push(kit.sku);
+            parentsBySku.set(comp.child_sku_id, list);
+          });
+        });
+
+        allSkus.forEach(sku => {
+          if (sku.is_kit || !childSkuIds.has(sku.id)) return;
+          if (!matchesFilter(sku.quantidade || 0)) return;
+          const parents = parentsBySku.get(sku.id) || [];
+          hierarchy.push({
+            ...sku,
+            type: 'child',
+            parent_label: parents.length ? `Componente de: ${parents.join(', ')}` : 'Componente de kit',
+          });
+        });
+
+        return hierarchy.sort((a, b) => (a.sku || '').localeCompare(b.sku || ''));
+      }
+
       // 1. Adiciona os kits como itens "pai"
       kits.forEach(kit => {
         // Encontra os dados completos dos SKUs filhos (componentes)
@@ -387,8 +449,10 @@ export default defineComponent({
         }
       });
 
-      // 2. Adiciona SKUs "órfãos" (que não são kits e nem componentes de kits)
+      // 2. Adiciona SKUs "órfãos" (que não são kits e nem componentes de kits).
+      //    Em "Somente pai" eles ficam de fora: a lista mostra apenas os kits.
       allSkus.forEach(sku => {
+        if (skuTypeFilter.value === 'parent') return;
         if (!sku.is_kit && !childSkuIds.has(sku.id)) {
           if (matchesFilter(sku.quantidade || 0)) {
             hierarchy.push({
@@ -474,6 +538,7 @@ export default defineComponent({
       query, 
       pkgFilter, 
       stockFilter,
+      skuTypeFilter,
       filteredSkus, 
       tbodyEl, 
       expandedKits,
