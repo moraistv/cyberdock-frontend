@@ -1,6 +1,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { API_BASE_URL } from '@/config';
+import { homeRouteForRole } from '@/utils/homeRoute';
 
 const loggedInUser = ref(null);
 const token = ref(localStorage.getItem('authToken'));
@@ -101,7 +102,9 @@ export function useAuth() {
         // Captura o destino ANTES de preencher loggedInUser. Assim nenhum
         // efeito reativo consegue apagar o callback OAuth durante o login.
         const pending = router?.currentRoute?.value?.query?.redirect;
-        const safeTarget = typeof pending === 'string' && /^\/(?!\/)/.test(pending) ? pending : '/dashboard';
+        /* Vazio quando não há destino guardado: a tela inicial depende do papel,
+         * que só é conhecido depois da resposta do login. */
+        const safeTarget = typeof pending === 'string' && /^\/(?!\/)/.test(pending) ? pending : '';
         const isShopeeResume = safeTarget.startsWith('/shopee/callback') ||
             (safeTarget.startsWith('/contas') && safeTarget.includes('success='));
         // A tentativa Shopee passou a viver em localStorage (o retorno pode
@@ -147,7 +150,8 @@ export function useAuth() {
         } else if (!isShopeeResume) {
             forgetShopeeKeys('shopeeOAuthAttempt', 'shopeeOAuthExpectedUid');
         }
-        if (router) await router.push(safeTarget);
+        // Sem destino guardado, cada papel tem a sua tela inicial.
+        if (router) await router.push(safeTarget || homeRouteForRole(authenticatedUser?.role));
     };
 
     const register = async (name, email, password) => {

@@ -207,7 +207,8 @@ function handleOutsideClick(ev) {
 }
 
 // ===== Admin actions =====
-const enterAdminMode = () => { setAdminMode(true); router.push('/admin'); };
+// Entra pelo dashboard master, não pelo tabelão: a visão geral vem primeiro.
+const enterAdminMode = () => { setAdminMode(true); router.push('/admin/dashboard'); };
 const exitAdminMode = () => { setAdminMode(false); router.push('/dashboard'); };
 
 // ===== Dropdown animation =====

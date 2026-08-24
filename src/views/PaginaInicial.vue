@@ -14,6 +14,7 @@
 <script setup>
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { homeRouteFromStorage } from '@/utils/homeRoute';
 
 const router = useRouter();
 
@@ -33,7 +34,7 @@ function isAuthenticated() {
 }
 
 onMounted(() => {
-  router.replace(isAuthenticated() ? '/dashboard' : '/auth');
+  router.replace(isAuthenticated() ? homeRouteFromStorage() : '/auth');
 });
 </script>
 

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { homeRouteForRole } from '../utils/homeRoute';
 const PaginaInicial = () => import('../views/PaginaInicial.vue');
 const AuthComponent = () => import('../views/AuthComponent.vue');
 const DashboardView = () => import('../views/DashboardView.vue');
@@ -9,6 +10,7 @@ const ArmazenamentoView = () => import('../views/ArmazenamentoView.vue');
 const KitParentView = () => import('../views/KitParentView.vue');
 const ResumoCobranca = () => import('../views/ResumoCobranca.vue');
 const AdminView = () => import('../views/AdminView.vue');
+const MasterDashboardView = () => import('../views/MasterDashboardView.vue');
 const ManageUsersView = () => import('../views/ManageUsersView.vue');
 const ShopeeCallbackView = () => import('../views/ShopeeCallbackView.vue');
 // MasterResumoCobranca e ServiceHistory NÃO têm rota própria: são componentes
@@ -37,6 +39,15 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    // Primeira tela do master: métricas somadas de todos os clientes.
+    path: '/admin/dashboard',
+    name: 'MasterDashboardView',
+    component: MasterDashboardView,
+    meta: { requiresAuth: true, requiresMaster: true }
+  },
+  {
+    // O tabelão continua em /admin para não invalidar link salvo nem histórico;
+    // o que mudou é que ele deixou de ser a porta de entrada do master.
     path: '/admin',
     name: 'AdminView',
     component: AdminView,
@@ -155,10 +166,11 @@ router.beforeEach(async (to, from, next) => {
   const isAuthenticated = payload && payload.exp * 1000 > Date.now();
   const userRole = payload ? payload.role : null;
 
-  // A raiz é apenas um portão: manda para o dashboard quando logado, senão
-  // para o login. Resolver aqui evita renderizar a tela intermediária.
+  // A raiz é apenas um portão: manda para a tela inicial do papel quando
+  // logado, senão para o login. Resolver aqui evita renderizar a tela
+  // intermediária.
   if (to.path === '/') {
-    next(isAuthenticated ? '/dashboard' : '/auth');
+    next(isAuthenticated ? homeRouteForRole(userRole) : '/auth');
   } else if (requiresAuth && !isAuthenticated) {
     /* Guarda o destino COMPLETO, com query string.
      *
@@ -171,7 +183,7 @@ router.beforeEach(async (to, from, next) => {
   } else if (requiresMaster && userRole !== 'master') {
     next('/dashboard'); // Redireciona se não for master
   } else if (isGuestRoute && isAuthenticated) {
-    next('/dashboard');
+    next(homeRouteForRole(userRole));
   } else {
     next();
   }

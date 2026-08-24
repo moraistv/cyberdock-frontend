@@ -169,13 +169,22 @@ const baseNavItems = [
 ];
 
 const adminNavItems = [
-    { to: '/admin', text: 'Painel Admin', iconOutline: '<path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3" /><path d="M12 11m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M12 12l0 2.5" />', iconSolid: '<path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3" /><path d="M12 11m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M12 12l0 2.5" />' },
+    { to: '/admin/dashboard', text: 'Dashboard Master', iconOutline: '<path d="M12 13m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M13.45 11.55l2.05 -2.05" /><path d="M6.4 20a9 9 0 1 1 11.2 0z" />', iconSolid: '<path d="M12 13m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M13.45 11.55l2.05 -2.05" /><path d="M6.4 20a9 9 0 1 1 11.2 0z" />' },
+    { to: '/admin', text: 'Tabelão de vendas', iconOutline: '<path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14z" /><path d="M3 10h18" /><path d="M10 3v18" />', iconSolid: '<path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14z" /><path d="M3 10h18" /><path d="M10 3v18" />' },
     { to: '/admin/separacao-itens', text: 'Separação de Itens', iconOutline: '<path d="M12 3l8 4.5v9l-8 4.5l-8 -4.5v-9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12v9" /><path d="M12 12l-8 -4.5" /><path d="M16 5.25l-8 4.5" />', iconSolid: '<path d="M12 3l8 4.5v9l-8 4.5l-8 -4.5v-9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12v9" /><path d="M12 12l-8 -4.5" /><path d="M16 5.25l-8 4.5" />' },
     { to: '/admin/users', text: 'Usuários', iconOutline: '<path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />', iconSolid: '<path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />' },
 ];
 
+/* Estar numa rota /admin já é estar em modo admin.
+ *
+ * O menu dependia só do toggle da topbar. Agora que o master cai direto no
+ * /admin/dashboard ao logar, ele abriria numa tela de admin com o menu do
+ * cliente — e sem item correspondente à rota atual o indicador deslizante
+ * desaparece, dando a impressão de tela órfã. */
+const isAdminRoute = computed(() => route.path.startsWith('/admin'));
+
 const navItems = computed(() => {
-  if (userRole.value === 'master' && isAdminMode.value) {
+  if (userRole.value === 'master' && (isAdminMode.value || isAdminRoute.value)) {
     return adminNavItems;
   }
   return baseNavItems;

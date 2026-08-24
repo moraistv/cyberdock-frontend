@@ -16,6 +16,9 @@ const EMPTY = {
     units: 0,
     pending_orders: 0,
     pending: 0,
+    // Complemento de "a despachar": o que já saiu da expedição.
+    shipped_orders: 0,
+    shipped: 0,
     valid_orders: 0,
     cancelled_orders: 0,
     cancelled: 0,
@@ -29,6 +32,9 @@ const EMPTY = {
   byDay: [],
   byMarketplace: [],
   byShippingMode: [],
+  // Distribuição por conta, usada pelo Dashboard Master para pôr as contas de
+  // todos os clientes lado a lado.
+  byAccount: [],
   topSkus: [],
 };
 
@@ -74,6 +80,18 @@ export function useDashboardStats() {
       if (params.queue) qs.set('queue', params.queue);
       if (params.processed) qs.set('processed', params.processed);
       if (params.skuMapped) qs.set('skuMapped', params.skuMapped);
+
+      /* Visão global do Dashboard Master.
+       *
+       * O backend só aceita `scope=all` de quem tem papel master; usuário comum
+       * que mandasse isso continuaria vendo apenas as próprias vendas. Aqui é só
+       * repasse, a autoridade é do servidor.
+       *
+       * `window=all` desliga a janela padrão de 30 dias, e `userNickname`
+       * recorta a visão global por cliente. */
+      if (params.scope) qs.set('scope', params.scope);
+      if (params.userNickname) qs.set('userNickname', params.userNickname);
+      if (params.window) qs.set('window', params.window);
 
       const data = await api.get(`/sales/dashboard-stats?${qs.toString()}`, {
         signal: activeController.signal,

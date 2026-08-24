@@ -16,6 +16,9 @@ const EMPTY = {
   shippingStatuses: [],
   shippingModes: [],
   saleStatuses: [],
+  // Só a visão master (`scope=all`) preenche esta lista, mas ela precisa existir
+  // sempre: sem isso a tela do admin lia `undefined` antes da primeira resposta.
+  users: [],
 };
 
 export function useSalesFilterFacets() {

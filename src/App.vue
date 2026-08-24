@@ -43,6 +43,7 @@ import ToastComponent from '@/components/ToastComponent.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 import { useAuth } from '@/composables/useAuth';
+import { homeRouteFromStorage } from '@/utils/homeRoute';
 
 // Quais telas ficam fora do cache é decidido por `meta.noCache` na definição
 // da rota (src/router/index.js), e não por uma lista de nomes aqui: com
@@ -64,7 +65,7 @@ onMounted(() => {
           // Só redireciona se estiver em / ou /auth
           const current = route?.path;
           if (current === '/' || current === '/auth') {
-            router.replace('/dashboard');
+            router.replace(homeRouteFromStorage());
           }
           // Para outras rotas protegidas, deixa o router guard lidar
         }

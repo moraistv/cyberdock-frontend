@@ -40,9 +40,16 @@
                             <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                         </span>
                         <div class="live-account-info">
-                            <span class="live-account-name">{{ acc.nickname }}</span>
+                            <span class="live-account-name">
+                                <!-- Numa sincronização global com 30+ contas dos dois canais, o
+                                     nome sozinho não diz de onde a conta é. A logo resolve sem
+                                     gastar largura, que é escassa nesta linha. -->
+                                <img v-if="MK_LOGOS[acc.marketplace]" :src="MK_LOGOS[acc.marketplace]"
+                                     :alt="acc.marketplace" :title="acc.marketplace" class="live-account-logo" />
+                                {{ acc.nickname }}
+                            </span>
                             <span class="live-account-msg">
-                                {{ acc.message }}
+                                {{ shortMessage(acc) }}
                                 <span v-if="(acc.status === 'done' || acc.status === 'error') && acc.durationMs" class="live-account-time"> · {{ fmtDuration(acc.durationMs) }}</span>
                             </span>
                         </div>
@@ -74,6 +81,23 @@ const props = defineProps({
 
 // eslint-disable-next-line no-undef
 defineEmits(['close']);
+
+const MK_LOGOS = {
+    ML: '/img/ml-logo.svg',
+    Shopee: '/img/shopee-logo.svg',
+};
+
+/**
+ * Mensagem sem o prefixo "[NOME DA CONTA]".
+ *
+ * O backend repete o apelido no início de cada mensagem, e o apelido já aparece
+ * na linha de cima. Numa conta de nome longo isso empurrava a parte útil
+ * ("34 pedidos, 5 novos") para fora da caixa, então sobrava só o nome repetido.
+ */
+function shortMessage(acc) {
+    const text = String(acc?.message || '');
+    return text.replace(/^\s*\[[^\]]*\]\s*/, '');
+}
 
 const doneCount = computed(() =>
     props.accounts.filter(a => a.status === 'done' || a.status === 'error').length
@@ -147,7 +171,11 @@ function fmtDuration(ms) {
 .live-status-icon.syncing { color: #4f46e5; }
 
 .live-account-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.live-account-name { font-size: 14px; font-weight: 600; color: #0f172a; }
+.live-account-name {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 600; color: #0f172a;
+}
+.live-account-logo { width: 15px; height: 15px; object-fit: contain; border-radius: 3px; flex-shrink: 0; }
 .live-account-msg { font-size: 12px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .live-account-time { color: #cbd5e1; font-weight: 600; }
 
