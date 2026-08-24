@@ -208,8 +208,9 @@
         </div>
 
         <p v-if="windowCapped" class="window-hint">
-          Sem recorte de data, a consulta usa os últimos 30 dias de venda para não varrer o histórico
-          inteiro de todos os clientes. Escolha um prazo de despacho ou uma data de venda para ampliar.
+          Contando vendas dos últimos {{ MASTER_WINDOW_DAYS }} dias. A visão de todos os clientes tem
+          teto de data de venda para não varrer o histórico inteiro da base; escolha uma data de venda
+          para recortar um período específico.
         </p>
 
         <!-- Gráficos -->
@@ -423,20 +424,19 @@ const shipRange = computed(() => {
   return { from: '', to: '' };
 });
 
-/* Janela de proteção do backend.
+/* Sem data de venda escolhida, o servidor impõe um teto.
  *
- * Sem `from`, o servidor recorta os últimos 30 dias de data de venda para não
- * varrer o histórico completo de todos os clientes — e isso escondia pedido
- * antigo ainda por despachar. Quando o prazo de despacho tem começo E fim, a
- * consulta já está limitada por ele, então liberamos o histórico inteiro com
- * `window=all`. Recorte aberto (Atrasados, Todos) mantém a proteção, e a tela
- * avisa em vez de mentir o número. */
-const windowParam = computed(() => {
-  if (dateRange.value.from) return '';
-  const ship = shipRange.value;
-  return ship.from && ship.to ? 'all' : '';
-});
-const windowCapped = computed(() => !dateRange.value.from && windowParam.value !== 'all');
+ * A primeira versão desta tela mandava `window=all` quando havia recorte de
+ * prazo, achando que o prazo limitaria a varredura. Não limita: `shipping_deadline`
+ * é expressão sobre JSONB na view unificada e não usa índice, então cada
+ * agregação percorria as duas tabelas inteiras de todos os clientes. O resultado
+ * em produção foi statement timeout e pool esgotado, derrubando telas de outros
+ * usuários.
+ *
+ * Agora o teto é do backend (MASTER_WINDOW_DAYS) e a tela só informa. Pedir
+ * `window=all` não tem mais efeito na visão global. */
+const MASTER_WINDOW_DAYS = 90;
+const windowCapped = computed(() => !dateRange.value.from);
 
 const periodLabel = computed(() => {
   const { from, to } = dateRange.value;
@@ -549,7 +549,6 @@ function currentFilterParams() {
   const ship = shipRange.value;
   return {
     scope: 'all',
-    window: windowParam.value,
     from,
     to,
     shipFrom: ship.from,
@@ -558,6 +557,9 @@ function currentFilterParams() {
     account: selectedAccounts.value,
     shippingMode: selectedModes.value,
     userNickname: selectedUser.value,
+    // Só as facetas que esta tela mostra: cada uma é uma varredura da base
+    // inteira na visão global, e status de envio/pedido não aparecem aqui.
+    facets: 'marketplace,account,shippingMode,userNickname',
   };
 }
 
