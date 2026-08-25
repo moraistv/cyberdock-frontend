@@ -175,18 +175,13 @@
                         </div>
                     </div>
 
-                    <!-- Janela de datas visível: sem recorte, o tabelão pede as
-                         vendas mais recentes de TODOS os clientes e a consulta
-                         estourava o tempo limite do banco. "Tudo" continua
-                         disponível, mas como escolha explícita. -->
-                    <div class="window-chips">
-                        <span class="window-chips__label">Período</span>
-                        <button v-for="opt in windowOptions" :key="opt.value"
-                                class="window-chip" :class="{ 'is-active': salesWindow === opt.value }"
-                                @click="applyWindow(opt.value)">
-                            {{ opt.label }}
-                        </button>
-                    </div>
+                    <!-- Não existe mais linha "Período" aqui.
+                         Ela duplicava o "Data da Venda" dos filtros avançados,
+                         que já tem Hoje / Ontem / 7 dias / 30 dias / Este mês e
+                         ainda aceita intervalo manual. Existia porque a consulta
+                         sem recorte estourava o tempo limite do banco; medido em
+                         25/08/2026, o recorte da página caiu de 15.307 ms para
+                         94 ms, então o motivo deixou de existir. -->
 
                     <!-- Filtros avançados: recolhidos, no mesmo padrão da tabela
                          do usuário. Abertos por padrão eles empurravam a listagem
@@ -1057,27 +1052,17 @@ function deselectAll() {
 // fora da primeira tela no painel admin.
 const showAdvancedFilters = ref(false);
 
-/**
- * Janela de datas do tabelão. O padrão recorta os últimos 30 dias porque a
- * consulta sem recorte precisa considerar o histórico completo dos dois canais
- * de todos os clientes — passava dos 30s de limite do banco e a tela quebrava.
- */
-const windowOptions = [
-    { value: '30d', label: '30 dias' },
-    { value: '7d', label: '7 dias' },
-    { value: 'today', label: 'Hoje' },
-    { value: 'all', label: 'Tudo' },
-];
-const salesWindow = ref('30d');
-
-function applyWindow(value) {
-    salesWindow.value = value;
-    // Uma janela explícita substitui as datas manuais, para não brigarem.
-    filters.saleDateStart = '';
-    filters.saleDateEnd = '';
-    activeSaleDatePreset.value = null;
-    triggerServerFetch(true);
-}
+/* A janela de datas do tabelão foi removida.
+ *
+ * Ela recortava 30 dias por padrão porque a consulta sem recorte considerava o
+ * histórico completo dos dois canais de todos os clientes e passava do limite de
+ * 30s do banco. Depois que o recorte da página passou a usar a fonte projetada
+ * (medido: 15.307 ms -> 94 ms), o recorte deixou de ser necessário — e sem data
+ * o plano é ainda mais barato, porque o Postgres percorre o índice de
+ * `sale_date DESC` e para nas 50 linhas da página.
+ *
+ * Quem quiser recortar por data usa "Data da Venda" nos filtros avançados, que
+ * já oferece Hoje / Ontem / 7 dias / 30 dias / Este mês e intervalo manual. */
 
 const selectedSaleStatusFilter = ref(null);
 const isSaleStatusDropdownOpen = ref(false);
@@ -1270,8 +1255,6 @@ function triggerServerFetch(resetPage = true) {
         userNickname: selectedUserFilter.value || undefined,
         processed: selectedProcessedFilter.value || undefined,
         marketplace: selectedMarketplaces.value.length > 0 ? selectedMarketplaces.value.join(',') : undefined,
-        // A janela é resolvida no backend; data manual preenchida tem precedência.
-        window: salesWindow.value,
     });
     // Opções e linhas saem do mesmo recorte, então são buscadas juntas.
     refreshFacets();
@@ -1297,7 +1280,6 @@ function refreshFacets() {
         userNickname: selectedUserFilter.value || undefined,
         processed: selectedProcessedFilter.value || undefined,
         marketplace: selectedMarketplaces.value.length > 0 ? selectedMarketplaces.value.join(',') : undefined,
-        window: salesWindow.value,
     });
 }
 
@@ -2709,19 +2691,7 @@ function getThumbUrl(sale) {
 .adv-toggle__chev { transition: transform 180ms ease; }
 .adv-toggle__chev.is-open { transform: rotate(180deg); }
 
-.window-chips { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
-.window-chips__label {
-    margin-right: 0.15rem; color: #475569; font-size: 0.68rem; font-weight: 800;
-    letter-spacing: 0.05em; text-transform: uppercase;
-}
-.window-chip {
-    height: 30px; padding: 0 0.6rem; border: 1px solid #dbe3ef; border-radius: 8px;
-    background: #fff; color: #475569; cursor: pointer;
-    font-family: inherit; font-size: 0.74rem; font-weight: 700;
-}
-.window-chip:hover { border-color: #93c5fd; background: #f8fbff; color: #1d4ed8; }
-.window-chip.is-active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
-
+/* Estilos da linha "Período", removida do template. Mantidos fora do bundle. */
 @media (max-width: 1050px) {
     .sales-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -62,7 +62,10 @@ export function useMasterSales() {
       if (params.userNickname) queryParams.set('userNickname', params.userNickname);
       if (params.processed) queryParams.set('processed', params.processed);
       if (params.marketplace) queryParams.set('marketplace', params.marketplace);
-      if (params.window) queryParams.set('window', params.window);
+      // `window` saiu junto com a linha de botões "Período" do tabelão: o
+      // recorte obrigatório de 30 dias existia só por causa da lentidão da
+      // consulta, que foi corrigida. Recorte por data agora é o
+      // saleDateStart/saleDateEnd dos filtros avançados.
 
       const result = await api.get(`/sales/all?${queryParams.toString()}`, {
         signal: activeController.signal,
