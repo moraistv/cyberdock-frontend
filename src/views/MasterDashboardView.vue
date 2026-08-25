@@ -66,6 +66,26 @@
             </div>
           </div>
 
+          <div class="filter-block">
+            <span class="filter-label">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+              Modalidade de envio
+            </span>
+            <div class="chip-row">
+              <button class="chip" :class="{ 'is-active': !selectedModes.length }"
+                      @click="selectedModes = []">Todas</button>
+              <button v-for="m in modeOptions" :key="m.value"
+                      class="chip" :class="{ 'is-active': selectedModes.includes(m.value) }"
+                      @click="toggleIn(selectedModes, m.value)">
+                {{ m.label }}
+                <span v-if="m.count !== null" class="chip__count">{{ m.count }}</span>
+              </button>
+              <span v-if="!modeOptions.length" class="filter-empty">
+                {{ statsLoading ? 'Carregando...' : 'Nenhuma modalidade no recorte' }}
+              </span>
+            </div>
+          </div>
+
           <div class="filter-block" v-if="userFacets.length">
             <span class="filter-label">
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
@@ -102,19 +122,6 @@
                           @click="toggleIn(selectedAccounts, acc.value)">
                     <img :src="MK_LOGOS[acc.marketplace] || MK_LOGOS.ML" alt="" class="chip__logo" />
                     {{ acc.label }} <span class="chip__count">{{ acc.count }}</span>
-                  </button>
-                </div>
-              </div>
-
-              <div class="filter-block" v-if="modeFacets.length">
-                <span class="filter-label">Modalidade</span>
-                <div class="chip-row">
-                  <button class="chip" :class="{ 'is-active': !selectedModes.length }"
-                          @click="selectedModes = []">Todas</button>
-                  <button v-for="m in modeFacets" :key="m.value"
-                          class="chip" :class="{ 'is-active': selectedModes.includes(m.value) }"
-                          @click="toggleIn(selectedModes, m.value)">
-                    {{ m.label }} <span class="chip__count">{{ m.count }}</span>
                   </button>
                 </div>
               </div>
@@ -355,6 +362,30 @@ const byAccount = computed(() => stats.value.byAccount);
 const marketplaceFacets = computed(() => facets.value.marketplaces);
 const accountFacets = computed(() => facets.value.accounts);
 const modeFacets = computed(() => facets.value.shippingModes);
+
+/* Opções do filtro de modalidade de envio.
+ *
+ * A faceta é a fonte preferida: vem cruzada com os outros filtros ativos e
+ * traz a contagem de pedidos. Mas o bloco ficava escondido atrás de
+ * `v-if="modeFacets.length"`, então quando a chamada de facetas falhava — e ela
+ * estava falhando por timeout — o filtro desaparecia da tela e parecia nunca ter
+ * existido.
+ *
+ * Sem faceta, caímos nas modalidades presentes nas próprias métricas do recorte
+ * (`byShippingMode`), sem contagem cruzada mas com o filtro visível e usável. E a
+ * união com o que está selecionado garante que nunca se fica preso num chip que
+ * saiu da lista. */
+const modeOptions = computed(() => {
+  const options = modeFacets.value.length
+    ? modeFacets.value.map((m) => ({ value: m.value, label: m.label, count: m.count }))
+    : byShippingMode.value.map((d) => ({ value: d.mode, label: d.mode, count: null }));
+
+  const present = new Set(options.map((o) => o.value));
+  for (const value of selectedModes.value) {
+    if (!present.has(value)) options.push({ value, label: value, count: null });
+  }
+  return options;
+});
 const userFacets = computed(() => facets.value.users);
 
 const isBusy = computed(() => statsLoading.value || storageLoading.value);
@@ -447,7 +478,8 @@ const shipLabel = computed(() =>
   shipPeriodOptions.find((o) => o.value === shipPeriod.value)?.label ?? shipPeriod.value
 );
 
-const advancedFilterCount = computed(() => selectedAccounts.value.length + selectedModes.value.length);
+// Modalidade saiu dos avançados e virou filtro principal, então não conta aqui.
+const advancedFilterCount = computed(() => selectedAccounts.value.length);
 const hasActiveFilters = computed(() =>
   shipPeriod.value !== 'today'
   || period.value !== 'all'
@@ -735,6 +767,9 @@ onUnmounted(() => {
   display: inline-flex; align-items: center; gap: 0.35rem;
   font-size: 0.78rem; font-weight: 600; color: #6b7280;
 }
+/* Mostra que o filtro existe mesmo sem opção para oferecer, em vez de
+   desaparecer e dar a impressão de que não foi feito. */
+.filter-empty { font-size: 0.78rem; color: #9ca3af; font-style: italic; }
 
 .window-hint {
   margin: -0.35rem 0 1.25rem; padding: 0.6rem 0.85rem;
