@@ -649,7 +649,10 @@ function runEnterAnimations() {
     if (tableRow.value) {
       gsap.from(tableRow.value, { opacity: 0, y: 16, duration: 0.45, ease: 'power2.out', delay: 0.18 });
     }
-  }, rootEl);
+    // rootEl.value, não rootEl: gsap.context espera elemento ou seletor. Passar
+    // o ref do Vue faz o gsap registrar "Invalid scope" no console a cada
+    // animação e ignorar o escopo.
+  }, rootEl.value);
 }
 
 onMounted(() => {

@@ -673,7 +673,9 @@ onMounted(() => {
     if (listTitleRef.value) {
       gsap.from(listTitleRef.value, { opacity: 0, y: 8, duration: 0.35, delay: 0.05 });
     }
-  }, rootRef);
+    // rootRef.value, não rootRef: gsap.context espera elemento ou seletor.
+    // Passar o ref do Vue faz o gsap registrar "Invalid scope" no console.
+  }, rootRef.value);
 
   watch(
     isAuthReady,
