@@ -34,24 +34,35 @@
     <div v-if="isLoadingAny && !totalAccounts" class="panel-empty">Carregando contas...</div>
 
     <div v-else-if="!totalAccounts" class="panel-empty">
+      <div class="panel-empty__logos">
+        <img :src="MK_LOGOS.ML" alt="Mercado Livre" />
+        <img :src="MK_LOGOS.Shopee" alt="Shopee" />
+      </div>
       Este cliente não tem nenhuma conta de marketplace conectada.
     </div>
 
     <template v-else>
       <div v-if="accounts.length" class="channel-block">
         <h3 class="channel-title">
-          <span class="channel-badge channel-badge--ml">ML</span>
+          <span class="channel-badge channel-badge--ml">
+            <img :src="MK_LOGOS.ML" alt="" />
+          </span>
           Mercado Livre
           <span class="channel-count">{{ accounts.length }}</span>
         </h3>
         <ul class="account-list">
           <li v-for="account in accounts" :key="`ml-${account.user_id}`" class="account-card">
-            <div class="account-info">
-              <strong class="account-name">{{ account.nickname || 'Conta sem apelido' }}</strong>
-              <span class="account-meta">ID {{ account.user_id }}</span>
-              <span class="account-meta" v-if="account.connected_at">
-                Conectada em {{ formatDate(account.connected_at) }}
+            <div class="account-main">
+              <span class="account-avatar account-avatar--ml">
+                <img :src="MK_LOGOS.ML" alt="Mercado Livre" />
               </span>
+              <div class="account-info">
+                <strong class="account-name">{{ account.nickname || 'Conta sem apelido' }}</strong>
+                <span class="account-meta">ID {{ account.user_id }}</span>
+                <span class="account-meta" v-if="account.connected_at">
+                  Conectada em {{ formatDate(account.connected_at) }}
+                </span>
+              </div>
             </div>
             <div class="account-side">
               <span :class="['status-pill', account.status === 'active' ? 'status-pill--on' : 'status-pill--off']">
@@ -72,18 +83,25 @@
 
       <div v-if="shopeeAccounts.length" class="channel-block">
         <h3 class="channel-title">
-          <span class="channel-badge channel-badge--shopee">SH</span>
+          <span class="channel-badge channel-badge--shopee">
+            <img :src="MK_LOGOS.Shopee" alt="" />
+          </span>
           Shopee
           <span class="channel-count">{{ shopeeAccounts.length }}</span>
         </h3>
         <ul class="account-list">
           <li v-for="account in shopeeAccounts" :key="`shopee-${account.shop_id}`" class="account-card account-card--shopee">
-            <div class="account-info">
-              <strong class="account-name">{{ account.shop_name || 'Loja sem nome' }}</strong>
-              <span class="account-meta">ID {{ account.shop_id }}</span>
-              <span class="account-meta" v-if="account.connected_at">
-                Conectada em {{ formatDate(account.connected_at) }}
+            <div class="account-main">
+              <span class="account-avatar account-avatar--shopee">
+                <img :src="MK_LOGOS.Shopee" alt="Shopee" />
               </span>
+              <div class="account-info">
+                <strong class="account-name">{{ account.shop_name || 'Loja sem nome' }}</strong>
+                <span class="account-meta">ID {{ account.shop_id }}</span>
+                <span class="account-meta" v-if="account.connected_at">
+                  Conectada em {{ formatDate(account.connected_at) }}
+                </span>
+              </div>
             </div>
             <div class="account-side">
               <span :class="['status-pill', account.status === 'active' ? 'status-pill--on' : 'status-pill--off']">
@@ -124,6 +142,13 @@ import { useConfirm } from '@/composables/useConfirm';
 const props = defineProps({
   userId: { type: String, required: true },
 });
+
+// Mesmos caminhos usados pelo resto do sistema (TabelaVendas, ContasView,
+// SidebarComponent, SyncLiveModal): os arquivos estão em public/img.
+const MK_LOGOS = {
+  ML: '/img/ml-logo.svg',
+  Shopee: '/img/shopee-logo.svg',
+};
 
 const userIdRef = toRefs(props).userId;
 // `shopee: true`: este painel é o único lugar que precisa dos dois canais.
@@ -265,6 +290,21 @@ const askRemove = async (platform, accountId, label) => {
   font-size: 0.9rem;
 }
 
+.panel-empty__logos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+/* Cinza enquanto não há conta: o logo colorido aqui pareceria conta conectada. */
+.panel-empty__logos img {
+  height: 26px;
+  width: auto;
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
 .channel-block + .channel-block { margin-top: 1.5rem; }
 
 .channel-title {
@@ -280,15 +320,21 @@ const askRemove = async (platform, accountId, label) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 22px;
-  border-radius: 5px;
-  font-size: 0.68rem;
-  font-weight: 800;
-  color: #422006;
+  width: 34px;
+  height: 24px;
+  border-radius: 6px;
+  background: #f1f5f9;
 }
+.channel-badge img {
+  max-width: 26px;
+  max-height: 18px;
+  width: auto;
+  height: auto;
+  display: block;
+}
+/* Fundo na cor da marca. O logo do ML é amarelo e some no branco. */
 .channel-badge--ml { background: #ffe600; }
-.channel-badge--shopee { background: #ee4d2d; color: #fff; }
+.channel-badge--shopee { background: #fff1ed; }
 
 .channel-count {
   padding: 0.1rem 0.5rem;
@@ -320,6 +366,30 @@ const askRemove = async (platform, accountId, label) => {
   background: #fcfdff;
 }
 .account-card--shopee { border-left-color: #ee4d2d; }
+
+.account-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+.account-avatar img {
+  max-width: 28px;
+  max-height: 24px;
+  width: auto;
+  height: auto;
+  display: block;
+}
+.account-avatar--ml { background: #ffe600; border-color: #f5d800; }
+.account-avatar--shopee { background: #fff1ed; border-color: #ffd6c9; }
+
+/* O avatar e o texto andam juntos: sem isto o `space-between` do card jogaria o
+   logo para um canto e o nome para o outro. */
+.account-main { display: flex; align-items: center; gap: 0.8rem; min-width: 0; }
 
 .account-info { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
 .account-name { font-size: 0.95rem; color: #0f172a; word-break: break-word; }
