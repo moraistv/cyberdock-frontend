@@ -651,9 +651,16 @@ function openBulkStatusModal() {
 // Estado para rastrear a disponibilidade real das etiquetas
 const labelAvailabilityCache = ref(new Map());
 
-// Sistema de verificação automática em tempo real
+/* Sistema de verificação automática em tempo real.
+ *
+ * Começa DESLIGADO. Enquanto ele apontava para uma rota inexistente, o botão
+ * mostrava "ON" e não fazia nada além de um 405 a cada 30 segundos. Agora que a
+ * chamada é real, ligá-lo por padrão passaria a consultar a API do Mercado Livre
+ * uma vez por envio visível, a cada 30 segundos, em toda aba aberta — tráfego
+ * que nunca existiu. Quem quiser continua ligando no botão, e o botão "Verificar
+ * Etiquetas" já faz a mesma checagem sob demanda. */
 const autoCheckInterval = ref(null);
-const isAutoCheckEnabled = ref(true);
+const isAutoCheckEnabled = ref(false);
 const lastAutoCheck = ref(null);
 const autoCheckStatus = ref('Parado');
 const autoCheckCount = ref(0);
@@ -1862,14 +1869,22 @@ async function performAutoCheck(salesToCheck) {
         try {
             const shipmentIds = sales.map(sale => getLabelInfo(sale).shipmentId);
 
-            const response = await fetch('/api/mercadolivre/check-labels-availability', {
+            /* Endpoint e payload iguais aos do botão "Verificar Etiquetas".
+             *
+             * Antes daqui saía POST /api/mercadolivre/check-labels-availability,
+             * que não existe: o router do ML é montado em /api/ml e a rota se
+             * chama check-multiple-shipments. O servidor respondia 405 a cada 30
+             * segundos, sem token, e o resultado era descartado no
+             * `if (response.ok)` — a verificação automática nunca funcionou. */
+            const response = await fetch('/api/ml/check-multiple-shipments', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: JSON.stringify({
-                    seller_id: sellerId,
-                    shipment_ids: shipmentIds
+                    shipments: shipmentIds,
+                    seller_id: sellerId
                 })
             });
 
@@ -2182,8 +2197,8 @@ function prevSalesPage() { if (salesCurrentPage.value > 1) salesCurrentPage.valu
 
 onMounted(() => {
     document.addEventListener('click', handleClickOutside);
-    // Inicia a verificação automática quando o componente é montado
-    startAutoCheck();
+    // A verificação automática não começa sozinha: ela consulta a API do
+    // Mercado Livre em laço. Quem quiser liga no botão "Auto Verificação".
 });
 
 // ===== UTILITY FUNCTIONS FOR CUSTOMER DATA =====
