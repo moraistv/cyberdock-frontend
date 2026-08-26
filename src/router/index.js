@@ -65,7 +65,7 @@ const routes = [
     // funciona. Antes tudo isso vivia em estado interno de /admin/users e
     // qualquer recarga jogava o usuário de volta para a lista.
     // `tab` é validado no componente; valor inválido cai na lista.
-    path: '/admin/users/:uid/:tab(vendas|armazenamento|cobranca)',
+    path: '/admin/users/:uid/:tab(vendas|armazenamento|cobranca|contas)',
     name: 'ManageUserDetail',
     component: ManageUsersView,
     meta: { requiresAuth: true, requiresMaster: true }

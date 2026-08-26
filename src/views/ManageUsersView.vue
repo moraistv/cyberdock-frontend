@@ -95,6 +95,13 @@
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
               Cobrança
             </button>
+            <button
+              :class="['user-tab', { active: currentView === 'accounts' }]"
+              @click="switchUserView('accounts')"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+              Contas
+            </button>
           </nav>
         </div>
         <div v-else-if="currentView !== 'users'" class="breadcrumbs">
@@ -353,6 +360,7 @@
         <UserSalesTable v-if="currentView === 'sales' && selectedUser" :user-id="selectedUser.uid" />
         <UserStorageView v-if="currentView === 'storage' && selectedUser" :user-id="selectedUser.uid" />
         <MasterResumoCobranca v-if="currentView === 'billing' && selectedUser" :user-id="selectedUser.uid" />
+        <UserAccountsPanel v-if="currentView === 'accounts' && selectedUser" :user-id="selectedUser.uid" />
         <ServiceHistory v-if="currentView === 'history'" />
 
 
@@ -383,6 +391,10 @@
           <a @click="editUserBilling(activeMenu.user)">
             <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
             Gerenciar Cobrança
+          </a>
+          <a @click="editUserAccounts(activeMenu.user)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            Contas Conectadas
           </a>
           <div class="dropdown-divider"></div>
           <a v-if="activeMenu.user.active" @click="handleToggleActive(activeMenu.user)" class="action-suspend">
@@ -702,6 +714,7 @@ import UniversalModal from '../components/UniversalModal.vue';
 import UserSalesTable from '../components/UserSalesTable.vue';
 import UserStorageView from './UserStorageView.vue';
 import MasterResumoCobranca from './MasterResumoCobranca.vue';
+import UserAccountsPanel from './UserAccountsPanel.vue';
 import ServiceHistory from './ServiceHistory.vue';
 import ToastNotification from '../components/ToastNotification.vue';
 import { useUsers } from '@/composables/useUsers';
@@ -832,7 +845,7 @@ const breadcrumbTitle = computed(() => {
   if (currentView.value === 'sales') return `Vendas de ${displayName}`;
   if (currentView.value === 'storage') return `Armazenamento de ${displayName}`;
   if (currentView.value === 'billing') return `Resumo de Faturamento de ${displayName}`;
-  if (currentView.value === 'history') return 'Histórico de Serviços';
+  if (currentView.value === 'accounts') return `Contas conectadas de ${displayName}`;
   if (currentView.value === 'history') return 'Histórico de Serviços';
   return '';
 });
@@ -847,8 +860,8 @@ const formatDate = (timestamp, isDateString = false) => {
  * A aba de um cliente vive na URL (/admin/users/:uid/vendas). Estes mapas
  * traduzem entre o segmento da URL, legível, e o nome interno da visão.
  */
-const TAB_TO_VIEW = { vendas: 'sales', armazenamento: 'storage', cobranca: 'billing' };
-const VIEW_TO_TAB = { sales: 'vendas', storage: 'armazenamento', billing: 'cobranca' };
+const TAB_TO_VIEW = { vendas: 'sales', armazenamento: 'storage', cobranca: 'billing', contas: 'accounts' };
+const VIEW_TO_TAB = { sales: 'vendas', storage: 'armazenamento', billing: 'cobranca', accounts: 'contas' };
 
 /** Aplica o que está na URL ao estado da tela. */
 const applyRoute = () => {
@@ -1076,6 +1089,7 @@ const openUserTab = (user, view) => {
 const editUserSales = (user) => openUserTab(user, 'sales');
 const editUserStorage = (user) => openUserTab(user, 'storage');
 const editUserBilling = (user) => openUserTab(user, 'billing');
+const editUserAccounts = (user) => openUserTab(user, 'accounts');
 const openDeleteUserModal = (user) => { userToDelete.value = user; isDeleteUserModalOpen.value = true; activeMenu.value.user = null; };
 const closeDeleteUserModal = () => { isDeleteUserModalOpen.value = false; userToDelete.value = null; };
 
