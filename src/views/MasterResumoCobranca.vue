@@ -342,25 +342,53 @@
                ("Storage", "Shipment", "Manual") e sem nenhum somatório. -->
           <div v-if="detailsInvoice" class="invoice-details-content">
             <div class="invoice-meta">
-              <div><span>Vencimento</span><strong>{{ detailsInvoice.dueDate }}</strong></div>
               <div>
-                <span>Pagamento</span>
+                <span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  Vencimento
+                </span>
+                <strong>{{ detailsInvoice.dueDate }}</strong>
+              </div>
+              <div>
+                <span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                  Pagamento
+                </span>
                 <strong :class="['status-badge', getStatusClass(detailsInvoice.status)]">
                   {{ getStatusLabel(detailsInvoice.status) }}
                 </strong>
               </div>
               <div>
-                <span>Competência</span>
+                <span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Competência
+                </span>
                 <strong class="status-badge" :class="detailsInvoice.isClosed ? 'status-frozen' : 'status-live'">
                   {{ detailsInvoice.isClosed ? 'Fechada' : 'Aberta' }}
                 </strong>
               </div>
-              <div v-if="detailsInvoice.paymentDate"><span>Pago em</span><strong>{{ detailsInvoice.paymentDate }}</strong></div>
-              <div v-if="detailsInvoice.asaasStatus"><span>Cobrança</span><strong>{{ detailsInvoice.asaasStatus }}</strong></div>
+              <div v-if="detailsInvoice.paymentDate">
+                <span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  Pago em
+                </span>
+                <strong>{{ detailsInvoice.paymentDate }}</strong>
+              </div>
+              <div v-if="detailsInvoice.asaasStatus">
+                <span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>
+                  Cobrança
+                </span>
+                <strong>{{ detailsInvoice.asaasStatus }}</strong>
+              </div>
             </div>
 
             <section v-for="group in groupedItems(detailsInvoice)" :key="group.key" class="detail-group">
               <header class="detail-group__head">
+                <!-- Ícone por categoria: armazenamento, expedição e avulso são
+                     naturezas diferentes de cobrança, e a forma ajuda a bater o
+                     olho mais rápido que ler o rótulo. -->
+                <span class="detail-group__icon" v-html="ICONES_GRUPO[group.key] || ICONES_GRUPO.outros"></span>
                 <h5>{{ group.label }}</h5>
                 <strong>{{ formatCurrency(group.subtotal) }}</strong>
               </header>
@@ -380,7 +408,10 @@
             </section>
 
             <footer class="detail-total">
-              <span>Total da fatura</span>
+              <span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="13" x2="15" y2="13"/></svg>
+                Total da fatura
+              </span>
               <strong>{{ formatCurrency(detailsInvoice.totalAmount) }}</strong>
             </footer>
           </div>
@@ -510,16 +541,22 @@
           size="md"
         >
           <div class="manual-service-form">
+            <!-- Onde o lançamento vai cair. Ficava em dois campos desabilitados
+                 que pareciam preenchíveis; virou um resumo, que é o que eles
+                 sempre foram. -->
+            <p class="manual-target">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span>
+                Lançando para <strong>{{ clientName }}</strong>
+                na competência <strong>{{ periodLabel(selectedPeriod) }}</strong>
+              </span>
+            </p>
+
             <div class="form-group">
-              <label for="manual-client">Cliente</label>
-              <input id="manual-client" type="text" :value="clientName" disabled>
-            </div>
-            <div class="form-group">
-              <label for="manual-period">Competência</label>
-              <input id="manual-period" type="text" v-model="selectedPeriod" disabled>
-            </div>
-            <div class="form-group">
-              <label for="manual-service">Serviço</label>
+              <label for="manual-service">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                Serviço
+              </label>
               <select id="manual-service" v-model="manualService.serviceId">
                 <option disabled value="">Selecione um serviço</option>
                 <option v-for="service in manualServices" :key="service.id" :value="service.id">
@@ -527,13 +564,23 @@
                 </option>
               </select>
             </div>
+
             <div class="form-group">
-              <label for="manual-date">Data de Realização do Serviço</label>
+              <label for="manual-date">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Data de realização do serviço
+              </label>
               <input id="manual-date" type="date" v-model="manualService.serviceDate">
+              <!-- A data fica gravada no item e é o que responde "quando foi
+                   feito" numa conferência com o cliente. Não é a data de hoje. -->
+              <small class="form-hint">Quando o serviço foi executado, não a data de hoje.</small>
             </div>
 
             <div class="form-group" v-if="isQuantityServiceSelected">
-              <label for="manual-quantity">{{ selectedService?.config?.quantity_label || 'Quantidade' }}</label>
+              <label for="manual-quantity">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/><path d="M12 12 4 7.5"/></svg>
+                {{ selectedService?.config?.quantity_label || 'Quantidade' }}
+              </label>
               <input
                 id="manual-quantity"
                 type="number"
@@ -541,16 +588,29 @@
                 :placeholder="selectedService?.config?.placeholder || 'Ex: 1'"
                 min="1"
               >
+              <!-- Serviço com faixas: o preço unitário sai da quantidade, então
+                   dizer as faixas aqui evita a surpresa no total da fatura. -->
+              <small v-if="selectedService?.config?.tiers?.length" class="form-hint">
+                Preço por faixa:
+                <template v-for="(tier, ti) in selectedService.config.tiers" :key="ti">
+                  <template v-if="ti"> · </template>{{ tier.from }}{{ tier.to ? `-${tier.to}` : '+' }}: {{ formatCurrency(tier.price) }}
+                </template>
+              </small>
             </div>
 
-            <div class="form-actions">
-              <button @click="closeManualServiceModal" class="btn-secondary">Cancelar</button>
-              <button @click="submitManualService" class="btn-primary" :disabled="isSubmittingManualService">
-                {{ isSubmittingManualService ? 'Lançando...' : 'Lançar Serviço' }}
-              </button>
-            </div>
             <p v-if="manualServiceError" class="error-text">{{ manualServiceError }}</p>
           </div>
+
+          <template #footer>
+            <button @click="closeManualServiceModal" class="btn-secondary btn-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Cancelar
+            </button>
+            <button @click="submitManualService" class="btn-primary btn-ico" :disabled="isSubmittingManualService">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              {{ isSubmittingManualService ? 'Lançando...' : 'Lançar serviço' }}
+            </button>
+          </template>
         </UniversalModal>
 
       </div>
@@ -596,6 +656,20 @@ const ITEM_GROUPS = [
   { key: 'shipment', label: 'Expedição' },
   { key: 'manual', label: 'Serviços pontuais' },
 ];
+
+/* Ícone por categoria de item. Injetados por v-html num ponto só; repetir quatro
+ * <svg> com v-if no template deixaria o cabeçalho do grupo ilegível.
+ * `outros` cobre tipo novo que apareça no banco e ainda não esteja mapeado. */
+const ICONES_GRUPO = {
+  // Caixa: armazenamento.
+  storage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
+  // Caminhão: expedição.
+  shipment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>',
+  // Mais dentro de círculo: lançamento pontual, feito à mão.
+  manual: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
+  // Etiqueta: categoria não mapeada.
+  outros: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
+};
 
 const UNIT_LABELS = { m3: 'm³', pacote: 'pacote', viagem: 'viagem', venda: 'venda', unidade: 'unidade' };
 
@@ -1238,14 +1312,16 @@ watch(() => props.userId, (newId) => {
 /* Cabeçalho com competência, vencimento e status */
 .invoice-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--cd-line, #e5e7eb); }
 .invoice-meta div { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
-.invoice-meta span { color: var(--cd-muted, #6b7280); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.invoice-meta span { display: inline-flex; align-items: center; gap: 0.28rem; color: var(--cd-muted, #6b7280); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.invoice-meta span svg { flex: 0 0 auto; }
 .invoice-meta strong { color: var(--cd-ink, #111827); font-size: 0.9rem; }
 .invoice-meta .status-badge { align-self: flex-start; }
 
 /* Seções por categoria, com subtotal */
 .detail-group { margin-bottom: 1rem; overflow: hidden; border: 1px solid var(--cd-line, #e5e7eb); border-radius: 0.6rem; background: #fff; }
-.detail-group__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.6rem 0.85rem; background: var(--cd-blue-50, #f0f9ff); }
-.detail-group__head h5 { margin: 0; color: var(--cd-blue-800, #075985); font-size: 0.85rem; font-weight: 750; }
+.detail-group__head { display: flex; align-items: center; gap: 0.45rem; padding: 0.6rem 0.85rem; background: var(--cd-blue-50, #f0f9ff); }
+.detail-group__head h5 { flex: 1 1 auto; margin: 0; color: var(--cd-blue-800, #075985); font-size: 0.85rem; font-weight: 750; }
+.detail-group__icon { display: inline-flex; flex: 0 0 auto; color: var(--cd-blue-700, #0369a1); }
 .detail-group__head strong { color: var(--cd-blue-900, #0c3f68); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 .detail-table { width: 100%; border-collapse: collapse; }
 .detail-table td { padding: 0.55rem 0.85rem; border-top: 1px solid #f1f5f9; color: #4b5563; font-size: 0.83rem; vertical-align: top; }
@@ -1256,7 +1332,8 @@ watch(() => props.userId, (newId) => {
 
 /* Total geral da fatura */
 .detail-total { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.85rem 1rem; border-radius: 0.6rem; background: var(--cd-gradient, linear-gradient(140deg, #0c3f68, #0369a1)); box-shadow: var(--cd-shadow, 0 10px 24px rgba(7, 89, 133, 0.22)); color: #fff; }
-.detail-total span { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.detail-total span { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.detail-total span svg { flex: 0 0 auto; }
 .detail-total strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 
 /* Remoção de lançamento avulso, dentro da linha da composição. Substituiu os
@@ -1365,12 +1442,20 @@ watch(() => props.userId, (newId) => {
   .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 }
 .inline-error { margin: 0 0 1rem; padding: 0.6rem 0.8rem; border-radius: 0.45rem; background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); font-size: 0.83rem; font-weight: 600; }
-.manual-service-form { padding: 1rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.manual-service-form { padding: 0.25rem 0 0; display: flex; flex-direction: column; gap: 1.1rem; }
+/* Destino do lançamento: substituiu dois campos desabilitados que pareciam
+   preenchíveis e só repetiam informação que a tela já mostra. */
+.manual-target { display: flex; align-items: center; gap: 0.5rem; margin: 0; padding: 0.65rem 0.8rem; border: 1px solid var(--cd-line, #dbe7f0); border-radius: 0.5rem; background: #f8fbfe; color: #475569; font-size: 0.82rem; line-height: 1.45; }
+.manual-target svg { flex: 0 0 auto; color: var(--cd-blue-700, #0369a1); }
+.manual-target strong { color: var(--cd-ink, #0f172a); }
+.form-hint { margin-top: 0.35rem; color: #94a3b8; font-size: 0.73rem; line-height: 1.4; }
 .form-group { display: flex; flex-direction: column; }
-.form-group label { margin-bottom: 0.5rem; font-weight: 500; color: #374151; }
+.form-group label { display: inline-flex; align-items: center; gap: 0.32rem; margin-bottom: 0.5rem; font-weight: 600; color: #374151; font-size: 0.85rem; }
+.form-group label svg { flex: 0 0 auto; color: var(--cd-blue-700, #0369a1); }
 .form-group input, .form-group select { padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem; }
 .form-group input:disabled { background-color: #f3f4f6; }
-.form-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1rem; }
+/* `.form-actions` saiu: os botões do modal de avulso passaram para o slot
+   #footer do UniversalModal, que já alinha à direita com espaçamento. */
 .btn-primary { background-color: #2563eb; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; cursor: pointer; }
 .btn-primary:disabled { background-color: #9ca3af; cursor: wait; }
 .btn-secondary { background-color: #e5e7eb; color: #374151; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; cursor: pointer; }
