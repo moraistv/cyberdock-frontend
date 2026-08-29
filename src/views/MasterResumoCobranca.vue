@@ -137,16 +137,64 @@
               </template>
             </p>
 
-            <!-- Só aparece quando existe emissão no provedor. Nada popula ainda. -->
-            <a
-              v-if="currentInvoice.asaasInvoiceUrl"
-              class="invoice-hero__charge"
-              :href="currentInvoice.asaasInvoiceUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Abrir cobrança{{ currentInvoice.asaasStatus ? ` (${currentInvoice.asaasStatus})` : '' }}
-            </a>
+            <!-- ============ Cobrança no provedor ============
+                 Emitir exige a competência fechada, porque a emissão manda o
+                 valor para fora do sistema e com o mês aberto ele ainda muda. -->
+            <div class="charge-box">
+              <div class="charge-box__head">
+                <span class="charge-box__label">Cobrança</span>
+                <span v-if="temCobranca" class="charge-box__status">
+                  {{ currentInvoice.asaasStatus || 'emitida' }}
+                </span>
+                <span v-else class="charge-box__status is-off">não emitida</span>
+              </div>
+
+              <div class="charge-box__actions">
+                <template v-if="!temCobranca">
+                  <button
+                    class="charge-btn charge-btn--ghost"
+                    :disabled="isChargeBusy || !isPeriodClosed"
+                    title="Valida tudo e mostra o que seria enviado, sem criar nada"
+                    @click="emitirCobranca({ dryRun: true })"
+                  >
+                    Simular
+                  </button>
+                  <button
+                    class="charge-btn charge-btn--solid"
+                    :disabled="isChargeBusy || !isPeriodClosed"
+                    :title="isPeriodClosed ? 'Emite a cobrança no provedor' : 'Feche a competência primeiro'"
+                    @click="emitirCobranca()"
+                  >
+                    {{ isChargeBusy ? 'Enviando...' : 'Emitir cobrança' }}
+                  </button>
+                </template>
+
+                <template v-else>
+                  <a
+                    v-if="currentInvoice.asaasInvoiceUrl"
+                    class="charge-btn charge-btn--solid"
+                    :href="currentInvoice.asaasInvoiceUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >Abrir</a>
+                  <button class="charge-btn charge-btn--ghost" :disabled="isChargeBusy" @click="sincronizarCobranca">
+                    {{ isChargeBusy ? '...' : 'Sincronizar' }}
+                  </button>
+                  <button class="charge-btn charge-btn--ghost" :disabled="isChargeBusy" @click="alterarVencimento">
+                    Alterar prazo
+                  </button>
+                  <button class="charge-btn charge-btn--danger" :disabled="isChargeBusy" @click="cancelarCobranca">
+                    Cancelar
+                  </button>
+                </template>
+              </div>
+
+              <p v-if="!isPeriodClosed && !temCobranca" class="charge-box__hint">
+                Feche a competência para poder emitir.
+              </p>
+              <p v-if="chargeMessage" class="charge-box__msg">{{ chargeMessage }}</p>
+              <p v-if="chargeError" class="charge-box__msg is-error">{{ chargeError }}</p>
+            </div>
           </section>
 
           <!-- ================= Composição, por categoria ================= -->
@@ -373,7 +421,12 @@ const {
   setInvoiceStatus,
   deleteManualItem,
   closeInvoicePeriod,
-  reopenInvoicePeriod
+  reopenInvoicePeriod,
+  ensureAsaasCustomer,
+  issueCharge,
+  syncCharge,
+  updateChargeDueDate,
+  cancelCharge
 } = useBilling();
 
 const { confirm } = useConfirm();
@@ -586,6 +639,185 @@ async function toggleInvoicePayment() {
     statusError.value = e.message || 'Não foi possível atualizar o status da fatura.';
   } finally {
     isUpdatingStatus.value = false;
+  }
+}
+
+/* ========================= Cobrança no provedor =========================
+ *
+ * O backend recusa o que não pode ser feito e devolve um `code`. A tela usa o
+ * code para oferecer a saída em vez de só repetir a mensagem: cliente sem
+ * vínculo vira "quer vincular agora?", vencimento vencido vira "qual a data
+ * nova?". Sem isso o master lê um erro e não sabe o que fazer com ele.
+ * ===================================================================== */
+
+const isChargeBusy = ref(false);
+const chargeError = ref('');
+const chargeMessage = ref('');
+const temCobranca = computed(() => Boolean(currentInvoice.value?.asaasPaymentId));
+
+/** Código de erro do backend, quando existir. */
+const codigoDoErro = (e) => e?.data?.code || null;
+
+function limparAvisosDeCobranca() {
+  chargeError.value = '';
+  chargeMessage.value = '';
+}
+
+async function recarregarFatura() {
+  await fetchInvoices(targetUserId.value, selectedPeriod.value);
+}
+
+/**
+ * Emite a cobrança da competência.
+ *
+ * `dryRun` não cria nada no provedor e não notifica ninguém — serve para
+ * conferir valor, vencimento e destinatário antes de mandar de verdade.
+ *
+ * Dois desvios tratados aqui, e os dois vêm do backend por `code`:
+ *   missing_customer  -> oferece vincular o cliente e repete a emissão;
+ *   due_date_in_past  -> pede a data nova, porque o provedor recusa vencimento
+ *                        no passado e trocar a data em silêncio faria a cobrança
+ *                        vencer num dia diferente do que a tela mostra.
+ */
+async function emitirCobranca({ dryRun = false, dueDate = null } = {}) {
+  if (!currentInvoice.value || !targetUserId.value) return;
+  const periodo = currentInvoice.value.period;
+
+  if (!dryRun) {
+    const confirmado = await confirm({
+      title: `Emitir cobrança de ${periodLabel(periodo)}`,
+      message: `${formatCurrency(currentInvoice.value.totalAmount)} para ${props.clientName}.`,
+      detail: 'A cobrança é criada no provedor e o cliente é notificado por ele. '
+        + 'Use "Simular" antes se quiser conferir sem enviar.',
+      confirmText: 'Emitir cobrança',
+      tone: 'primary',
+    });
+    if (!confirmado) return;
+  }
+
+  limparAvisosDeCobranca();
+  isChargeBusy.value = true;
+  try {
+    const resposta = await issueCharge(targetUserId.value, periodo, { dryRun, dueDate });
+
+    if (dryRun) {
+      const p = resposta?.wouldSend || {};
+      chargeMessage.value = `Simulação: ${formatCurrency(p.value)} com vencimento em `
+        + `${p.dueDate}, forma ${p.billingType}. Nada foi criado e ninguém foi notificado.`;
+      return;
+    }
+
+    chargeMessage.value = resposta?.adopted
+      ? `Já existia uma cobrança no provedor (${resposta.paymentId}); ela foi vinculada a esta competência.`
+      : `Cobrança ${resposta.paymentId} emitida.`;
+    await recarregarFatura();
+  } catch (e) {
+    const code = codigoDoErro(e);
+
+    if (code === 'missing_customer') {
+      const vincular = await confirm({
+        title: 'Cliente ainda não está no provedor',
+        message: 'Para emitir, o cliente precisa existir no provedor de cobrança.',
+        detail: 'Vou procurar pelo documento antes de criar, então não gera cadastro duplicado.',
+        confirmText: 'Vincular e emitir',
+        tone: 'primary',
+      });
+      if (!vincular) { chargeError.value = e.message; return; }
+      try {
+        await ensureAsaasCustomer(targetUserId.value);
+        // Repete a emissão já com o vínculo em mão.
+        isChargeBusy.value = false;
+        return await emitirCobranca({ dryRun, dueDate });
+      } catch (erroCliente) {
+        chargeError.value = codigoDoErro(erroCliente) === 'missing_document'
+          ? 'Este cliente não tem CPF/CNPJ cadastrado, e o provedor exige o documento do pagador.'
+          : erroCliente.message;
+        return;
+      }
+    }
+
+    if (code === 'due_date_in_past') {
+      const sugestao = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+      // eslint-disable-next-line no-alert
+      const nova = window.prompt(
+        `O vencimento desta competência (${e.data?.invoiceDueDate || ''}) já passou e o provedor recusa `
+        + 'cobrança com data no passado.\n\nInforme a nova data de vencimento (AAAA-MM-DD):',
+        sugestao
+      );
+      if (!nova) { chargeError.value = e.message; return; }
+      isChargeBusy.value = false;
+      return await emitirCobranca({ dryRun, dueDate: nova.trim() });
+    }
+
+    chargeError.value = e.message || 'Não foi possível emitir a cobrança.';
+  } finally {
+    isChargeBusy.value = false;
+  }
+}
+
+/** Relê o estado no provedor. Usar quando um evento se perdeu. */
+async function sincronizarCobranca() {
+  limparAvisosDeCobranca();
+  isChargeBusy.value = true;
+  try {
+    const r = await syncCharge(targetUserId.value, currentInvoice.value.period);
+    chargeMessage.value = `Provedor: ${r.status}`
+      + (r.statusLocal ? ` — fatura marcada como ${r.statusLocal === 'paid' ? 'paga' : 'em aberto'}.` : '.');
+    await recarregarFatura();
+  } catch (e) {
+    chargeError.value = e.message || 'Não foi possível sincronizar.';
+  } finally {
+    isChargeBusy.value = false;
+  }
+}
+
+/**
+ * Altera só o vencimento.
+ *
+ * Valor não muda por aqui de propósito: mudaria o documento do cliente sem
+ * mudar o total congelado da competência, e os dois passariam a discordar.
+ */
+async function alterarVencimento() {
+  const atual = currentInvoice.value?.dueDate || '';
+  // eslint-disable-next-line no-alert
+  const nova = window.prompt(`Nova data de vencimento (AAAA-MM-DD).\nVencimento atual: ${atual}`, '');
+  if (!nova) return;
+
+  limparAvisosDeCobranca();
+  isChargeBusy.value = true;
+  try {
+    const r = await updateChargeDueDate(targetUserId.value, currentInvoice.value.period, nova.trim());
+    chargeMessage.value = `Vencimento alterado para ${r.dueDate}.`;
+    await recarregarFatura();
+  } catch (e) {
+    chargeError.value = e.message || 'Não foi possível alterar o vencimento.';
+  } finally {
+    isChargeBusy.value = false;
+  }
+}
+
+/** Cancela no provedor e desfaz o vínculo, deixando a competência reemitível. */
+async function cancelarCobranca() {
+  const confirmado = await confirm({
+    title: 'Cancelar a cobrança',
+    message: 'A cobrança é removida no provedor e a competência volta a poder ser emitida.',
+    detail: 'Se o cliente já tiver pago, o cancelamento é recusado — devolver dinheiro é estorno, '
+      + 'e isso se faz no painel do provedor.',
+    confirmText: 'Cancelar cobrança',
+    tone: 'danger',
+  });
+  if (!confirmado) return;
+
+  limparAvisosDeCobranca();
+  isChargeBusy.value = true;
+  try {
+    await cancelCharge(targetUserId.value, currentInvoice.value.period);
+    chargeMessage.value = 'Cobrança cancelada.';
+    await recarregarFatura();
+  } catch (e) {
+    chargeError.value = e.message || 'Não foi possível cancelar a cobrança.';
+  } finally {
+    isChargeBusy.value = false;
   }
 }
 
@@ -804,8 +1036,23 @@ watch(() => props.userId, (newId) => {
 .invoice-hero__facts dd { margin: 0.2rem 0 0; font-size: 0.95rem; font-weight: 650; font-variant-numeric: tabular-nums; }
 .invoice-hero__facts small { display: block; margin-top: 0.15rem; font-size: 0.7rem; color: rgba(255, 255, 255, 0.6); overflow-wrap: anywhere; }
 .invoice-hero__hint { grid-column: 1 / -1; margin: 0; padding-top: 0.9rem; border-top: 1px solid rgba(255, 255, 255, 0.16); font-size: 0.78rem; line-height: 1.45; color: rgba(255, 255, 255, 0.78); }
-.invoice-hero__charge { grid-column: 1 / -1; justify-self: start; padding: 0.45rem 0.9rem; border-radius: 6px; background: rgba(255, 255, 255, 0.16); color: #fff; font-size: 0.8rem; font-weight: 650; text-decoration: none; }
-.invoice-hero__charge:hover { background: rgba(255, 255, 255, 0.26); }
+/* Cobrança no provedor, dentro do cartão da fatura: é ali que se decide se o
+   valor vai para fora, e ficar longe do valor separaria a decisão do número. */
+.charge-box { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding-top: 0.9rem; border-top: 1px solid rgba(255, 255, 255, 0.16); }
+.charge-box__head { display: flex; align-items: baseline; gap: 0.45rem; }
+.charge-box__label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.66); }
+.charge-box__status { font-size: 0.82rem; font-weight: 700; color: #fff; }
+.charge-box__status.is-off { color: rgba(255, 255, 255, 0.6); font-weight: 600; }
+.charge-box__actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-left: auto; }
+.charge-btn { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.4rem 0.8rem; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 6px; background: transparent; color: #fff; font-size: 0.78rem; font-weight: 650; cursor: pointer; text-decoration: none; transition: background-color 0.15s, opacity 0.15s; }
+.charge-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+.charge-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.charge-btn--solid { background: #fff; border-color: #fff; color: var(--cd-blue-800, #075985); }
+.charge-btn--solid:hover:not(:disabled) { background: #e0f2fe; }
+.charge-btn--danger { border-color: rgba(254, 202, 202, 0.55); color: #fecaca; }
+.charge-btn--danger:hover:not(:disabled) { background: rgba(185, 28, 28, 0.35); }
+.charge-box__hint, .charge-box__msg { flex: 1 1 100%; margin: 0; font-size: 0.76rem; line-height: 1.45; color: rgba(255, 255, 255, 0.78); }
+.charge-box__msg.is-error { color: #fecaca; font-weight: 650; }
 
 /* Congelada x ainda mutável: informação que já chegava do backend e nenhuma
    tela mostrava, e é ela que responde "posso cobrar este valor?". */

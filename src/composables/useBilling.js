@@ -147,6 +147,46 @@ export function useBilling() {
     return api.post(`/billing/invoices/${uid}/${period}/reopen${query}`);
   };
 
+  /* ======================= Cobrança no provedor =======================
+   *
+   * Todas exigem master no backend. Os erros chegam como Error com `.data`
+   * preenchido pelo useApi, e o `code` de dentro do `.data` é o que a tela usa
+   * para oferecer a saída certa (vincular cliente, pedir data nova) em vez de
+   * só mostrar a mensagem crua.
+   * =================================================================== */
+
+  /** Diagnóstico: chave presente, ambiente e alcance do provedor. Não cria nada. */
+  const fetchAsaasStatus = async () => api.get('/billing/asaas/status');
+
+  /** Garante o cadastro do cliente no provedor. Idempotente. */
+  const ensureAsaasCustomer = async (uid) => api.post(`/billing/asaas/customers/${uid}`);
+
+  /**
+   * Emite a cobrança da competência.
+   *
+   * Exige competência fechada — com o mês aberto o total ainda muda e o cliente
+   * receberia um documento com valor diferente do que a tela mostra depois.
+   *
+   * `dryRun` valida tudo e devolve o que SERIA enviado, sem criar nada e sem
+   * notificar ninguém.
+   */
+  const issueCharge = async (uid, period, { dryRun = false, dueDate = null } = {}) => {
+    const query = dryRun ? '?dryRun=1' : '';
+    return api.post(`/billing/invoices/${uid}/${period}/charge${query}`, dueDate ? { dueDate } : undefined);
+  };
+
+  /** Relê o estado da cobrança no provedor. É o caminho de conferência. */
+  const syncCharge = async (uid, period) =>
+    api.post(`/billing/invoices/${uid}/${period}/charge/sync`);
+
+  /** Altera SÓ o vencimento. Valor diferente exige cancelar e emitir de novo. */
+  const updateChargeDueDate = async (uid, period, dueDate) =>
+    api.patch(`/billing/invoices/${uid}/${period}/charge`, { dueDate });
+
+  /** Cancela a cobrança no provedor e desfaz o vínculo. Não desfaz a baixa. */
+  const cancelCharge = async (uid, period) =>
+    api.delete(`/billing/invoices/${uid}/${period}/charge`);
+
   return {
     invoices,
     billingSummary,
@@ -161,5 +201,11 @@ export function useBilling() {
     deleteManualItem,
     closeInvoicePeriod,
     reopenInvoicePeriod,
+    fetchAsaasStatus,
+    ensureAsaasCustomer,
+    issueCharge,
+    syncCharge,
+    updateChargeDueDate,
+    cancelCharge,
   };
 }
