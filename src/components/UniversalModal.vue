@@ -473,7 +473,11 @@ defineExpose({ close, focusFirst, focusLast })
 /* Body e Footer */
 .modal-body {
   flex: 1 1 auto;
+  /* `min-width: 0` junto com `min-height: 0`: sem ele um filho largo empurra o
+     corpo e nasce barra horizontal, que é o defeito mais comum de formulário em
+     grade dentro de modal. */
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
   overscroll-behavior: contain; /* rolar até o fim não continua na página atrás */
   padding: 1rem 1.25rem 1.25rem;

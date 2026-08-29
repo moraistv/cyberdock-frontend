@@ -531,11 +531,14 @@
              Abre sozinho quando a emissão é recusada por dado faltando, com o
              campo que falta destacado. Antes esse caso era um beco sem saída: a
              tela dizia "não tem CPF/CNPJ" e não havia onde preencher. -->
+        <!-- `full` e não `lg`: com nove campos, 720px obrigava a rolar e ainda
+             criava barra horizontal. Formulário que não cabe vira formulário que
+             ninguém preenche até o fim. -->
         <UniversalModal
           :is-open="isBillingInfoModalOpen"
           @close="closeBillingInfoModal"
           title="Dados de cobrança do cliente"
-          size="lg"
+          size="full"
         >
           <div class="billing-form">
             <p class="billing-form__intro">
@@ -552,20 +555,39 @@
                 Identificação
               </legend>
               <div class="billing-grid">
-                <div class="form-group form-group--wide" :class="{ 'is-missing': faltaCampo('cpfCnpj') }">
+                <div class="form-group" :class="{ 'is-missing': faltaCampo('cpfCnpj'), 'is-invalid': erroDoc }">
                   <label for="bf-doc">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     CPF ou CNPJ <span class="req">obrigatório</span>
+                    <span v-if="tipoDoc" class="doc-tipo">{{ tipoDoc }}</span>
                   </label>
-                  <input id="bf-doc" type="text" v-model="billingForm.cpfCnpj" placeholder="Só números, com ou sem pontuação" inputmode="numeric">
-                  <small class="form-hint">Validado pelo dígito verificador, não só pelo tamanho.</small>
+                  <input
+                    id="bf-doc"
+                    type="text"
+                    :value="billingForm.cpfCnpj"
+                    placeholder="000.000.000-00"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    @input="billingForm.cpfCnpj = mascaraDocumento($event.target.value)"
+                  >
+                  <small v-if="erroDoc" class="form-erro">{{ erroDoc }}</small>
+                  <small v-else class="form-hint">Validado pelo dígito verificador, não só pelo tamanho.</small>
                 </div>
-                <div class="form-group">
+                <div class="form-group" :class="{ 'is-invalid': erroFone }">
                   <label for="bf-fone">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                     Telefone
                   </label>
-                  <input id="bf-fone" type="text" v-model="billingForm.phone" placeholder="DDD + número" inputmode="numeric">
+                  <input
+                    id="bf-fone"
+                    type="text"
+                    :value="billingForm.phone"
+                    placeholder="(11) 91234-5678"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    @input="billingForm.phone = mascaraTelefone($event.target.value)"
+                  >
+                  <small v-if="erroFone" class="form-erro">{{ erroFone }}</small>
                 </div>
               </div>
             </fieldset>
@@ -577,26 +599,35 @@
                 <small>necessário para boleto</small>
               </legend>
               <div class="billing-grid">
-                <div class="form-group" :class="{ 'is-missing': faltaCampo('postalCode') }">
+                <div class="form-group" :class="{ 'is-missing': faltaCampo('postalCode'), 'is-invalid': erroCepAtual }">
                   <label for="bf-cep">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
                     CEP
                   </label>
-                  <input id="bf-cep" type="text" v-model="billingForm.postalCode" placeholder="00000-000" inputmode="numeric">
+                  <input
+                    id="bf-cep"
+                    type="text"
+                    :value="billingForm.postalCode"
+                    placeholder="00000-000"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    @input="billingForm.postalCode = mascaraCep($event.target.value)"
+                  >
+                  <small v-if="erroCepAtual" class="form-erro">{{ erroCepAtual }}</small>
                 </div>
                 <div class="form-group" :class="{ 'is-missing': faltaCampo('addressNumber') }">
                   <label for="bf-num">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
                     Número
                   </label>
-                  <input id="bf-num" type="text" v-model="billingForm.addressNumber" placeholder="123">
+                  <input id="bf-num" type="text" v-model="billingForm.addressNumber" placeholder="123" maxlength="20">
                 </div>
                 <div class="form-group form-group--wide">
                   <label for="bf-rua">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
                     Logradouro
                   </label>
-                  <input id="bf-rua" type="text" v-model="billingForm.address" placeholder="Rua, avenida...">
+                  <input id="bf-rua" type="text" v-model="billingForm.address" placeholder="Rua, avenida..." maxlength="255">
                 </div>
                 <div class="form-group">
                   <label for="bf-compl">
@@ -624,7 +655,15 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
                     UF
                   </label>
-                  <input id="bf-uf" type="text" v-model="billingForm.state" placeholder="SP" maxlength="2">
+                  <input
+                    id="bf-uf"
+                    type="text"
+                    :value="billingForm.state"
+                    placeholder="SP"
+                    maxlength="2"
+                    autocomplete="off"
+                    @input="billingForm.state = mascaraUf($event.target.value)"
+                  >
                 </div>
               </div>
             </fieldset>
@@ -637,7 +676,12 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               Cancelar
             </button>
-            <button class="btn-primary btn-ico" :disabled="isSavingBillingInfo" @click="salvarDadosDeCobranca">
+            <button
+              class="btn-primary btn-ico"
+              :disabled="isSavingBillingInfo || !podeSalvarDados"
+              :title="podeSalvarDados ? '' : 'Informe um CPF ou CNPJ válido para continuar'"
+              @click="salvarDadosDeCobranca"
+            >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
               {{ isSavingBillingInfo ? 'Salvando...' : (retomarEmissaoAoSalvar ? 'Salvar e emitir' : 'Salvar dados') }}
             </button>
@@ -734,6 +778,13 @@ import { ref, computed, watch, onMounted, defineProps } from 'vue';
 import { useBilling } from '@/composables/useBilling';
 import { useConfirm } from '@/composables/useConfirm';
 import UniversalModal from '@/components/UniversalModal.vue';
+/* Máscara e validação no navegador. O backend valida de novo e continua sendo a
+ * autoridade — isto existe para recusar o caractere errado no momento em que é
+ * digitado, em vez de deixar preencher tudo para errar no submit. */
+import {
+  apenasDigitos, mascaraDocumento, mascaraCep, mascaraTelefone, mascaraUf,
+  erroDocumento, erroCep, erroTelefone, tipoDocumento,
+} from '@/utils/documentoFiscal';
 
 const props = defineProps({
   userId: { type: String, default: null },
@@ -1098,6 +1149,24 @@ const billingForm = ref({
 });
 
 const faltaCampo = (campo) => camposFaltando.value.includes(campo);
+
+/* Erros por campo, avaliados enquanto se digita.
+ *
+ * Campo vazio não é erro: quem decide o que é obrigatório é a operação (o
+ * documento sempre; CEP só para boleto), e acusar "obrigatório" antes de a
+ * pessoa terminar de preencher é ruído. O que estas checagens pegam é o valor
+ * ERRADO — dígito verificador que não fecha, CEP com número de dígitos errado,
+ * DDD que não existe. */
+const erroDoc = computed(() => erroDocumento(billingForm.value.cpfCnpj));
+const erroFone = computed(() => erroTelefone(billingForm.value.phone));
+const erroCepAtual = computed(() => erroCep(billingForm.value.postalCode));
+const tipoDoc = computed(() => tipoDocumento(billingForm.value.cpfCnpj));
+
+/** Documento é o único sempre obrigatório; o resto só não pode estar errado. */
+const podeSalvarDados = computed(() =>
+  Boolean(apenasDigitos(billingForm.value.cpfCnpj))
+  && !erroDoc.value && !erroFone.value && !erroCepAtual.value
+);
 
 /**
  * Abre o formulário de dados de cobrança.
@@ -1675,7 +1744,10 @@ watch(() => props.userId, (newId) => {
 .form-hint { margin-top: 0.35rem; color: #94a3b8; font-size: 0.73rem; line-height: 1.4; }
 
 /* ---------------- Formulário de dados de cobrança ---------------- */
-.billing-form { display: flex; flex-direction: column; gap: 1rem; padding-top: 0.25rem; }
+/* `min-width: 0` também aqui: sem ele um filho flex não encolhe e a barra
+   horizontal reaparece por outro caminho. */
+.billing-form { display: flex; flex-direction: column; gap: 0.85rem; padding-top: 0.25rem; min-width: 0; }
+.billing-form > * { min-width: 0; }
 .billing-form__intro { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0; padding: 0.65rem 0.8rem; border: 1px solid var(--cd-line, #dbe7f0); border-left: 3px solid var(--cd-blue-600, #0284c7); border-radius: 0.45rem; background: #f8fbfe; color: #475569; font-size: 0.79rem; line-height: 1.5; }
 .billing-form__intro svg { flex: 0 0 auto; margin-top: 0.1rem; color: var(--cd-blue-700, #0369a1); }
 .billing-form__intro strong { color: var(--cd-ink, #0f172a); }
@@ -1685,18 +1757,40 @@ watch(() => props.userId, (newId) => {
 .billing-fieldset legend { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0 0.4rem; color: var(--cd-blue-800, #075985); font-size: 0.82rem; font-weight: 750; }
 .billing-fieldset legend svg { flex: 0 0 auto; }
 .billing-fieldset legend small { color: #94a3b8; font-size: 0.7rem; font-weight: 600; }
-.billing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 0 0.75rem; }
+/* `minmax(0, 1fr)` e não `minmax(8.5rem, 1fr)`: era a origem da BARRA
+   HORIZONTAL. Coluna com mínimo em rem não encolhe abaixo disso, e três colunas
+   de 8.5rem mais o espaçamento passavam da largura útil do modal — daí o campo
+   "Cidade" cortado no lado direito. */
+.billing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 0 0.75rem; }
 .billing-grid .form-group--wide { grid-column: 1 / -1; }
-.billing-grid .form-group { margin-bottom: 0.85rem; }
+.billing-grid .form-group { margin-bottom: 0.85rem; min-width: 0; }
+
+/* `min-width: 0` no input é o par obrigatório do acima: item de grade nasce com
+   `min-width: auto`, e input tem largura intrínseca de ~20 caracteres, então ele
+   se recusava a encolher e empurrava a grade para fora. `box-sizing` garante que
+   o padding entre na conta da largura. */
+.billing-grid input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
 
 /* Campo que o backend apontou como faltando. O destaque é a diferença entre
    "deu erro" e "preencha ISTO". */
 .form-group.is-missing input { border-color: #f59e0b; background: #fffbeb; }
 .form-group.is-missing label { color: #9a5700; }
-.req { padding: 0.05rem 0.35rem; border-radius: 999px; background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); font-size: 0.63rem; font-weight: 750; letter-spacing: 0.03em; text-transform: uppercase; }
 
-@media (min-width: 34rem) {
-  .billing-grid { grid-template-columns: 1fr 1fr 1fr; }
+/* Valor digitado errado. Vermelho vence o âmbar de "faltando": um campo pode
+   estar nos dois estados, e o erro é a informação mais urgente. */
+.form-group.is-invalid input { border-color: #dc2626 !important; background: #fef2f2 !important; }
+.form-erro { margin-top: 0.35rem; color: #b91c1c; font-size: 0.73rem; font-weight: 650; line-height: 1.4; }
+
+.req { padding: 0.05rem 0.35rem; border-radius: 999px; background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); font-size: 0.63rem; font-weight: 750; letter-spacing: 0.03em; text-transform: uppercase; }
+/* Confirma para quem digita que o sistema entendeu CPF ou CNPJ. */
+.doc-tipo { padding: 0.05rem 0.35rem; border-radius: 999px; background: var(--cd-blue-50, #f0f9ff); color: var(--cd-blue-700, #0369a1); font-size: 0.63rem; font-weight: 750; }
+
+@media (min-width: 40rem) {
+  .billing-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 .form-group { display: flex; flex-direction: column; }
 .form-group label { display: inline-flex; align-items: center; gap: 0.32rem; margin-bottom: 0.5rem; font-weight: 600; color: #374151; font-size: 0.85rem; }
