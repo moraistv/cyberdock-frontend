@@ -637,28 +637,121 @@
             <button @click="handleSaveName" class="btn btn-primary" :disabled="isSavingName">{{ isSavingName ? 'Salvando...' : 'Salvar' }}</button>
           </div>
         </UniversalModal>
-        <UniversalModal :title="`Gerenciar Serviços de ${currentUser?.mlNickname || currentUser?.email}`" :is-open="isContractModalOpen" @close="closeContractModal">
+        <!-- size="lg" (720px): a tabela antiga tinha `min-width: 600px` dentro
+             de um modal de 560px, então a barra de rolagem horizontal era
+             garantida em qualquer tela. A lista abaixo não tem largura mínima,
+             então o scroll deixa de existir por construção e não por sorte. -->
+        <UniversalModal
+          :title="`Gerenciar Serviços de ${currentUser?.mlNickname || currentUser?.email}`"
+          :is-open="isContractModalOpen"
+          size="lg"
+          @close="closeContractModal"
+        >
           <div class="contract-modal-content">
-            <h4 class="modal-subtitle">Serviços Atuais</h4>
-            <div class="table-wrapper-modal">
-              <table class="services-table-modal">
-                <thead><tr><th>Serviço</th><th>Contratado em</th><th>Volume/Qtd</th><th>Ações</th></tr></thead>
-                <tbody>
-                  <tr v-if="isLoadingClientServices"><td colspan="4" class="feedback-cell">Carregando...</td></tr>
-                  <tr v-else-if="clientServices.length === 0"><td colspan="4" class="feedback-cell">Nenhum serviço contratado.</td></tr>
-                  <tr v-for="service in clientServices" :key="service.id">
-                    <td>{{ service.name }}</td><td>{{ formatDate(service.startDate, true) }}</td><td>{{ service.volume || 'N/A' }}</td>
-                    <td><button @click="handleRemoveClientService(service.id)" class="btn-action delete" title="Remover"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button></td>
-                  </tr>
-                </tbody>
-              </table>
+            <div class="contract-section-head">
+              <h4 class="modal-subtitle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+                Serviços contratados
+              </h4>
+              <span v-if="!isLoadingClientServices" class="catalogue-count">{{ clientServices.length }}</span>
             </div>
-            <h4 class="modal-subtitle">Adicionar Novo Serviço</h4>
+
+            <p v-if="isLoadingClientServices" class="contract-feedback">Carregando...</p>
+
+            <p v-else-if="clientServices.length === 0" class="contract-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M20.91 8.84 8.56 2.23a1.93 1.93 0 0 0-1.81 0L3.1 4.13a2.02 2.02 0 0 0-.1 3.5l12.35 6.61a1.93 1.93 0 0 0 1.81 0l3.65-1.9a2.02 2.02 0 0 0 .1-3.5Z"/><path d="m3.09 8.84 12.35-6.61"/><line x1="12" y1="22" x2="12" y2="13"/></svg>
+              <span>Nenhum serviço contratado. Use o formulário abaixo para começar.</span>
+            </p>
+
+            <ul v-else class="contract-list">
+              <li v-for="service in clientServices" :key="service.id" class="contract-item">
+                <!-- Ícone por tipo de cobrança, o mesmo do catálogo. -->
+                <span
+                  class="contract-item__icon"
+                  :class="`icon--${contractType(service) || 'none'}`"
+                  v-html="serviceTypeIcon(contractType(service))"
+                ></span>
+
+                <div class="contract-item__body">
+                  <div class="contract-item__title">
+                    {{ service.name }}
+                    <!-- O tipo aparece aqui porque é ele que decide se o serviço
+                         entra na fatura. Serviço criado pela tela do catálogo
+                         nasce sem tipo, e sem tipo o cliente NÃO é cobrado: foi
+                         assim que um armazenamento de R$ 397 passou meses sem
+                         cobrança, e nada na tela denunciava. -->
+                    <span class="type-badge" :class="contractType(service) ? 'is-set' : 'is-missing'">
+                      {{ serviceTypeLabel(contractType(service)) }}
+                    </span>
+                  </div>
+
+                  <div class="contract-item__meta">
+                    <span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      Desde {{ formatDate(service.startDate, true) }}
+                    </span>
+                    <span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/><path d="M12 12 4 7.5"/></svg>
+                      {{ service.volume || 1 }} {{ contractUnitLabel(service) }}
+                    </span>
+                    <span v-if="service.price != null" class="contract-item__price">
+                      {{ formatCurrency(service.price) }}
+                    </span>
+                  </div>
+
+                  <p v-if="!contractType(service)" class="contract-item__warning">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="13" height="13"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    Sem tipo de cobrança: não entra na fatura.
+                  </p>
+                </div>
+
+                <button
+                  @click="handleRemoveClientService(service.id)"
+                  class="btn-action delete contract-item__remove"
+                  title="Remover este serviço do cliente"
+                >
+                  <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+              </li>
+            </ul>
+
+            <h4 class="modal-subtitle contract-add-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Adicionar novo serviço
+            </h4>
             <form @submit.prevent="handleAddClientService" class="add-service-form">
-              <div class="form-group"><label>Serviço</label><select v-model="newContract.serviceId" required><option disabled value="">Selecione</option><option v-for="s in availableServices" :key="s.id" :value="s.id">{{ s.name }}</option></select></div>
-              <div class="form-group"><label>Volume (m³)/Qtd</label><input type="number" v-model.number="newContract.volume" required /></div>
-              <div class="form-group"><label>Data de Início</label><input type="date" v-model="newContract.startDate" required /></div>
-              <button type="submit" class="btn btn-primary add-btn">Adicionar</button>
+              <div class="add-service-form__grid">
+                <div class="form-group form-group--wide">
+                  <label>Serviço</label>
+                  <select v-model="newContract.serviceId" required>
+                    <option disabled value="">Selecione</option>
+                    <option v-for="s in availableServices" :key="s.id" :value="s.id">{{ s.name }}</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Volume / Qtd</label>
+                  <input type="number" v-model.number="newContract.volume" min="1" required />
+                </div>
+                <div class="form-group">
+                  <label>Data de início</label>
+                  <input type="date" v-model="newContract.startDate" required />
+                </div>
+              </div>
+
+              <!-- A data de início não é detalhe de cadastro: é ela que define o
+                   proporcional do mês de entrada e o que a fatura de uma
+                   competência passada continua cobrando. -->
+              <p class="add-service-form__hint">
+                A data de início define o proporcional do primeiro mês e mantém as competências passadas corretas.
+              </p>
+
+              <div class="add-service-form__actions">
+                <button type="button" class="btn btn-secondary" @click="closeContractModal">Fechar</button>
+                <button type="submit" class="btn btn-primary btn-with-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Adicionar serviço
+                </button>
+              </div>
             </form>
           </div>
         </UniversalModal>
@@ -852,9 +945,55 @@ const breadcrumbTitle = computed(() => {
 
 const formatDate = (timestamp, isDateString = false) => {
   if (!timestamp) return 'N/A';
-  const date = isDateString ? new Date(timestamp.replace(/-/g, '/')) : new Date(timestamp);
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  /* BUG QUE ISTO CORRIGE: a coluna "Contratado em" mostrava "Invalid Date".
+   *
+   * O caminho antigo era `new Date(timestamp.replace(/-/g, '/'))`. Esse truque
+   * existe para ler 'AAAA-MM-DD' em hora LOCAL, porque `new Date('2026-05-01')`
+   * é interpretado como UTC e, num fuso a oeste de Greenwich, exibe 30/04.
+   *
+   * Só que ele funciona apenas numa data pura. `start_date` é DATE no Postgres
+   * e chega serializado como ISO completo ('2026-05-01T00:00:00.000Z'); trocar
+   * os hifens produzia '2026/05/01T00:00:00.000Z', que não é data nenhuma.
+   *
+   * Agora o valor é sempre parseado como veio, e `isDateString` passou a
+   * significar "isto é data de calendário, leia em UTC" — que resolve o mesmo
+   * problema de fuso sem depender do formato exato da string.
+   */
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+
+  return date.toLocaleDateString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    ...(isDateString ? { timeZone: 'UTC' } : {}),
+  });
 };
+
+/* -------------------------------------------------------------------------- */
+/* Contrato do cliente x catálogo                                             */
+/*                                                                            */
+/* GET /users/contracts/:uid devolve id, serviceId, name, price, volume e      */
+/* startDate — e NÃO o tipo de cobrança nem a unidade, que moram em            */
+/* public.services. O modal já carrega o catálogo (fetchServices no            */
+/* openContractModal), então o cruzamento é feito aqui pelo serviceId em vez   */
+/* de mudar a rota do backend.                                                 */
+/* -------------------------------------------------------------------------- */
+
+function catalogoDoContrato(contract) {
+  if (!contract?.serviceId) return null;
+  return availableServices.value.find((s) => s.id === contract.serviceId) || null;
+}
+
+/** Tipo de cobrança do serviço contratado, ou null quando não tem. */
+function contractType(contract) {
+  return catalogoDoContrato(contract)?.type || null;
+}
+
+/** Unidade do serviço, já no plural quando faz sentido. */
+function contractUnitLabel(contract) {
+  const servico = catalogoDoContrato(contract);
+  return unitLabel(servico?.unit, contract?.volume || 1) || 'un.';
+}
 
 /**
  * A aba de um cliente vive na URL (/admin/users/:uid/vendas). Estes mapas
@@ -1823,8 +1962,42 @@ button, input, select, table { font-family: var(--font-sans); }
 .feedback-cell { text-align: center; color: #64748b; }
 .form-group { margin-bottom: 1rem; }
 .form-group label { display: block; font-size: .8rem; font-weight: 700; color: #334155; margin-bottom: .25rem; }
+/* ---------------- Serviços contratados do cliente ----------------
+   Substituiu a tabela com `min-width: 600px`, que dentro de um modal de 560px
+   garantia barra de rolagem horizontal em qualquer tela. Lista sem largura
+   mínima: o scroll deixa de existir por construção. */
+.contract-section-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.65rem; }
+.contract-section-head .modal-subtitle { margin: 0; flex: 1 1 auto; }
+.contract-feedback { margin: 0 0 1rem; color: #64748b; font-size: 0.85rem; }
+.contract-empty { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 1rem; padding: 1rem; border: 1px dashed #cbd5e1; border-radius: 0.6rem; color: #64748b; font-size: 0.83rem; line-height: 1.45; }
+.contract-empty svg { flex: 0 0 auto; color: #94a3b8; }
+
+.contract-list { list-style: none; margin: 0 0 0.5rem; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.contract-item { display: grid; grid-template-columns: auto 1fr auto; gap: 0.75rem; align-items: start; padding: 0.75rem 0.85rem; border: 1px solid var(--cd-line, #dbe7f0); border-radius: 0.65rem; background: #fff; }
+.contract-item__icon { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 0.5rem; background: #f0f9ff; color: var(--cd-blue-700, #0369a1); flex: 0 0 auto; }
+.contract-item__icon :deep(svg) { width: 16px; height: 16px; }
+.contract-item__icon.icon--none { background: #fff3cd; color: #9a5700; }
+.contract-item__body { min-width: 0; }
+.contract-item__title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; color: #0f172a; font-size: 0.87rem; font-weight: 700; line-height: 1.35; }
+.contract-item__meta { display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; margin-top: 0.3rem; color: #64748b; font-size: 0.76rem; }
+.contract-item__meta span { display: inline-flex; align-items: center; gap: 0.28rem; }
+.contract-item__meta svg { flex: 0 0 auto; color: #94a3b8; }
+.contract-item__price { font-weight: 700; color: var(--cd-blue-700, #0369a1); font-variant-numeric: tabular-nums; }
+.contract-item__warning { display: flex; align-items: center; gap: 0.3rem; margin: 0.4rem 0 0; color: var(--cd-warning-ink, #9a5700); font-size: 0.74rem; font-weight: 650; }
+.contract-item__warning svg { flex: 0 0 auto; }
+.contract-item__remove { align-self: center; }
+
+.contract-add-title { margin-top: 1.35rem; }
 .add-service-form { border-top: 1px solid #eef2f7; padding-top: 1rem; }
-.add-btn { width: 100%; }
+.add-service-form__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0 0.75rem; }
+.add-service-form__grid .form-group--wide { grid-column: 1 / -1; }
+.add-service-form__hint { margin: 0 0 0.9rem; color: #64748b; font-size: 0.75rem; line-height: 1.45; }
+.add-service-form__actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+@media (min-width: 34rem) {
+  /* Serviço ocupa a linha inteira; volume e data dividem a de baixo. */
+  .add-service-form__grid { grid-template-columns: 1fr 1fr; }
+}
 .status-creator { display: flex; gap: .5rem; margin-bottom: 1rem; }
 .modal-subtitle {
   display: flex; align-items: center; gap: 0.4rem;
