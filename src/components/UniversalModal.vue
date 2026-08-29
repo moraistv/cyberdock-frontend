@@ -58,6 +58,71 @@
   </Teleport>
 </template>
 
+<script>
+/* ──────────────────────────────────────────────────────────────────────────
+ * Estado COMPARTILHADO entre todas as instâncias de UniversalModal.
+ *
+ * Fica NESTE bloco, e não no <script setup>, de propósito: tudo que está no
+ * <script setup> é compilado para dentro de setup() e portanto vira estado por
+ * instância. Um contador por instância não coordena nada — foi exatamente esse
+ * o defeito. Este bloco roda uma única vez, na avaliação do módulo.
+ *
+ * A coordenação é necessária porque o componente é teleportado para o body:
+ * duas instâncias abertas disputam o mesmo `document.body` e o mesmo listener
+ * de teclado, e nenhuma delas sabe da outra. O sistema empilha modais em vários
+ * fluxos — KitFormModal é renderizada DENTRO do slot de KitManagementModal,
+ * PackageTypeSelectModal abre sobre SkuFormModal, e o ConfirmDialog global abre
+ * sobre qualquer um.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* Pilha de instâncias abertas, na ordem em que abriram. O último é o do topo. */
+const openInstances = []
+
+/* Trava de rolagem do body, por CONTAGEM e não por instância.
+ *
+ * O modelo anterior era por instância: cada modal guardava o
+ * `body.style.overflow` que ELE viu ao abrir e regravava esse valor ao fechar.
+ * Com dois modais na tela, o de dentro capturava 'hidden' — valor sujo, deixado
+ * pelo de fora — e, se fechasse por último, regravava 'hidden' no body. Aí não
+ * havia mais modal nenhum na tela e a página não rolava mais: era exatamente o
+ * que acontecia ao criar SKU ou kit, onde a página fica clicável mas sem rolar.
+ *
+ * A ordem de fechamento deixa de importar quando o valor original é capturado
+ * uma única vez (0 -> 1) e restaurado uma única vez (1 -> 0).
+ */
+let lockCount = 0
+let savedOverflow = ''
+let savedPaddingRight = ''
+
+function acquireBodyLock() {
+  lockCount += 1
+  // Já havia modal travando: o body está no estado certo e o valor original
+  // guardado é o de quem travou primeiro. Não tocar em nada.
+  if (lockCount > 1) return
+
+  const body = document.body
+  savedOverflow = body.style.overflow
+  savedPaddingRight = body.style.paddingRight
+  const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+  body.style.overflow = 'hidden'
+  if (scrollbarWidth > 0) {
+    const current = parseFloat(getComputedStyle(body).paddingRight || '0')
+    body.style.paddingRight = `${current + scrollbarWidth}px`
+  }
+}
+
+function releaseBodyLock() {
+  lockCount = Math.max(0, lockCount - 1)
+  if (lockCount > 0) return
+
+  const body = document.body
+  body.style.overflow = savedOverflow
+  body.style.paddingRight = savedPaddingRight
+  savedOverflow = ''
+  savedPaddingRight = ''
+}
+</script>
+
 <script setup>
 
 /* global defineProps, defineEmits, defineExpose */
@@ -90,6 +155,13 @@ const sentinelStart = ref(null)
 const sentinelEnd = ref(null)
 const previouslyFocused = ref(null)
 const overlayPointerDownOnSelf = ref(false)
+
+/* Identidade desta instância na pilha e se ela detém uma unidade da trava.
+ * `holdsLock` é o que torna lock/unlock idempotentes: o watcher com
+ * `immediate: true`, o onMounted e o onBeforeUnmount podem chamar os dois em
+ * sequência, e sem esse controle o contador dessincronizaria. */
+const instanceId = Symbol('universal-modal')
+let holdsLock = false
 
 const uid = Math.random().toString(36).slice(2, 9)
 const titleId = `modal-title-${uid}`
@@ -155,6 +227,15 @@ function onBackdropPointerUp() { requestAnimationFrame(() => { overlayPointerDow
 /* Keydown: ESC + trap de foco */
 function onKeydown(e) {
   if (!openComputed.value) return
+
+  /* Só o modal do topo responde ao teclado.
+   *
+   * O listener é registrado em `document` na fase de captura por CADA instância
+   * aberta. Com dois na tela, os dois handlers rodavam: um ESC fechava a pilha
+   * inteira (o formulário de kit e a gestão de kits junto) e o trap de foco do
+   * de baixo disputava o Tab com o de cima. */
+  if (!isTopmost()) return
+
   if (props.closeOnEsc && e.key === 'Escape') {
     e.stopPropagation()
     e.preventDefault()
@@ -190,26 +271,38 @@ function focusLast() {
   target && target.focus && target.focus()
 }
 
-/* Scroll lock com compensação da scrollbar */
-let previousBodyOverflow = ''
-let previousBodyPaddingRight = ''
+/* Trava de rolagem: esta instância pega e devolve UMA unidade do contador
+ * compartilhado. A conta em si está no <script> do topo do arquivo. */
 function lockBodyScroll() {
-  if (!props.lockScroll) return
-  const body = document.body
-  previousBodyOverflow = body.style.overflow
-  previousBodyPaddingRight = body.style.paddingRight
-  const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
-  body.style.overflow = 'hidden'
-  if (scrollbarWidth > 0) {
-    const current = parseFloat(getComputedStyle(body).paddingRight || '0')
-    body.style.paddingRight = `${current + scrollbarWidth}px`
-  }
+  if (!props.lockScroll || holdsLock) return
+  holdsLock = true
+  acquireBodyLock()
 }
+
 function unlockBodyScroll() {
-  if (!props.lockScroll) return
-  const body = document.body
-  body.style.overflow = previousBodyOverflow || ''
-  body.style.paddingRight = previousBodyPaddingRight || ''
+  /* Sem `holdsLock` não há o que devolver, e é isso que impede o contador de
+   * dessincronizar quando lock/unlock são chamados mais de uma vez pelo mesmo
+   * modal (o watcher `immediate`, o onMounted e o onBeforeUnmount se sobrepõem).
+   *
+   * Também corrige um efeito colateral do `immediate: true`: montar com o modal
+   * FECHADO caía no ramo do else e destravava o body de um modal que estava
+   * aberto. A tela de armazenamento monta nove instâncias, então isso acontecia
+   * nove vezes a cada visita. */
+  if (!holdsLock) return
+  holdsLock = false
+  releaseBodyLock()
+}
+
+/* Entrada e saída da pilha de instâncias abertas. */
+function pushInstance() {
+  if (!openInstances.includes(instanceId)) openInstances.push(instanceId)
+}
+function popInstance() {
+  const i = openInstances.indexOf(instanceId)
+  if (i !== -1) openInstances.splice(i, 1)
+}
+function isTopmost() {
+  return openInstances[openInstances.length - 1] === instanceId
 }
 
 /* Reagir à abertura/fechamento */
@@ -217,12 +310,14 @@ watch(() => openComputed.value, async (open) => {
   if (open) {
     previouslyFocused.value = document.activeElement
     document.addEventListener('keydown', onKeydown, true)
+    pushInstance()
     lockBodyScroll()
     await nextTick()
     focusFirst()
     emit('after-open')
   } else {
     document.removeEventListener('keydown', onKeydown, true)
+    popInstance()
     unlockBodyScroll()
     previouslyFocused.value && previouslyFocused.value.focus && previouslyFocused.value.focus()
     emit('after-close')
@@ -233,12 +328,21 @@ watch(() => openComputed.value, async (open) => {
 onMounted(() => {
   if (openComputed.value) {
     document.addEventListener('keydown', onKeydown, true)
+    pushInstance()
     lockBodyScroll()
     nextTick(() => focusFirst())
   }
 })
+
+/* Desmontar conta como fechar.
+ *
+ * KitManagementModal é renderizada com `v-if` e leva KitFormModal dentro dela:
+ * fechar a de fora destrói as duas ainda abertas, e o Vue roda o
+ * onBeforeUnmount de fora para dentro. É a ordem que prendia o body no modelo
+ * antigo — com o contador, a ordem passa a ser irrelevante. */
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown, true)
+  popInstance()
   unlockBodyScroll()
 })
 
