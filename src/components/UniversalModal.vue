@@ -4,7 +4,7 @@
       <div
         v-if="openComputed"
         class="modal-overlay"
-        :style="{ zIndex: String(zIndex) }"
+        :style="{ zIndex: String(camada || zIndex) }"
         @mousedown.self="onBackdropPointerDown"
         @mouseup.self="onBackdropPointerUp"
         @click.self="onOverlayClick"
@@ -78,6 +78,19 @@
 /* Pilha de instâncias abertas, na ordem em que abriram. O último é o do topo. */
 const openInstances = []
 
+/* Camada do próximo modal a abrir.
+ *
+ * Todas as instâncias nasciam com zIndex 9999. Com dois modais na tela — uma
+ * confirmação sobre um formulário, por exemplo — quem ficava por cima era
+ * decidido pela ordem no DOM, o que funciona por acidente e para de funcionar
+ * quando o de baixo é remontado ou quando o de cima abre antes.
+ *
+ * O passo de 10 deixa espaço para um elemento intermediário (dica, seletor) se
+ * precisar entrar entre duas camadas. Zera quando a pilha esvazia, para o valor
+ * não crescer indefinidamente numa sessão longa.
+ */
+let proximaCamada = 0
+
 /* Trava de rolagem do body, por CONTAGEM e não por instância.
  *
  * O modelo anterior era por instância: cada modal guardava o
@@ -103,9 +116,19 @@ function acquireBodyLock() {
   const body = document.body
   savedOverflow = body.style.overflow
   savedPaddingRight = body.style.paddingRight
-  const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
   body.style.overflow = 'hidden'
-  if (scrollbarWidth > 0) {
+
+  /* Compensa a largura da barra de rolagem, para a página não dar um salto
+   * lateral quando a barra desaparece com o overflow: hidden.
+   *
+   * O teto de 40px não é paranoia: com zoom do navegador,
+   * `innerWidth - clientWidth` pode devolver um valor grande e sem relação com
+   * barra nenhuma, e aí a compensação empurra o layout inteiro para o lado. Barra
+   * de rolagem real nunca passa de ~20px, então qualquer coisa acima disso é
+   * medição ruim e é melhor ignorar do que deslocar a tela. */
+  const LARGURA_MAXIMA_DE_BARRA = 40
+  const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+  if (scrollbarWidth > 0 && scrollbarWidth <= LARGURA_MAXIMA_DE_BARRA) {
     const current = parseFloat(getComputedStyle(body).paddingRight || '0')
     body.style.paddingRight = `${current + scrollbarWidth}px`
   }
@@ -162,6 +185,10 @@ const overlayPointerDownOnSelf = ref(false)
  * sequência, e sem esse controle o contador dessincronizaria. */
 const instanceId = Symbol('universal-modal')
 let holdsLock = false
+
+/* Camada desta instância. Sai de `zIndex` na montagem e é elevada a cada
+ * abertura, para que um modal aberto sobre outro fique de fato por cima. */
+const camada = ref(0)
 
 const uid = Math.random().toString(36).slice(2, 9)
 const titleId = `modal-title-${uid}`
@@ -295,11 +322,22 @@ function unlockBodyScroll() {
 
 /* Entrada e saída da pilha de instâncias abertas. */
 function pushInstance() {
-  if (!openInstances.includes(instanceId)) openInstances.push(instanceId)
+  if (openInstances.includes(instanceId)) return
+  openInstances.push(instanceId)
+  /* Cada modal que abre fica uma camada acima do anterior. Sem isto, quem fica
+   * por cima depende da ordem no DOM: funciona por acidente e para de funcionar
+   * quando o de baixo é remontado, ou quando a confirmação abre antes do
+   * formulário terminar de entrar. */
+  proximaCamada += 10
+  camada.value = props.zIndex + proximaCamada
 }
 function popInstance() {
   const i = openInstances.indexOf(instanceId)
   if (i !== -1) openInstances.splice(i, 1)
+  /* Pilha vazia: zera o contador para o z-index não crescer indefinidamente
+   * numa sessão longa. Com modal ainda aberto o contador é mantido, senão o
+   * próximo a abrir voltaria para a camada de baixo. */
+  if (openInstances.length === 0) proximaCamada = 0
 }
 function isTopmost() {
   return openInstances[openInstances.length - 1] === instanceId
@@ -382,11 +420,23 @@ defineExpose({ close, focusFirst, focusLast })
   background: rgba(10, 20, 30, 0.7);
 }
 
+/* Coluna flex com o CORPO rolando, e cabeçalho e rodapé fixos.
+ *
+ * Antes o `overflow: auto` estava aqui, no elemento inteiro: num modal alto o
+ * rodapé rolava para fora da tela junto com o conteúdo, e o botão de ação — que
+ * é o motivo de o modal existir — ficava inalcançável sem rolar até o fim. O
+ * título também sumia, então quem rolava perdia o contexto.
+ *
+ * `min-height: 0` no corpo é obrigatório: sem ele um filho flex não encolhe
+ * abaixo do tamanho do próprio conteúdo, o `overflow-y` nunca ativa e o modal
+ * estoura a altura máxima em silêncio. */
 .modal-content {
   background: #ffffff;
   width: 100%;
+  display: flex;
+  flex-direction: column;
   max-height: calc(100vh - 2rem);
-  overflow: auto;
+  overflow: hidden;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
   box-shadow: 0 20px 60px rgba(2, 6, 23, 0.18);
@@ -401,7 +451,9 @@ defineExpose({ close, focusFirst, focusLast })
 
 /* Header */
 .modal-header {
+  flex: 0 0 auto;
   display: flex; justify-content: space-between; align-items: center;
+  gap: 1rem;
   padding: 1rem 1.25rem;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -419,11 +471,20 @@ defineExpose({ close, focusFirst, focusLast })
 .close-button:hover { background-color: rgba(59, 130, 246, 0.08); color: #0f172a; }
 
 /* Body e Footer */
-.modal-body { padding: 1rem 1.25rem 1.25rem; color: #374151; line-height: 1.55; }
+.modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain; /* rolar até o fim não continua na página atrás */
+  padding: 1rem 1.25rem 1.25rem;
+  color: #374151; line-height: 1.55;
+}
 .modal-footer {
-  display: flex; gap: .5rem; justify-content: flex-end;
-  padding: 0.75rem 1.25rem 1.25rem;
+  flex: 0 0 auto;
+  display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; align-items: center;
+  padding: 0.75rem 1.25rem;
   border-top: 1px solid #e5e7eb;
+  background: #ffffff;
 }
 
 /* Acessibilidade visual */

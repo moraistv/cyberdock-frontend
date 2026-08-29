@@ -1199,18 +1199,17 @@ async function emitirCobranca({ dryRun = false, dueDate = null } = {}) {
   if (!currentInvoice.value || !targetUserId.value) return;
   const periodo = currentInvoice.value.period;
 
-  if (!dryRun) {
-    const confirmado = await confirm({
-      title: `Emitir cobrança de ${periodLabel(periodo)}`,
-      message: `${formatCurrency(currentInvoice.value.totalAmount)} para ${props.clientName}.`,
-      detail: 'A cobrança é criada no provedor e o cliente é notificado por ele. '
-        + 'Use "Simular" antes se quiser conferir sem enviar.',
-      confirmText: 'Emitir cobrança',
-      tone: 'primary',
-    });
-    if (!confirmado) return;
-  }
-
+  /* Sem confirmação aqui, de propósito.
+   *
+   * O botão diz "Emitir cobrança", o valor e o cliente estão na tela ao lado
+   * dele, e a competência já teve que ser fechada num passo anterior — que é
+   * onde a confirmação existe e faz sentido. Perguntar de novo era um clique a
+   * mais para chegar no mesmo lugar.
+   *
+   * E tinha um efeito colateral concreto: a confirmação é outro modal, aberto
+   * SOBRE o modal de detalhes, e dois modais empilhados brigavam por posição e
+   * z-index. Emitir deixou de empilhar. As ações destrutivas (cancelar
+   * cobrança, reabrir competência) continuam confirmando. */
   limparAvisosDeCobranca();
   isChargeBusy.value = true;
   try {
