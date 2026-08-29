@@ -158,6 +158,18 @@ export function useBilling() {
   /** Diagnóstico: chave presente, ambiente e alcance do provedor. Não cria nada. */
   const fetchAsaasStatus = async () => api.get('/billing/asaas/status');
 
+  /**
+   * Dados de cobrança do cliente, com o que falta para poder cobrar.
+   *
+   * A resposta traz `faltando`, `canCharge` e `boletoReady` — quem decide o que
+   * é obrigatório é o backend, não a tela. Duplicar a regra aqui garantiria que
+   * as duas divergissem no primeiro ajuste.
+   */
+  const fetchBillingInfo = async (uid) => api.get(`/users/${uid}/billing-info`);
+
+  /** Grava CPF/CNPJ, telefone e endereço de cobrança. */
+  const saveBillingInfo = async (uid, dados) => api.put(`/users/${uid}/billing-info`, dados);
+
   /** Garante o cadastro do cliente no provedor. Idempotente. */
   const ensureAsaasCustomer = async (uid) => api.post(`/billing/asaas/customers/${uid}`);
 
@@ -202,6 +214,8 @@ export function useBilling() {
     closeInvoicePeriod,
     reopenInvoicePeriod,
     fetchAsaasStatus,
+    fetchBillingInfo,
+    saveBillingInfo,
     ensureAsaasCustomer,
     issueCharge,
     syncCharge,

@@ -158,15 +158,9 @@
 
               <div class="charge-box__actions">
                 <template v-if="!temCobranca">
-                  <button
-                    class="charge-btn charge-btn--ghost"
-                    :disabled="isChargeBusy || !isPeriodClosed"
-                    title="Mostra valor, vencimento e forma de pagamento sem criar nada e sem notificar o cliente"
-                    @click="emitirCobranca({ dryRun: true })"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-                    Simular
-                  </button>
+                  <!-- Sem botão de simular: era um passo a mais para chegar no
+                       mesmo lugar. O ?dryRun=1 continua existindo na API para
+                       teste, mas quem opera a tela quer emitir. -->
                   <button
                     class="charge-btn charge-btn--solid"
                     :disabled="isChargeBusy || !isPeriodClosed"
@@ -221,6 +215,15 @@
                   </button>
                 </template>
               </div>
+
+              <button
+                class="charge-btn charge-btn--ghost"
+                title="CPF/CNPJ, telefone e endereço usados na cobrança"
+                @click="abrirDadosDeCobranca()"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Dados de cobrança
+              </button>
 
               <p v-if="!isPeriodClosed && !temCobranca" class="charge-box__hint">
                 Feche a competência para poder emitir.
@@ -453,15 +456,6 @@
 
                 <template v-if="!temCobranca">
                   <button
-                    class="action-button action-button--ghost btn-ico"
-                    :disabled="isChargeBusy || !isPeriodClosed"
-                    title="Mostra valor, vencimento e forma de pagamento sem criar nada no provedor e sem notificar o cliente"
-                    @click="emitirCobranca({ dryRun: true })"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-                    Simular
-                  </button>
-                  <button
                     class="action-button btn-ico"
                     :disabled="isChargeBusy || !isPeriodClosed"
                     :title="isPeriodClosed
@@ -530,6 +524,123 @@
                 </button>
               </div>
             </div>
+          </template>
+        </UniversalModal>
+
+        <!-- Dados de cobrança do cliente.
+             Abre sozinho quando a emissão é recusada por dado faltando, com o
+             campo que falta destacado. Antes esse caso era um beco sem saída: a
+             tela dizia "não tem CPF/CNPJ" e não havia onde preencher. -->
+        <UniversalModal
+          :is-open="isBillingInfoModalOpen"
+          @close="closeBillingInfoModal"
+          title="Dados de cobrança do cliente"
+          size="lg"
+        >
+          <div class="billing-form">
+            <p class="billing-form__intro">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              <span>
+                O provedor de cobrança exige o <strong>CPF ou CNPJ</strong> do pagador.
+                <strong>CEP e número</strong> são exigidos só para <strong>boleto</strong> — PIX e cartão funcionam sem eles.
+              </span>
+            </p>
+
+            <fieldset class="billing-fieldset">
+              <legend>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="10" r="2"/><path d="M12 14h6M12 10h6M6 15c1.2-1 2.8-1 4 0"/></svg>
+                Identificação
+              </legend>
+              <div class="billing-grid">
+                <div class="form-group form-group--wide" :class="{ 'is-missing': faltaCampo('cpfCnpj') }">
+                  <label for="bf-doc">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    CPF ou CNPJ <span class="req">obrigatório</span>
+                  </label>
+                  <input id="bf-doc" type="text" v-model="billingForm.cpfCnpj" placeholder="Só números, com ou sem pontuação" inputmode="numeric">
+                  <small class="form-hint">Validado pelo dígito verificador, não só pelo tamanho.</small>
+                </div>
+                <div class="form-group">
+                  <label for="bf-fone">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    Telefone
+                  </label>
+                  <input id="bf-fone" type="text" v-model="billingForm.phone" placeholder="DDD + número" inputmode="numeric">
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="billing-fieldset">
+              <legend>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Endereço
+                <small>necessário para boleto</small>
+              </legend>
+              <div class="billing-grid">
+                <div class="form-group" :class="{ 'is-missing': faltaCampo('postalCode') }">
+                  <label for="bf-cep">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                    CEP
+                  </label>
+                  <input id="bf-cep" type="text" v-model="billingForm.postalCode" placeholder="00000-000" inputmode="numeric">
+                </div>
+                <div class="form-group" :class="{ 'is-missing': faltaCampo('addressNumber') }">
+                  <label for="bf-num">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+                    Número
+                  </label>
+                  <input id="bf-num" type="text" v-model="billingForm.addressNumber" placeholder="123">
+                </div>
+                <div class="form-group form-group--wide">
+                  <label for="bf-rua">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+                    Logradouro
+                  </label>
+                  <input id="bf-rua" type="text" v-model="billingForm.address" placeholder="Rua, avenida...">
+                </div>
+                <div class="form-group">
+                  <label for="bf-compl">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    Complemento
+                  </label>
+                  <input id="bf-compl" type="text" v-model="billingForm.addressComplement" placeholder="Sala, bloco...">
+                </div>
+                <div class="form-group">
+                  <label for="bf-bairro">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Bairro
+                  </label>
+                  <input id="bf-bairro" type="text" v-model="billingForm.province">
+                </div>
+                <div class="form-group">
+                  <label for="bf-cidade">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M18 21V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"/><path d="M2 21h20"/><path d="M10 7h4M10 11h4M10 15h4"/></svg>
+                    Cidade
+                  </label>
+                  <input id="bf-cidade" type="text" v-model="billingForm.cityName">
+                </div>
+                <div class="form-group">
+                  <label for="bf-uf">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+                    UF
+                  </label>
+                  <input id="bf-uf" type="text" v-model="billingForm.state" placeholder="SP" maxlength="2">
+                </div>
+              </div>
+            </fieldset>
+
+            <p v-if="billingFormError" class="billing-form__error">{{ billingFormError }}</p>
+          </div>
+
+          <template #footer>
+            <button class="btn-secondary btn-ico" @click="closeBillingInfoModal">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Cancelar
+            </button>
+            <button class="btn-primary btn-ico" :disabled="isSavingBillingInfo" @click="salvarDadosDeCobranca">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              {{ isSavingBillingInfo ? 'Salvando...' : (retomarEmissaoAoSalvar ? 'Salvar e emitir' : 'Salvar dados') }}
+            </button>
           </template>
         </UniversalModal>
 
@@ -641,6 +752,8 @@ const {
   deleteManualItem,
   closeInvoicePeriod,
   reopenInvoicePeriod,
+  fetchBillingInfo,
+  saveBillingInfo,
   ensureAsaasCustomer,
   issueCharge,
   syncCharge,
@@ -945,7 +1058,7 @@ const passoAtual = computed(() => {
     return {
       icone: ICONES_PASSO.aviao,
       titulo: 'Passo 2 de 3: emitir a cobrança.',
-      texto: 'O valor está congelado. Use "Simular" para conferir sem enviar nada, e depois "Emitir cobrança".',
+      texto: 'O valor está congelado e pode ser cobrado. Clique em "Emitir cobrança".',
     };
   }
 
@@ -959,6 +1072,107 @@ const passoAtual = computed(() => {
 
 /** Código de erro do backend, quando existir. */
 const codigoDoErro = (e) => e?.data?.code || null;
+
+/* ---------------- Dados de cobrança do cliente (modal) ----------------
+ *
+ * Antes, emitir sem CPF/CNPJ era um beco sem saída: a tela dizia "este cliente
+ * não tem CPF/CNPJ" e não existia lugar nenhum para preencher — a rota
+ * PUT /users/:uid/billing-info existia no backend sem nenhuma interface.
+ *
+ * Agora a recusa ABRE o formulário, já apontando o campo que falta, e salvar
+ * retoma a emissão de onde parou.
+ * -------------------------------------------------------------------- */
+
+const isBillingInfoModalOpen = ref(false);
+const isSavingBillingInfo = ref(false);
+const billingFormError = ref('');
+/** Campos que o backend apontou como faltando, para destacar no formulário. */
+const camposFaltando = ref([]);
+/** Quando o modal foi aberto por uma emissão recusada, salvar continua o fluxo. */
+const retomarEmissaoAoSalvar = ref(false);
+
+const billingForm = ref({
+  cpfCnpj: '', phone: '',
+  postalCode: '', address: '', addressNumber: '',
+  addressComplement: '', province: '', cityName: '', state: '',
+});
+
+const faltaCampo = (campo) => camposFaltando.value.includes(campo);
+
+/**
+ * Abre o formulário de dados de cobrança.
+ *
+ * Carrega o que já existe para o master corrigir em vez de redigitar, e usa o
+ * `faltando` que o backend devolve — quem decide o que é obrigatório é a regra
+ * do provedor, do lado do servidor, não uma cópia dela aqui.
+ */
+async function abrirDadosDeCobranca({ retomarEmissao = false, faltando = [] } = {}) {
+  billingFormError.value = '';
+  retomarEmissaoAoSalvar.value = retomarEmissao;
+  camposFaltando.value = faltando;
+  isBillingInfoModalOpen.value = true;
+
+  try {
+    const { user, faltando: doServidor } = await fetchBillingInfo(targetUserId.value);
+    billingForm.value = {
+      cpfCnpj: user.cpfCnpjFormatted || '',
+      phone: user.phone || '',
+      postalCode: user.postalCodeFormatted || '',
+      address: user.address || '',
+      addressNumber: user.address_number || '',
+      addressComplement: user.address_complement || '',
+      province: user.province || '',
+      cityName: user.city_name || '',
+      state: user.state || '',
+    };
+    // O do servidor é mais completo que o que veio no erro da emissão.
+    if (Array.isArray(doServidor) && doServidor.length) camposFaltando.value = doServidor;
+  } catch (e) {
+    billingFormError.value = e.message || 'Não foi possível carregar os dados atuais.';
+  }
+}
+
+function closeBillingInfoModal() {
+  isBillingInfoModalOpen.value = false;
+  retomarEmissaoAoSalvar.value = false;
+  camposFaltando.value = [];
+  billingFormError.value = '';
+}
+
+/**
+ * Grava os dados e, se o modal veio de uma emissão recusada, retoma a emissão.
+ *
+ * A sequência é gravar -> vincular no provedor -> emitir. O vínculo entra no
+ * meio porque é ele que leva o documento e o endereço para lá; salvar no nosso
+ * banco não atualiza o cadastro do provedor por conta própria.
+ */
+async function salvarDadosDeCobranca() {
+  billingFormError.value = '';
+  isSavingBillingInfo.value = true;
+  try {
+    await saveBillingInfo(targetUserId.value, { ...billingForm.value });
+    const eraRetomada = retomarEmissaoAoSalvar.value;
+    closeBillingInfoModal();
+
+    if (!eraRetomada) {
+      chargeMessage.value = 'Dados de cobrança salvos.';
+      return;
+    }
+
+    chargeMessage.value = 'Dados salvos. Vinculando o cliente e emitindo...';
+    await ensureAsaasCustomer(targetUserId.value);
+    isSavingBillingInfo.value = false;
+    await emitirCobranca();
+  } catch (e) {
+    /* O backend responde 400 com `field`, e 409 com `code: document_already_used`
+     * quando o documento está em outro cadastro — que quase sempre é cliente
+     * duplicado, e a mensagem já diz de quem é. */
+    billingFormError.value = e.message || 'Não foi possível salvar os dados.';
+    camposFaltando.value = e?.data?.field ? [e.data.field] : camposFaltando.value;
+  } finally {
+    isSavingBillingInfo.value = false;
+  }
+}
 
 function limparAvisosDeCobranca() {
   chargeError.value = '';
@@ -1016,24 +1230,35 @@ async function emitirCobranca({ dryRun = false, dueDate = null } = {}) {
   } catch (e) {
     const code = codigoDoErro(e);
 
-    if (code === 'missing_customer') {
-      const vincular = await confirm({
-        title: 'Cliente ainda não está no provedor',
-        message: 'Para emitir, o cliente precisa existir no provedor de cobrança.',
-        detail: 'Vou procurar pelo documento antes de criar, então não gera cadastro duplicado.',
-        confirmText: 'Vincular e emitir',
-        tone: 'primary',
+    /* Falta dado de cadastro: abre o formulário em vez de só informar. Este era
+     * o beco sem saída — a mensagem aparecia e não havia onde preencher. */
+    if (code === 'missing_billing_info') {
+      isChargeBusy.value = false;
+      await abrirDadosDeCobranca({
+        retomarEmissao: true,
+        faltando: e?.data?.faltando || ['cpfCnpj'],
       });
-      if (!vincular) { chargeError.value = e.message; return; }
+      return;
+    }
+
+    if (code === 'missing_customer') {
+      isChargeBusy.value = false;
       try {
+        // Vincula direto: procurar por documento antes de criar já evita
+        // duplicidade, então não há decisão para o master tomar aqui.
         await ensureAsaasCustomer(targetUserId.value);
-        // Repete a emissão já com o vínculo em mão.
-        isChargeBusy.value = false;
         return await emitirCobranca({ dryRun, dueDate });
       } catch (erroCliente) {
-        chargeError.value = codigoDoErro(erroCliente) === 'missing_document'
-          ? 'Este cliente não tem CPF/CNPJ cadastrado, e o provedor exige o documento do pagador.'
-          : erroCliente.message;
+        /* O vínculo também recusa por dado faltando. Mesmo tratamento: abre o
+         * formulário apontando o campo. */
+        if (codigoDoErro(erroCliente) === 'missing_billing_info') {
+          await abrirDadosDeCobranca({
+            retomarEmissao: true,
+            faltando: erroCliente?.data?.faltando || ['cpfCnpj'],
+          });
+          return;
+        }
+        chargeError.value = erroCliente.message;
         return;
       }
     }
@@ -1449,6 +1674,31 @@ watch(() => props.userId, (newId) => {
 .manual-target svg { flex: 0 0 auto; color: var(--cd-blue-700, #0369a1); }
 .manual-target strong { color: var(--cd-ink, #0f172a); }
 .form-hint { margin-top: 0.35rem; color: #94a3b8; font-size: 0.73rem; line-height: 1.4; }
+
+/* ---------------- Formulário de dados de cobrança ---------------- */
+.billing-form { display: flex; flex-direction: column; gap: 1rem; padding-top: 0.25rem; }
+.billing-form__intro { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0; padding: 0.65rem 0.8rem; border: 1px solid var(--cd-line, #dbe7f0); border-left: 3px solid var(--cd-blue-600, #0284c7); border-radius: 0.45rem; background: #f8fbfe; color: #475569; font-size: 0.79rem; line-height: 1.5; }
+.billing-form__intro svg { flex: 0 0 auto; margin-top: 0.1rem; color: var(--cd-blue-700, #0369a1); }
+.billing-form__intro strong { color: var(--cd-ink, #0f172a); }
+.billing-form__error { margin: 0; padding: 0.6rem 0.8rem; border-radius: 0.45rem; background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); font-size: 0.82rem; font-weight: 650; line-height: 1.45; }
+
+.billing-fieldset { margin: 0; padding: 0.9rem 1rem 0.4rem; border: 1px solid var(--cd-line, #dbe7f0); border-radius: 0.6rem; }
+.billing-fieldset legend { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0 0.4rem; color: var(--cd-blue-800, #075985); font-size: 0.82rem; font-weight: 750; }
+.billing-fieldset legend svg { flex: 0 0 auto; }
+.billing-fieldset legend small { color: #94a3b8; font-size: 0.7rem; font-weight: 600; }
+.billing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 0 0.75rem; }
+.billing-grid .form-group--wide { grid-column: 1 / -1; }
+.billing-grid .form-group { margin-bottom: 0.85rem; }
+
+/* Campo que o backend apontou como faltando. O destaque é a diferença entre
+   "deu erro" e "preencha ISTO". */
+.form-group.is-missing input { border-color: #f59e0b; background: #fffbeb; }
+.form-group.is-missing label { color: #9a5700; }
+.req { padding: 0.05rem 0.35rem; border-radius: 999px; background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); font-size: 0.63rem; font-weight: 750; letter-spacing: 0.03em; text-transform: uppercase; }
+
+@media (min-width: 34rem) {
+  .billing-grid { grid-template-columns: 1fr 1fr 1fr; }
+}
 .form-group { display: flex; flex-direction: column; }
 .form-group label { display: inline-flex; align-items: center; gap: 0.32rem; margin-bottom: 0.5rem; font-weight: 600; color: #374151; font-size: 0.85rem; }
 .form-group label svg { flex: 0 0 auto; color: var(--cd-blue-700, #0369a1); }
