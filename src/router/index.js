@@ -147,6 +147,75 @@ const router = createRouter({
   routes,
 });
 
+/* ---------------------------------------------------------------------------
+ * Recuperação de chunk que não carrega.
+ *
+ * BUG QUE ISTO CORRIGE: colar no navegador uma URL profunda (por exemplo
+ * /admin/users/<uid>/cobranca) caía no dashboard, com o destino descartado em
+ * silêncio. Pelo menu funcionava. Não era o guard nem a rota: as duas coisas
+ * estavam certas.
+ *
+ * O que acontece de verdade:
+ *
+ * 1. As telas são carregadas sob demanda (`() => import(...)`) e o nome do
+ *    arquivo leva o hash do build. Todo deploy troca os hashes.
+ * 2. Um navegador com o index.html anterior em cache pede o chunk antigo, que
+ *    já não existe.
+ * 3. O servidor NÃO devolve 404 para arquivo estático ausente: devolve o
+ *    index.html com status 200 e Content-Type text/html (conferido em produção:
+ *    /js/qualquer-coisa.js responde 200 com o HTML). O import() recebe HTML no
+ *    lugar de JavaScript e falha.
+ * 4. A navegação inicial é abortada, a rota corrente fica na inicial, e o
+ *    checkAndRedirect do App.vue — que só age em '/' e '/auth' — conclui que
+ *    está na raiz e manda para a tela inicial do papel. Daí o dashboard.
+ *
+ * Pelo menu isso não aparece porque o pacote já carregado é coerente consigo
+ * mesmo; o problema é exclusivo do primeiro carregamento depois de um deploy.
+ *
+ * Recarregar resolve porque a recarga busca o index.html novo, com os hashes
+ * novos, e mantém o endereço pedido. A trava em sessionStorage garante UMA
+ * tentativa por destino: se a causa não for cache velho, o erro aparece de
+ * verdade em vez de virar laço de recarga.
+ *
+ * A correção definitiva é de servidor (arquivo estático ausente tem que
+ * responder 404, e o index.html não pode ser cacheado) e está em nginx.conf.
+ * Isto aqui é a rede de baixo, e continua valendo para quem já tem o HTML
+ * velho no cache.
+ * ------------------------------------------------------------------------- */
+const FALHA_DE_CHUNK = /loading (?:css )?chunk|failed to fetch dynamically imported module|importing a module script failed|error loading dynamically imported module|expected a javascript(?:-or-wasm)? module/i;
+
+const chaveRecarga = (destino) => `chunk-reload:${destino}`;
+
+router.onError((erro, to) => {
+  if (!FALHA_DE_CHUNK.test(String(erro?.message || ''))) return;
+
+  // `to` existe a partir do vue-router 4.1; o fallback cobre o caso de a falha
+  // acontecer antes de haver destino resolvido.
+  const destino = to?.fullPath || `${window.location.pathname}${window.location.search}`;
+  const chave = chaveRecarga(destino);
+
+  try {
+    if (sessionStorage.getItem(chave)) return;
+    sessionStorage.setItem(chave, '1');
+  } catch {
+    /* Armazenamento indisponível (aba privada). Sem trava disponível, não
+     * recarrega: um laço infinito de recarga é pior que a tela de erro. */
+    return;
+  }
+
+  window.location.replace(destino);
+});
+
+/* Chegou ao destino: a trava sai, para que uma falha futura no mesmo endereço
+ * possa tentar de novo em vez de ficar marcada para sempre nesta aba. */
+router.afterEach((to) => {
+  try {
+    sessionStorage.removeItem(chaveRecarga(to.fullPath));
+  } catch {
+    /* sem storage, nada a limpar */
+  }
+});
+
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiresMaster = to.matched.some(record => record.meta.requiresMaster);
