@@ -30,11 +30,35 @@ export function useBilling() {
           formattedPaymentDate = `${String(paymentDate.getUTCDate()).padStart(2, '0')}/${String(paymentDate.getUTCMonth() + 1).padStart(2, '0')}/${paymentDate.getUTCFullYear()}`;
         }
 
+        /* `closed_at` e `paid_at` são TIMESTAMPTZ, não DATE: aqui vale a hora
+         * local de quem olha, e não UTC como no vencimento (que é um dia de
+         * calendário e escorregaria um dia se lido no fuso do navegador). */
+        const dataHora = (valor) => {
+          if (!valor) return null;
+          const d = new Date(valor);
+          return Number.isNaN(d.getTime()) ? null : d.toLocaleString('pt-BR', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+          });
+        };
+
         return {
           ...inv,
           totalAmount: parseFloat(inv.total_amount),
           dueDate: formattedDueDate,
           paymentDate: formattedPaymentDate,
+          /* Fechamento: já vinha no payload do backend e nenhuma tela usava.
+           * `isClosed` evita que cada lugar refaça o teste de nulo. */
+          isClosed: Boolean(inv.closed_at),
+          closedAtLabel: dataHora(inv.closed_at),
+          closedBy: inv.closed_by || null,
+          paidAtLabel: dataHora(inv.paid_at),
+          paidBy: inv.paid_by || null,
+          /* Cobrança externa: preenchida só quando existir emissão no provedor.
+           * Hoje nada popula, e a tela simplesmente não mostra o bloco. */
+          asaasPaymentId: inv.asaas_payment_id || null,
+          asaasStatus: inv.asaas_status || null,
+          asaasInvoiceUrl: inv.asaas_invoice_url || null,
           items: inv.items || []
         };
       });
@@ -95,6 +119,34 @@ export function useBilling() {
     return api.delete(`/billing/manual-item/${itemId}`);
   };
 
+  /**
+   * Fecha a competência (somente master).
+   *
+   * É o que "gera" a fatura no sentido prático: enquanto a competência está
+   * aberta, o total é recalculado a cada abertura da tela e uma venda
+   * processada com data retroativa muda o valor. Fechar congela, e o valor
+   * passa a ser o mesmo que pode ser cobrado do cliente por fora do sistema.
+   *
+   * O backend recalcula uma última vez antes de congelar, então o valor
+   * congelado inclui as expedições mais recentes.
+   */
+  const closeInvoicePeriod = async (uid, period) => {
+    return api.post(`/billing/invoices/${uid}/${period}/close`);
+  };
+
+  /**
+   * Reabre a competência (somente master).
+   *
+   * `force` só é necessário quando já existe cobrança emitida no provedor: o
+   * backend responde 409 `has_external_charge` sem ele, porque reabrir faz o
+   * total voltar a mudar e ele pode divergir do documento que o cliente
+   * recebeu.
+   */
+  const reopenInvoicePeriod = async (uid, period, { force = false } = {}) => {
+    const query = force ? '?force=1' : '';
+    return api.post(`/billing/invoices/${uid}/${period}/reopen${query}`);
+  };
+
   return {
     invoices,
     billingSummary,
@@ -107,5 +159,7 @@ export function useBilling() {
     addManualService,
     setInvoiceStatus,
     deleteManualItem,
+    closeInvoicePeriod,
+    reopenInvoicePeriod,
   };
 }

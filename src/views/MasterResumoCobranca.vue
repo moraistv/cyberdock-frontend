@@ -47,90 +47,146 @@
               <!-- SVG inline: o projeto nunca carregou o CSS do Font Awesome,
                    então as tags <i class="fas ..."> daqui não desenhavam nada.
                    O botão aparecia só com o texto e um espaço vazio na frente. -->
-              <button @click="openManualServiceModal" class="action-button">
+              <button @click="openManualServiceModal" class="action-button action-button--ghost" :disabled="isPeriodClosed">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-                Lançar Serviço Avulso
+                Lançar avulso
               </button>
-              <!-- Baixa da fatura: exclusiva do master -->
+
+              <!-- Baixa do PAGAMENTO. Rótulo antigo era "Reabrir fatura", que
+                   se confundia com reabrir a competência: são coisas
+                   diferentes, uma mexe no status e a outra no congelamento. -->
               <button
                 v-if="currentInvoice"
                 @click="toggleInvoicePayment"
                 class="action-button"
-                :class="isCurrentInvoicePaid ? 'action-button--reopen' : 'action-button--pay'"
+                :class="isCurrentInvoicePaid ? 'action-button--ghost' : 'action-button--pay'"
                 :disabled="isUpdatingStatus"
               >
                 <svg v-if="isCurrentInvoicePaid" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"></path><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path></svg>
                 <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                {{ isUpdatingStatus ? 'Salvando...' : (isCurrentInvoicePaid ? 'Reabrir fatura' : 'Marcar como paga') }}
+                {{ isUpdatingStatus ? 'Salvando...' : (isCurrentInvoicePaid ? 'Desfazer baixa' : 'Marcar como paga') }}
+              </button>
+
+              <!-- Fechar a competência é o que "gera" a fatura: congela o valor.
+                   A rota existia no backend desde o commit do fechamento e nunca
+                   teve botão, então só dava para chamar por API. -->
+              <button
+                v-if="currentInvoice"
+                @click="togglePeriodClosure"
+                class="action-button"
+                :class="isPeriodClosed ? 'action-button--ghost' : 'action-button--primary'"
+                :disabled="isUpdatingClosure"
+              >
+                <svg v-if="isPeriodClosed" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                {{ isUpdatingClosure ? 'Salvando...' : (isPeriodClosed ? 'Reabrir competência' : 'Fechar e gerar fatura') }}
               </button>
             </div>
           </div>
 
           <p v-if="statusError" class="inline-error">{{ statusError }}</p>
 
-          <div v-if="currentInvoice" class="stats-cards-grid-5">
-            <div class="stat-card">
-              <h3 class="card-title">Valor da Fatura</h3>
-              <p class="metric-value">{{ formatCurrency(currentInvoice.totalAmount) }}</p>
-              <p class="card-description">Vencimento: {{ currentInvoice.dueDate }}</p>
-            </div>
-            <div class="stat-card">
-              <h3 class="card-title">Status da Fatura</h3>
-              <p class="metric-value status-text">
+          <!-- ================= Fatura da competência ================= -->
+          <section v-if="currentInvoice" class="invoice-hero">
+            <div class="invoice-hero__main">
+              <span class="invoice-hero__label">Fatura de {{ periodLabel(currentInvoice.period) }}</span>
+              <strong class="invoice-hero__value">{{ formatCurrency(currentInvoice.totalAmount) }}</strong>
+              <div class="invoice-hero__badges">
                 <span :class="['status-badge', getStatusClass(currentInvoice.status)]">
                   {{ getStatusLabel(currentInvoice.status) }}
                 </span>
-              </p>
-              <p class="card-description" v-if="currentInvoice.paymentDate">Pago em: {{ currentInvoice.paymentDate }}</p>
-              <p class="card-description" v-else>Aguardando pagamento.</p>
+                <span class="status-badge" :class="isPeriodClosed ? 'status-frozen' : 'status-live'">
+                  {{ isPeriodClosed ? 'Valor congelado' : 'Ainda pode mudar' }}
+                </span>
+              </div>
             </div>
-            <div class="stat-card">
-              <h3 class="card-title">Armazenamento</h3>
-              <p class="metric-value">
-                {{ currentInvoice.items.filter(i => i.type === 'storage').reduce((acc, item) => acc + item.quantity, 0) }}
-                <span class="metric-unit">item(s)</span>
-              </p>
-              <p class="card-description">Itens de armazenamento cobrados.</p>
-            </div>
-            <div class="stat-card">
-              <h3 class="card-title">Expedição Comum</h3>
-              <p class="metric-value">{{ currentInvoice.items.find(i => i.description === 'Expedição Comum')?.quantity || 0 }}</p>
-              <p class="card-description">Unidades expedidas.</p>
-            </div>
-            <div class="stat-card">
-              <h3 class="card-title">Expedição Premium</h3>
-              <p class="metric-value">{{ currentInvoice.items.find(i => i.description === 'Expedição Premium')?.quantity || 0 }}</p>
-              <p class="card-description">Unidades expedidas.</p>
-            </div>
-          </div>
 
-          <!-- Serviços pontuais da competência, um card por lançamento.
-               Antes só apareciam como linha crua dentro do modal de detalhes. -->
-          <section v-if="currentInvoice && manualItems.length" class="punctual-section">
-            <div class="punctual-head">
-              <h2 class="table-title">Serviços pontuais desta competência</h2>
-              <span class="punctual-total">{{ manualItems.length }} lançamento(s) · {{ formatCurrency(manualTotal) }}</span>
-            </div>
-            <div class="punctual-grid">
-              <article v-for="item in manualItems" :key="item.id" class="punctual-card">
-                <header class="punctual-card__head">
-                  <h4>{{ item.description }}</h4>
+            <dl class="invoice-hero__facts">
+              <div>
+                <dt>Vencimento</dt>
+                <dd>{{ currentInvoice.dueDate }}</dd>
+              </div>
+              <div>
+                <dt>Competência</dt>
+                <dd>{{ isPeriodClosed ? 'Fechada' : 'Aberta' }}</dd>
+                <small v-if="currentInvoice.closedAtLabel">
+                  {{ currentInvoice.closedAtLabel }}<template v-if="currentInvoice.closedBy"> · {{ currentInvoice.closedBy }}</template>
+                </small>
+              </div>
+              <div>
+                <dt>Pagamento</dt>
+                <dd>{{ currentInvoice.paymentDate || 'Em aberto' }}</dd>
+                <small v-if="currentInvoice.paidBy">baixa por {{ currentInvoice.paidBy }}</small>
+              </div>
+              <div>
+                <dt>Itens</dt>
+                <dd>{{ currentInvoice.items.length }}</dd>
+                <small>{{ composicao.length }} categoria(s)</small>
+              </div>
+            </dl>
+
+            <!-- Enquanto a competência está aberta o total é recalculado em toda
+                 abertura da tela. Dizer isso evita a pergunta "por que o valor
+                 mudou depois que eu mandei para o cliente". -->
+            <p class="invoice-hero__hint">
+              <template v-if="isPeriodClosed">
+                O valor está congelado: novas vendas e avulsos deste mês entram na competência seguinte.
+              </template>
+              <template v-else>
+                O total é recalculado a cada abertura desta tela. Feche a competência antes de cobrar o cliente.
+              </template>
+            </p>
+
+            <!-- Só aparece quando existe emissão no provedor. Nada popula ainda. -->
+            <a
+              v-if="currentInvoice.asaasInvoiceUrl"
+              class="invoice-hero__charge"
+              :href="currentInvoice.asaasInvoiceUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Abrir cobrança{{ currentInvoice.asaasStatus ? ` (${currentInvoice.asaasStatus})` : '' }}
+            </a>
+          </section>
+
+          <!-- ================= Composição, por categoria ================= -->
+          <section v-if="currentInvoice && composicao.length" class="breakdown">
+            <article v-for="grupo in composicao" :key="grupo.key" class="breakdown-card">
+              <header class="breakdown-card__head">
+                <h3>{{ grupo.label }}</h3>
+                <strong>{{ formatCurrency(grupo.subtotal) }}</strong>
+              </header>
+              <p class="breakdown-card__share">
+                {{ grupo.percentual }}% da fatura · {{ grupo.items.length }} linha(s)
+              </p>
+              <div class="breakdown-card__bar" aria-hidden="true">
+                <span :style="{ width: `${grupo.percentual}%` }"></span>
+              </div>
+              <ul class="breakdown-card__list">
+                <li v-for="item in grupo.items" :key="item.id || item.description">
+                  <span class="breakdown-card__desc">{{ item.description }}</span>
+                  <span class="breakdown-card__total">{{ formatCurrency(item.total_price) }}</span>
+                  <span class="breakdown-card__qty">
+                    {{ item.quantity }} {{ unitLabel(item.unit, item.quantity) || 'un.' }} × {{ formatCurrency(item.unit_price) }}
+                    <template v-if="item.service_date"> · {{ formatDate(item.service_date) }}</template>
+                  </span>
+                  <!-- Só avulso pode ser removido: storage e shipment são
+                       recriados pelo recálculo, e o backend recusa. Com a
+                       competência fechada o botão sai de cena porque a rota
+                       responde 409 period_closed. -->
                   <button
-                    class="punctual-card__remove"
+                    v-if="item.type === 'manual' && !isPeriodClosed"
+                    class="breakdown-card__remove"
                     :disabled="removingItemId === item.id"
-                    title="Remover este lançamento"
+                    :title="`Remover ${item.description}`"
                     @click="removeManualItem(item)"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    Remover
                   </button>
-                </header>
-                <p class="punctual-card__value">{{ formatCurrency(item.total_price) }}</p>
-                <p class="punctual-card__detail">
-                  {{ item.quantity }} {{ unitLabel(item.unit, item.quantity) || 'un.' }} × {{ formatCurrency(item.unit_price) }}
-                </p>
-                <p v-if="item.service_date" class="punctual-card__date">Realizado em {{ formatDate(item.service_date) }}</p>
-              </article>
-            </div>
+                </li>
+              </ul>
+            </article>
           </section>
 
           <div v-if="!currentInvoice" class="empty-state-full-page">
@@ -139,26 +195,44 @@
           </div>
 
           <div class="table-container" v-if="invoices.length > 0">
-            <h2 class="table-title">Histórico de Faturas</h2>
+            <div class="table-head-row">
+              <h2 class="table-title table-title--flush">Histórico de Faturas</h2>
+              <span class="table-summary">
+                {{ invoices.length }} competência(s) · {{ formatCurrency(historicoTotal) }} no total
+                <template v-if="historicoAberto > 0"> · {{ formatCurrency(historicoAberto) }} em aberto</template>
+              </span>
+            </div>
             <table class="history-table">
               <thead>
                 <tr>
                   <th>Competência</th>
-                  <th>Valor Total</th>
+                  <th class="num">Valor Total</th>
                   <th>Vencimento</th>
-                  <th>Status</th>
+                  <th>Pagamento</th>
+                  <th>Competência</th>
                   <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="invoice in invoices" :key="invoice.id">
-                  <td class="period-code">{{ invoice.period }}</td>
-                  <td>{{ formatCurrency(invoice.totalAmount) }}</td>
+                <tr
+                  v-for="invoice in invoices"
+                  :key="invoice.id"
+                  :class="{ 'is-selected': invoice.period === selectedPeriod }"
+                >
+                  <td class="period-code">{{ periodLabel(invoice.period) }}</td>
+                  <td class="num strong">{{ formatCurrency(invoice.totalAmount) }}</td>
                   <td>{{ invoice.dueDate }}</td>
                   <td>
                     <span :class="['status-badge', getStatusClass(invoice.status)]">
                       {{ getStatusLabel(invoice.status) }}
                     </span>
+                    <small v-if="invoice.paymentDate" class="cell-note">em {{ invoice.paymentDate }}</small>
+                  </td>
+                  <td>
+                    <span class="status-badge" :class="invoice.isClosed ? 'status-frozen' : 'status-live'">
+                      {{ invoice.isClosed ? 'Fechada' : 'Aberta' }}
+                    </span>
+                    <small v-if="invoice.closedAtLabel" class="cell-note">{{ invoice.closedAtLabel }}</small>
                   </td>
                   <td>
                     <button @click="openDetailsModal(invoice)" class="details-button">
@@ -297,7 +371,9 @@ const {
   manualServices,
   fetchManualServices,
   setInvoiceStatus,
-  deleteManualItem
+  deleteManualItem,
+  closeInvoicePeriod,
+  reopenInvoicePeriod
 } = useBilling();
 
 const { confirm } = useConfirm();
@@ -374,15 +450,120 @@ const isQuantityServiceSelected = computed(() => {
   return service?.type === 'avulso_quantidade';
 });
 
-// --- Serviços pontuais da competência ---
-const manualItems = computed(() => (currentInvoice.value?.items || []).filter(i => i.type === 'manual'));
-const manualTotal = computed(() => manualItems.value.reduce((sum, i) => sum + parseFloat(i.total_price || 0), 0));
+/* `manualItems`/`manualTotal` saíram junto com a seção separada de serviços
+ * pontuais: o grupo "Serviços pontuais" da composição já traz os mesmos
+ * lançamentos, com subtotal e com o botão de remover em cada linha. Manter os
+ * dois deixava o mesmo item na tela duas vezes. */
+
+/** "2026-08" -> "agosto de 2026". O código cru fica no title da célula. */
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+function periodLabel(period) {
+  const [ano, mes] = String(period || '').split('-').map(Number);
+  if (!ano || !mes || mes < 1 || mes > 12) return period || '';
+  return `${MESES[mes - 1]} de ${ano}`;
+}
+
+/**
+ * Composição da fatura por categoria, com subtotal e peso de cada uma.
+ *
+ * Reaproveita `groupedItems`, que já trata tipo desconhecido, e acrescenta o
+ * percentual. O percentual usa a soma dos grupos como base, não
+ * `totalAmount`: se algum item ficar fora de um grupo por tipo novo, dividir
+ * pelo total daria barras que não fecham 100% sem explicação.
+ *
+ * Isto substitui os cartões fixos de "Expedição Comum" e "Expedição Premium",
+ * que procuravam o item por `description` literal. Tipo de pacote é
+ * cadastrável, então qualquer nome diferente desses dois nunca aparecia.
+ */
+const composicao = computed(() => {
+  const grupos = groupedItems(currentInvoice.value);
+  const base = grupos.reduce((sum, g) => sum + g.subtotal, 0);
+  return grupos.map((g) => ({
+    ...g,
+    percentual: base > 0 ? Math.round((g.subtotal / base) * 100) : 0,
+  }));
+});
+
+const historicoTotal = computed(() =>
+  invoices.value.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0)
+);
+const historicoAberto = computed(() =>
+  invoices.value
+    .filter((inv) => inv.status !== 'paid')
+    .reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0)
+);
 
 // --- Baixa da fatura (master) ---
 const isUpdatingStatus = ref(false);
 const statusError = ref('');
 const removingItemId = ref(null);
 const isCurrentInvoicePaid = computed(() => currentInvoice.value?.status === 'paid');
+
+// --- Fechamento da competência (master) ---
+const isUpdatingClosure = ref(false);
+const isPeriodClosed = computed(() => currentInvoice.value?.isClosed === true);
+
+/**
+ * Fecha ou reabre a competência.
+ *
+ * Fechar é a ação que congela o valor, então a confirmação diz o que muda de
+ * fato em vez de só perguntar "confirma?". Reabrir com cobrança já emitida no
+ * provedor devolve 409 `has_external_charge`; nesse caso a segunda confirmação
+ * é explícita sobre a divergência com o documento enviado, e só então repete
+ * com `force`.
+ */
+async function togglePeriodClosure() {
+  if (!currentInvoice.value || !targetUserId.value) return;
+  const periodo = currentInvoice.value.period;
+  const fechando = !isPeriodClosed.value;
+
+  const confirmed = await confirm(fechando
+    ? {
+      title: `Fechar ${periodLabel(periodo)}`,
+      message: `O valor de ${formatCurrency(currentInvoice.value.totalAmount)} passa a ser definitivo.`,
+      detail: 'O sistema recalcula uma última vez antes de congelar. Depois disso, venda processada com '
+        + 'data retroativa e serviço avulso entram na competência seguinte.',
+      confirmText: 'Fechar competência',
+      tone: 'primary',
+    }
+    : {
+      title: `Reabrir ${periodLabel(periodo)}`,
+      message: 'O total volta a ser recalculado a cada abertura da tela.',
+      detail: 'Serve para corrigir um fechamento feito antes da hora.',
+      confirmText: 'Reabrir competência',
+      tone: 'danger',
+    });
+  if (!confirmed) return;
+
+  statusError.value = '';
+  isUpdatingClosure.value = true;
+  try {
+    if (fechando) {
+      await closeInvoicePeriod(targetUserId.value, periodo);
+    } else {
+      try {
+        await reopenInvoicePeriod(targetUserId.value, periodo);
+      } catch (e) {
+        if (e?.data?.code !== 'has_external_charge') throw e;
+        const forcar = await confirm({
+          title: 'Esta competência já tem cobrança emitida',
+          message: 'Reabrir faz o total voltar a mudar, e ele pode ficar diferente do documento que o cliente recebeu.',
+          detail: 'Quem reabrir agora precisa cancelar ou reemitir a cobrança no provedor.',
+          confirmText: 'Reabrir mesmo assim',
+          tone: 'danger',
+        });
+        if (!forcar) return;
+        await reopenInvoicePeriod(targetUserId.value, periodo, { force: true });
+      }
+    }
+    await fetchInvoices(targetUserId.value, selectedPeriod.value);
+  } catch (e) {
+    statusError.value = e.message || 'Não foi possível atualizar a competência.';
+  } finally {
+    isUpdatingClosure.value = false;
+  }
+}
 
 async function toggleInvoicePayment() {
   if (!currentInvoice.value || !targetUserId.value) return;
@@ -550,8 +731,17 @@ watch(() => props.userId, (newId) => {
 .filter-group { display: flex; align-items: center; gap: 0.5rem; }
 .filter-group label { font-size: 0.875rem; font-weight: 500; color: #374151; }
 .filter-group select { padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; background-color: #fff; }
-.action-button { background-color: #10b981; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background-color 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; }
-.action-button:hover { background-color: #059669; }
+/* Antes todos os botões eram verdes (#10b981), inclusive num app de paleta azul:
+   dois verdes lado a lado sem hierarquia entre eles. Agora o verde é reservado
+   para a baixa de pagamento, onde significa algo; a ação estrutural (fechar a
+   competência) usa o azul da marca e o resto fica neutro. */
+.action-button { background-color: var(--cd-blue-700, #0369a1); color: white; border: none; padding: 0.6rem 1.1rem; border-radius: 8px; font-weight: 650; font-size: 0.85rem; cursor: pointer; transition: background-color 0.15s, box-shadow 0.15s, opacity 0.15s; display: inline-flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
+.action-button:hover:not(:disabled) { background-color: var(--cd-blue-800, #075985); }
+.action-button:disabled { opacity: 0.45; cursor: not-allowed; }
+.action-button--primary { background-image: var(--cd-gradient, linear-gradient(140deg, #0c3f68, #0369a1)); box-shadow: 0 6px 16px rgba(7, 89, 133, 0.24); }
+.action-button--primary:hover:not(:disabled) { box-shadow: 0 8px 20px rgba(7, 89, 133, 0.32); }
+.action-button--ghost { background-color: #fff; color: var(--cd-blue-800, #075985); border: 1px solid var(--cd-line, #dbe7f0); }
+.action-button--ghost:hover:not(:disabled) { background-color: #f0f9ff; }
 .stats-cards-grid-5 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem; }
 .stat-card { background-color: #ffffff; border-radius: 0.75rem; padding: 1.5rem; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
 .card-title { font-size: 0.875rem; font-weight: 600; color: #374151; margin: 0 0 0.75rem 0; }
@@ -592,22 +782,73 @@ watch(() => props.userId, (newId) => {
 .detail-total span { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .detail-total strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 
-/* Cards de serviços pontuais */
-.punctual-section { margin-bottom: 1.5rem; }
-.punctual-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem; }
-.punctual-total { color: var(--cd-muted, #6b7280); font-size: 0.82rem; font-weight: 650; }
-.punctual-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.75rem; }
-.punctual-card { position: relative; padding: 0.85rem; border: 1px solid var(--cd-line, #e5e7eb); border-radius: 0.7rem; background: #fff; box-shadow: 0 4px 14px rgba(15, 71, 105, 0.05); }
-.punctual-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
-.punctual-card__head h4 { margin: 0; color: var(--cd-ink, #111827); font-size: 0.85rem; font-weight: 700; line-height: 1.35; }
-.punctual-card__remove { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 1.5rem; height: 1.5rem; border: none; border-radius: 0.3rem; background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); line-height: 1; cursor: pointer; }
-.punctual-card__remove:disabled { opacity: 0.5; cursor: wait; }
-.punctual-card__value { margin: 0.5rem 0 0; color: var(--cd-blue-700, #0369a1); font-size: 1.2rem; font-weight: 780; font-variant-numeric: tabular-nums; }
-.punctual-card__detail { margin: 0.15rem 0 0; color: #64748b; font-size: 0.78rem; }
-.punctual-card__date { margin: 0.35rem 0 0; color: #94a3b8; font-size: 0.73rem; }
+/* Remoção de lançamento avulso, dentro da linha da composição. Substituiu os
+   cards .punctual-*, que mostravam os mesmos itens numa seção à parte. */
+.breakdown-card__remove { grid-column: 1 / -1; justify-self: start; display: inline-flex; align-items: center; gap: 0.3rem; margin-top: 0.15rem; padding: 0.2rem 0.45rem; border: none; border-radius: 0.35rem; background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); font-size: 0.7rem; font-weight: 650; line-height: 1; cursor: pointer; }
+.breakdown-card__remove:hover:not(:disabled) { background: #fecaca; }
+.breakdown-card__remove:disabled { opacity: 0.5; cursor: wait; }
 
 .action-button--pay { background-color: var(--cd-success, #059669); }
-.action-button--reopen { background-color: #64748b; }
+.action-button--pay:hover:not(:disabled) { background-color: #047857; }
+
+/* ===================== Fatura da competência ===================== */
+.invoice-hero { display: grid; grid-template-columns: minmax(13rem, 20rem) 1fr; gap: 1.25rem 2rem; align-items: start; margin-bottom: 1.75rem; padding: 1.5rem; border-radius: 0.9rem; background: var(--cd-gradient, linear-gradient(140deg, #0c3f68, #0369a1)); box-shadow: var(--cd-shadow, 0 10px 24px rgba(7, 89, 133, 0.22)); color: #fff; }
+.invoice-hero__main { min-width: 0; }
+.invoice-hero__label { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.72); }
+.invoice-hero__value { display: block; margin-top: 0.3rem; font-size: 2.4rem; font-weight: 780; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.invoice-hero__badges { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
+
+.invoice-hero__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 1rem; margin: 0; }
+.invoice-hero__facts > div { min-width: 0; }
+.invoice-hero__facts dt { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.66); }
+.invoice-hero__facts dd { margin: 0.2rem 0 0; font-size: 0.95rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.invoice-hero__facts small { display: block; margin-top: 0.15rem; font-size: 0.7rem; color: rgba(255, 255, 255, 0.6); overflow-wrap: anywhere; }
+.invoice-hero__hint { grid-column: 1 / -1; margin: 0; padding-top: 0.9rem; border-top: 1px solid rgba(255, 255, 255, 0.16); font-size: 0.78rem; line-height: 1.45; color: rgba(255, 255, 255, 0.78); }
+.invoice-hero__charge { grid-column: 1 / -1; justify-self: start; padding: 0.45rem 0.9rem; border-radius: 6px; background: rgba(255, 255, 255, 0.16); color: #fff; font-size: 0.8rem; font-weight: 650; text-decoration: none; }
+.invoice-hero__charge:hover { background: rgba(255, 255, 255, 0.26); }
+
+/* Congelada x ainda mutável: informação que já chegava do backend e nenhuma
+   tela mostrava, e é ela que responde "posso cobrar este valor?". */
+.status-frozen { background-color: #e0e7ff; color: #3730a3; }
+.status-live { background-color: #fef3c7; color: #92400e; }
+.invoice-hero .status-frozen, .invoice-hero .status-live { background-color: rgba(255, 255, 255, 0.18); color: #fff; }
+
+/* ===================== Composição por categoria ===================== */
+.breakdown { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 1rem; margin-bottom: 1.75rem; }
+.breakdown-card { display: flex; flex-direction: column; padding: 1.1rem; border: 1px solid var(--cd-line, #dbe7f0); border-radius: 0.8rem; background: #fff; box-shadow: 0 4px 14px rgba(15, 71, 105, 0.05); }
+.breakdown-card__head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+.breakdown-card__head h3 { margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--cd-ink, #0f172a); }
+.breakdown-card__head strong { font-size: 1.15rem; font-weight: 780; color: var(--cd-blue-700, #0369a1); font-variant-numeric: tabular-nums; }
+.breakdown-card__share { margin: 0.3rem 0 0.6rem; font-size: 0.76rem; color: var(--cd-muted, #64748b); }
+.breakdown-card__bar { height: 5px; border-radius: 999px; background: #eef4f9; overflow: hidden; }
+.breakdown-card__bar span { display: block; height: 100%; border-radius: 999px; background: var(--cd-gradient, linear-gradient(140deg, #0c3f68, #0369a1)); }
+.breakdown-card__list { margin: 0.85rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+.breakdown-card__list li { display: grid; grid-template-columns: 1fr auto; gap: 0.15rem 0.75rem; padding-top: 0.5rem; border-top: 1px solid #f1f5f9; }
+.breakdown-card__list li:first-child { padding-top: 0; border-top: none; }
+.breakdown-card__desc { font-size: 0.82rem; font-weight: 600; color: var(--cd-ink, #0f172a); overflow-wrap: anywhere; }
+.breakdown-card__total { font-size: 0.85rem; font-weight: 750; color: var(--cd-ink, #0f172a); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.breakdown-card__qty { grid-column: 1 / -1; font-size: 0.73rem; color: var(--cd-muted, #64748b); font-variant-numeric: tabular-nums; }
+
+/* ===================== Histórico ===================== */
+.table-head-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
+.table-title--flush { padding: 0; border-bottom: none; font-size: 1.1rem; }
+.table-summary { font-size: 0.8rem; font-weight: 600; color: var(--cd-muted, #64748b); font-variant-numeric: tabular-nums; }
+.history-table th { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--cd-muted, #64748b); background: #f8fafc; }
+.history-table td { font-size: 0.85rem; color: #334155; vertical-align: top; }
+.history-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.history-table .strong { font-weight: 700; color: var(--cd-ink, #0f172a); }
+.history-table tr.is-selected { background: #f0f9ff; }
+.history-table tr.is-selected .period-code { color: var(--cd-blue-800, #075985); font-weight: 750; }
+.period-code { text-transform: capitalize; }
+.cell-note { display: block; margin-top: 0.2rem; font-size: 0.7rem; color: #94a3b8; }
+.details-button:hover { background-color: #1d4ed8; }
+
+@media (max-width: 720px) {
+  .invoice-hero { grid-template-columns: 1fr; }
+  .invoice-hero__value { font-size: 2rem; }
+  .filters-and-actions { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+}
 .inline-error { margin: 0 0 1rem; padding: 0.6rem 0.8rem; border-radius: 0.45rem; background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); font-size: 0.83rem; font-weight: 600; }
 .manual-service-form { padding: 1rem; display: flex; flex-direction: column; gap: 1.5rem; }
 .form-group { display: flex; flex-direction: column; }
