@@ -47,7 +47,14 @@
               <!-- SVG inline: o projeto nunca carregou o CSS do Font Awesome,
                    então as tags <i class="fas ..."> daqui não desenhavam nada.
                    O botão aparecia só com o texto e um espaço vazio na frente. -->
-              <button @click="openManualServiceModal" class="action-button action-button--ghost" :disabled="isPeriodClosed">
+              <button
+                @click="openManualServiceModal"
+                class="action-button action-button--ghost"
+                :disabled="isPeriodClosed"
+                :title="isPeriodClosed
+                  ? 'A competência está fechada: o valor não muda mais. Reabra para lançar'
+                  : 'Lança um serviço pontual nesta competência'"
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
                 Lançar avulso
               </button>
@@ -154,17 +161,21 @@
                   <button
                     class="charge-btn charge-btn--ghost"
                     :disabled="isChargeBusy || !isPeriodClosed"
-                    title="Valida tudo e mostra o que seria enviado, sem criar nada"
+                    title="Mostra valor, vencimento e forma de pagamento sem criar nada e sem notificar o cliente"
                     @click="emitirCobranca({ dryRun: true })"
                   >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
                     Simular
                   </button>
                   <button
                     class="charge-btn charge-btn--solid"
                     :disabled="isChargeBusy || !isPeriodClosed"
-                    :title="isPeriodClosed ? 'Emite a cobrança no provedor' : 'Feche a competência primeiro'"
+                    :title="isPeriodClosed
+                      ? 'Cria a cobrança no provedor. O cliente é notificado por ele'
+                      : 'Feche a competência primeiro: com o mês aberto o total ainda muda'"
                     @click="emitirCobranca()"
                   >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                     {{ isChargeBusy ? 'Enviando...' : 'Emitir cobrança' }}
                   </button>
                 </template>
@@ -176,14 +187,36 @@
                     :href="currentInvoice.asaasInvoiceUrl"
                     target="_blank"
                     rel="noopener noreferrer"
-                  >Abrir</a>
-                  <button class="charge-btn charge-btn--ghost" :disabled="isChargeBusy" @click="sincronizarCobranca">
+                    title="Abre a fatura no provedor, do jeito que o cliente vê"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Abrir
+                  </a>
+                  <button
+                    class="charge-btn charge-btn--ghost"
+                    :disabled="isChargeBusy"
+                    title="Relê o estado no provedor. Use se o pagamento entrou e a fatura não atualizou"
+                    @click="sincronizarCobranca"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                     {{ isChargeBusy ? '...' : 'Sincronizar' }}
                   </button>
-                  <button class="charge-btn charge-btn--ghost" :disabled="isChargeBusy" @click="alterarVencimento">
+                  <button
+                    class="charge-btn charge-btn--ghost"
+                    :disabled="isChargeBusy"
+                    title="Muda só a data de vencimento. O valor não muda por aqui"
+                    @click="alterarVencimento"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     Alterar prazo
                   </button>
-                  <button class="charge-btn charge-btn--danger" :disabled="isChargeBusy" @click="cancelarCobranca">
+                  <button
+                    class="charge-btn charge-btn--danger"
+                    :disabled="isChargeBusy"
+                    title="Remove a cobrança no provedor e libera a competência para emitir de novo"
+                    @click="cancelarCobranca"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                     Cancelar
                   </button>
                 </template>
@@ -293,30 +326,40 @@
           </div>
         </template>
 
-        <!-- Modal de Detalhes -->
+        <!-- Modal de Detalhes.
+             Abrir uma linha do histórico TROCA a competência selecionada, então
+             as ações do modal são as mesmas do cartão do topo, agindo sobre a
+             mesma fatura. Sem isso existiriam dois caminhos para a mesma
+             operação, e um deles ficaria desatualizado. -->
         <UniversalModal
           :is-open="isDetailsModalOpen"
           @close="closeDetailsModal"
-          :title="`Detalhes da Fatura - ${selectedInvoiceForModal?.period}`"
+          :title="`Fatura de ${periodLabel(detailsPeriod)}`"
           size="lg"
         >
           <!-- Agrupado por categoria, com subtotal por seção e total geral.
                Antes era um bloco por item, com o tipo cru em inglês no título
                ("Storage", "Shipment", "Manual") e sem nenhum somatório. -->
-          <div v-if="selectedInvoiceForModal" class="invoice-details-content">
+          <div v-if="detailsInvoice" class="invoice-details-content">
             <div class="invoice-meta">
-              <div><span>Competência</span><strong>{{ selectedInvoiceForModal.period }}</strong></div>
-              <div><span>Vencimento</span><strong>{{ selectedInvoiceForModal.dueDate }}</strong></div>
+              <div><span>Vencimento</span><strong>{{ detailsInvoice.dueDate }}</strong></div>
               <div>
-                <span>Status</span>
-                <strong :class="['status-badge', getStatusClass(selectedInvoiceForModal.status)]">
-                  {{ getStatusLabel(selectedInvoiceForModal.status) }}
+                <span>Pagamento</span>
+                <strong :class="['status-badge', getStatusClass(detailsInvoice.status)]">
+                  {{ getStatusLabel(detailsInvoice.status) }}
                 </strong>
               </div>
-              <div v-if="selectedInvoiceForModal.paymentDate"><span>Pago em</span><strong>{{ selectedInvoiceForModal.paymentDate }}</strong></div>
+              <div>
+                <span>Competência</span>
+                <strong class="status-badge" :class="detailsInvoice.isClosed ? 'status-frozen' : 'status-live'">
+                  {{ detailsInvoice.isClosed ? 'Fechada' : 'Aberta' }}
+                </strong>
+              </div>
+              <div v-if="detailsInvoice.paymentDate"><span>Pago em</span><strong>{{ detailsInvoice.paymentDate }}</strong></div>
+              <div v-if="detailsInvoice.asaasStatus"><span>Cobrança</span><strong>{{ detailsInvoice.asaasStatus }}</strong></div>
             </div>
 
-            <section v-for="group in groupedItems(selectedInvoiceForModal)" :key="group.key" class="detail-group">
+            <section v-for="group in groupedItems(detailsInvoice)" :key="group.key" class="detail-group">
               <header class="detail-group__head">
                 <h5>{{ group.label }}</h5>
                 <strong>{{ formatCurrency(group.subtotal) }}</strong>
@@ -338,9 +381,125 @@
 
             <footer class="detail-total">
               <span>Total da fatura</span>
-              <strong>{{ formatCurrency(selectedInvoiceForModal.totalAmount) }}</strong>
+              <strong>{{ formatCurrency(detailsInvoice.totalAmount) }}</strong>
             </footer>
           </div>
+
+          <!-- Ações da competência, dentro do modal: quem abriu a linha do
+               histórico quer AGIR nela, não voltar ao topo da página para achar
+               o botão. São os mesmos handlers do cartão, porque abrir o modal
+               troca a competência selecionada. -->
+          <template #footer>
+            <div v-if="detailsInvoice" class="details-actions">
+              <!-- Guia de próximo passo. A ordem fechar -> simular -> emitir não
+                   é preferência: o backend recusa emitir com a competência
+                   aberta. Dizer qual é o passo atual evita o clique que só
+                   devolve erro. -->
+              <p class="details-actions__step">
+                <span class="details-actions__step-icon" v-html="passoAtual.icone"></span>
+                <span><strong>{{ passoAtual.titulo }}</strong> {{ passoAtual.texto }}</span>
+              </p>
+
+              <p v-if="chargeMessage" class="details-actions__msg">{{ chargeMessage }}</p>
+              <p v-if="chargeError" class="details-actions__msg is-error">{{ chargeError }}</p>
+              <p v-if="statusError" class="details-actions__msg is-error">{{ statusError }}</p>
+
+              <div class="details-actions__row">
+                <!-- Fechar vem primeiro porque é pré-requisito de emitir. -->
+                <button
+                  class="action-button btn-ico"
+                  :class="isPeriodClosed ? 'action-button--ghost' : 'action-button--primary'"
+                  :disabled="isUpdatingClosure"
+                  :title="isPeriodClosed
+                    ? 'Volta o total a ser recalculado, para corrigir um fechamento feito antes da hora'
+                    : 'Congela o valor da competência. Depois disso, venda e avulso atrasados entram no mês seguinte'"
+                  @click="togglePeriodClosure"
+                >
+                  <svg v-if="isPeriodClosed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                  <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  {{ isUpdatingClosure ? 'Salvando...' : (isPeriodClosed ? 'Reabrir competência' : 'Fechar e gerar fatura') }}
+                </button>
+
+                <template v-if="!temCobranca">
+                  <button
+                    class="action-button action-button--ghost btn-ico"
+                    :disabled="isChargeBusy || !isPeriodClosed"
+                    title="Mostra valor, vencimento e forma de pagamento sem criar nada no provedor e sem notificar o cliente"
+                    @click="emitirCobranca({ dryRun: true })"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Simular
+                  </button>
+                  <button
+                    class="action-button btn-ico"
+                    :disabled="isChargeBusy || !isPeriodClosed"
+                    :title="isPeriodClosed
+                      ? 'Cria a cobrança no provedor. O cliente é notificado por ele'
+                      : 'Feche a competência primeiro: com o mês aberto o total ainda muda'"
+                    @click="emitirCobranca()"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    {{ isChargeBusy ? 'Enviando...' : 'Emitir cobrança' }}
+                  </button>
+                </template>
+
+                <template v-else>
+                  <a
+                    v-if="detailsInvoice.asaasInvoiceUrl"
+                    class="action-button btn-ico"
+                    :href="detailsInvoice.asaasInvoiceUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Abre a fatura no provedor, do jeito que o cliente vê"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Abrir cobrança
+                  </a>
+                  <button
+                    class="action-button action-button--ghost btn-ico"
+                    :disabled="isChargeBusy"
+                    title="Relê o estado no provedor. Use se o pagamento entrou e a fatura não atualizou"
+                    @click="sincronizarCobranca"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    {{ isChargeBusy ? '...' : 'Sincronizar' }}
+                  </button>
+                  <button
+                    class="action-button action-button--ghost btn-ico"
+                    :disabled="isChargeBusy"
+                    title="Muda só a data de vencimento. O valor não muda por aqui"
+                    @click="alterarVencimento"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    Alterar prazo
+                  </button>
+                  <button
+                    class="action-button action-button--danger btn-ico"
+                    :disabled="isChargeBusy"
+                    title="Remove a cobrança no provedor e libera a competência para emitir de novo"
+                    @click="cancelarCobranca"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    Cancelar cobrança
+                  </button>
+                </template>
+
+                <button
+                  class="action-button btn-ico"
+                  :class="isCurrentInvoicePaid ? 'action-button--ghost' : 'action-button--pay'"
+                  :disabled="isUpdatingStatus"
+                  :title="isCurrentInvoicePaid
+                    ? 'Desfaz a baixa manual e devolve a fatura para em aberto'
+                    : 'Dá baixa à mão. Use quando o cliente pagou por fora do provedor'"
+                  @click="toggleInvoicePayment"
+                >
+                  <svg v-if="isCurrentInvoicePaid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/></svg>
+                  <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  {{ isUpdatingStatus ? 'Salvando...' : (isCurrentInvoicePaid ? 'Desfazer baixa' : 'Marcar como paga') }}
+                </button>
+              </div>
+            </div>
+          </template>
         </UniversalModal>
 
         <!-- Modal Lançar Serviço Avulso -->
@@ -476,7 +635,11 @@ function groupedItems(invoice) {
 const selectedPeriod = ref('');
 const contentArea = ref(null);
 const isDetailsModalOpen = ref(false);
-const selectedInvoiceForModal = ref(null);
+/* A competência aberta no modal. Guardo o PERÍODO e não o objeto: o objeto vira
+ * uma cópia congelada no instante do clique, e depois de emitir ou fechar a
+ * fatura o modal continuaria mostrando o estado antigo. Com o período, o
+ * computed abaixo relê da lista recarregada. */
+const detailsPeriod = ref('');
 const isManualServiceModalOpen = ref(false);
 const isSubmittingManualService = ref(false);
 const manualServiceError = ref('');
@@ -489,6 +652,12 @@ const manualService = ref({
 const isModalView = computed(() => !!props.userId);
 const targetUserId = computed(() => props.userId);
 const currentInvoice = computed(() => invoices.value.find(inv => inv.period === selectedPeriod.value) || null);
+
+/* A fatura do modal, resolvida da lista a cada leitura. Depois de emitir ou
+ * fechar, `fetchInvoices` recarrega e isto reflete na hora. */
+const detailsInvoice = computed(() =>
+  invoices.value.find(inv => inv.period === detailsPeriod.value) || null
+);
 
 const availablePeriods = computed(() => {
   const periods = invoices.value.map(inv => inv.period);
@@ -514,7 +683,10 @@ const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
 function periodLabel(period) {
   const [ano, mes] = String(period || '').split('-').map(Number);
   if (!ano || !mes || mes < 1 || mes > 12) return period || '';
-  return `${MESES[mes - 1]} de ${ano}`;
+  const nome = MESES[mes - 1];
+  /* Só a primeira letra. Deixar isso para o CSS com `text-transform: capitalize`
+   * maiusculava cada palavra e produzia "Agosto De 2026". */
+  return `${nome.charAt(0).toUpperCase()}${nome.slice(1)} de ${ano}`;
 }
 
 /**
@@ -654,6 +826,62 @@ const isChargeBusy = ref(false);
 const chargeError = ref('');
 const chargeMessage = ref('');
 const temCobranca = computed(() => Boolean(currentInvoice.value?.asaasPaymentId));
+
+/* Ícones do guia de passo. Ficam aqui como string porque são injetados por
+ * v-html num único ponto — repetir cinco <svg> no template com v-if faria o
+ * bloco de orientação virar a maior parte do arquivo. */
+const ICONES_PASSO = {
+  cadeadoAberto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>',
+  aviao: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
+  relogio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+};
+
+/**
+ * Qual é o passo atual desta competência.
+ *
+ * A ordem fechar -> simular -> emitir -> receber não é preferência de tela: o
+ * backend RECUSA emitir com a competência aberta, porque o total ainda muda.
+ * Dizer em que ponto do caminho a fatura está evita o clique que só devolve
+ * erro, e é a diferença entre a tela ensinar e a tela deixar adivinhar.
+ */
+const passoAtual = computed(() => {
+  const fatura = detailsInvoice.value;
+
+  if (fatura?.status === 'paid') {
+    return {
+      icone: ICONES_PASSO.ok,
+      titulo: 'Fatura paga.',
+      texto: fatura.paidBy === 'asaas'
+        ? 'A baixa veio do provedor de cobrança.'
+        : `Baixa manual${fatura.paidBy ? ` por ${fatura.paidBy}` : ''}.`,
+    };
+  }
+
+  if (!fatura?.isClosed) {
+    return {
+      icone: ICONES_PASSO.cadeadoAberto,
+      titulo: 'Passo 1 de 3: fechar a competência.',
+      texto: 'Enquanto o mês está aberto o total é recalculado a cada visita, então ainda não dá para cobrar. '
+        + 'Fechar congela o valor.',
+    };
+  }
+
+  if (!temCobranca.value) {
+    return {
+      icone: ICONES_PASSO.aviao,
+      titulo: 'Passo 2 de 3: emitir a cobrança.',
+      texto: 'O valor está congelado. Use "Simular" para conferir sem enviar nada, e depois "Emitir cobrança".',
+    };
+  }
+
+  return {
+    icone: ICONES_PASSO.relogio,
+    titulo: 'Passo 3 de 3: aguardando o pagamento.',
+    texto: `Cobrança emitida${fatura.asaasStatus ? ` (${fatura.asaasStatus})` : ''}. `
+      + 'O provedor avisa quando o cliente pagar; "Sincronizar" confere na hora.',
+  };
+});
 
 /** Código de erro do backend, quando existir. */
 const codigoDoErro = (e) => e?.data?.code || null;
@@ -866,14 +1094,31 @@ const handlePeriodChange = () => {
   }
 };
 
+/**
+ * Abre o detalhe de uma competência do histórico.
+ *
+ * Além de abrir, TROCA a competência selecionada para a da linha clicada. É o
+ * que permite ao modal usar exatamente os mesmos handlers do cartão do topo
+ * (fechar, emitir, sincronizar, baixar) em vez de manter um segundo conjunto de
+ * ações — e dois conjuntos é como um deles fica desatualizado.
+ *
+ * Efeito colateral desejado: o cartão do topo passa a mostrar a mesma
+ * competência, então fechar o modal não deixa a tela contando outra história.
+ */
 const openDetailsModal = (invoice) => {
-  selectedInvoiceForModal.value = invoice;
+  detailsPeriod.value = invoice.period;
+  if (selectedPeriod.value !== invoice.period) {
+    selectedPeriod.value = invoice.period;
+    handlePeriodChange();
+  }
+  limparAvisosDeCobranca();
+  statusError.value = '';
   isDetailsModalOpen.value = true;
 };
 
 const closeDetailsModal = () => {
   isDetailsModalOpen.value = false;
-  selectedInvoiceForModal.value = null;
+  detailsPeriod.value = '';
 };
 
 const openManualServiceModal = async () => {
@@ -1086,7 +1331,30 @@ watch(() => props.userId, (newId) => {
 .history-table .strong { font-weight: 700; color: var(--cd-ink, #0f172a); }
 .history-table tr.is-selected { background: #f0f9ff; }
 .history-table tr.is-selected .period-code { color: var(--cd-blue-800, #075985); font-weight: 750; }
-.period-code { text-transform: capitalize; }
+
+/* `text-transform: capitalize` saiu daqui: ele maiúscula CADA palavra e
+   produzia "Agosto De 2026". A primeira letra agora é tratada em periodLabel. */
+.period-code { font-weight: 600; }
+
+/* Ações no rodapé do modal de detalhes. Rolam com o modal e ficam agrupadas à
+   direita, com as mensagens ocupando a linha inteira acima. */
+.details-actions { width: 100%; }
+.details-actions__row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
+
+/* Guia de passo: fica acima dos botões, ocupando a linha, porque é o que se lê
+   ANTES de decidir qual botão apertar. */
+.details-actions__step { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0 0 0.7rem; padding: 0.6rem 0.75rem; border: 1px solid var(--cd-line, #dbe7f0); border-left: 3px solid var(--cd-blue-600, #0284c7); border-radius: 0.45rem; background: #f8fbfe; color: #475569; font-size: 0.79rem; line-height: 1.5; }
+.details-actions__step strong { color: var(--cd-ink, #0f172a); }
+.details-actions__step-icon { display: inline-flex; flex: 0 0 auto; margin-top: 0.05rem; color: var(--cd-blue-700, #0369a1); }
+
+/* Ícone dentro do botão. `flex: 0 0 auto` impede que ele encolha quando o
+   rótulo é longo e a barra de ações quebra em duas linhas. */
+.btn-ico { display: inline-flex; align-items: center; gap: 0.4rem; }
+.btn-ico svg { flex: 0 0 auto; }
+.details-actions__msg { margin: 0 0 0.6rem; padding: 0.5rem 0.7rem; border-radius: 0.45rem; background: #f0f9ff; color: var(--cd-blue-800, #075985); font-size: 0.8rem; line-height: 1.45; }
+.details-actions__msg.is-error { background: var(--cd-danger-bg, #fee2e2); color: var(--cd-danger-ink, #991b1b); font-weight: 650; }
+.action-button--danger { background-color: #b91c1c; }
+.action-button--danger:hover:not(:disabled) { background-color: #991b1b; }
 .cell-note { display: block; margin-top: 0.2rem; font-size: 0.7rem; color: #94a3b8; }
 .details-button:hover { background-color: #1d4ed8; }
 
