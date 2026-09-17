@@ -55,6 +55,24 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Resumo do SKU inteiro. Fica fora do v-else da tabela para continuar
+           visível quando o filtro esconde tudo: é justamente aí que a conta
+           importa (aba Entrada vazia com saldo zerado = lançamento faltando). -->
+      <div v-if="!isLoading && (resumo.entradas > 0 || resumo.saidas > 0)" class="resumo">
+        <span class="resumo__item">
+          <span class="resumo__rotulo">Entradas</span>
+          <strong class="entrada">+{{ resumo.entradas }}</strong>
+        </span>
+        <span class="resumo__item">
+          <span class="resumo__rotulo">Saídas</span>
+          <strong class="saida">-{{ resumo.saidas }}</strong>
+        </span>
+        <span class="resumo__item">
+          <span class="resumo__rotulo">Saldo pelo histórico</span>
+          <strong>{{ resumo.entradas - resumo.saidas }}</strong>
+        </span>
+      </div>
     </div>
   </UniversalModal>
 </template>
@@ -77,14 +95,45 @@ export default defineComponent({
     const typeFilter = ref('all'); // all | entrada | saida
     const query = ref('');
 
-    const filtered = computed(() => {
+    /* Tipo normalizado antes de qualquer comparação.
+     *
+     * O filtro comparava o valor cru do banco com 'entrada' por igualdade
+     * exata, e `movement_type` é texto livre. Uma linha gravada como "Entrada"
+     * desaparecia da aba Entrada E era exibida com sinal negativo, porque o
+     * template trata "não é entrada" como saída. Normalizando aqui, a mesma
+     * lista alimenta filtro, sinal, cor e resumo com um valor só. */
+    const normalized = computed(() => {
       const list = Array.isArray(props.movements) ? props.movements : [];
+      return list.map(m => ({
+        ...m,
+        movement_type: String(m.movement_type || '').trim().toLowerCase(),
+      }));
+    });
+
+    const filtered = computed(() => {
+      const list = normalized.value;
       const byType = typeFilter.value === 'all'
         ? list
         : list.filter(m => m.movement_type === typeFilter.value);
       const q = query.value.toLowerCase();
       if (!q) return byType;
       return byType.filter(m => String(m.reason || '').toLowerCase().includes(q));
+    });
+
+    /* Resumo do SKU inteiro, não do filtro.
+     *
+     * É a pergunta que traz alguém a esta tela: "entraram quantas, saíram
+     * quantas, sobrou quanto?". Antes exigia somar as linhas na mão, e a conta
+     * era justamente o que revelava se faltava lançamento. O saldo aqui é o
+     * derivado do histórico; divergência dele contra a quantidade da tabela é
+     * sinal de movimentação faltando. */
+    const resumo = computed(() => {
+      return normalized.value.reduce((acc, m) => {
+        const qtd = Number(m.quantity_change) || 0;
+        if (m.movement_type === 'entrada') acc.entradas += qtd;
+        else if (m.movement_type === 'saida') acc.saidas += qtd;
+        return acc;
+      }, { entradas: 0, saidas: 0 });
     });
 
     const formatDate = (s) => {
@@ -96,7 +145,7 @@ export default defineComponent({
       return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     };
 
-    return { typeFilter, query, filtered, formatDate, formatTime };
+    return { typeFilter, query, filtered, resumo, formatDate, formatTime };
   }
 });
 </script>
@@ -148,6 +197,18 @@ export default defineComponent({
 
 .td-right.entrada { color: #16a34a; font-weight: 700; }
 .td-right.saida   { color: #dc2626; font-weight: 700; }
+
+/* Resumo */
+.resumo {
+  display: flex; flex-wrap: wrap; gap: 1.25rem;
+  border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: .6rem .9rem; background: #f9fafb;
+}
+.resumo__item { display: grid; gap: .1rem; }
+.resumo__rotulo { font-size: .74rem; color: #6b7280; text-transform: uppercase; letter-spacing: .02em; }
+.resumo__item strong { font-size: 1rem; color: #111827; }
+.resumo__item strong.entrada { color: #16a34a; }
+.resumo__item strong.saida { color: #dc2626; }
 
 /* Estados */
 .feedback { text-align: center; color: #6b7280; padding: 2.2rem 1rem; }
