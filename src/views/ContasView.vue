@@ -19,11 +19,16 @@
                 <img src="/img/shopee-logo.svg" alt="Shopee" class="mk-chip__logo" />
                 Shopee
               </span>
+              <span class="mk-chip">
+                <img src="/img/tiktok-logo.svg" alt="TikTok Shop" class="mk-chip__logo" />
+                TikTok Shop
+              </span>
             </div>
           </div>
           <div class="header-actions">
             <MercadoLivreConnect />
             <ShopeeConnect />
+            <TikTokConnect />
           </div>
         </div>
 
@@ -55,6 +60,16 @@
             <div class="stat-card__body">
               <span class="stat-card__value">{{ accounts.shopee.length }}</span>
               <span class="stat-card__label">Shopee</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-card__icon stat-card__icon--tiktok">
+              <img src="/img/tiktok-logo.svg" alt="" class="stat-card__logo" />
+            </span>
+            <div class="stat-card__body">
+              <span class="stat-card__value">{{ accounts.tiktok.length }}</span>
+              <span class="stat-card__label">TikTok Shop</span>
             </div>
           </div>
 
@@ -295,19 +310,112 @@
               </div>
             </section>
 
+            <!-- ================= TIKTOK SHOP ================= -->
+            <section v-if="accounts.tiktok.length > 0" class="platform-section">
+              <div class="section-head">
+                <div class="section-head__brand">
+                  <span class="section-head__logo section-head__logo--tiktok">
+                    <img src="/img/tiktok-logo.svg" alt="TikTok Shop" />
+                  </span>
+                  <div>
+                    <h2 class="section-head__title">TikTok Shop</h2>
+                    <p class="section-head__sub">{{ accounts.tiktok.length }} loja(s) conectada(s)</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="accounts-grid">
+                <article
+                  v-for="account in accounts.tiktok"
+                  :key="account.shop_id"
+                  class="account-card account-card--tiktok"
+                  @mouseenter="hoverCard($event, true)"
+                  @mouseleave="hoverCard($event, false)"
+                >
+                  <span class="account-card__stripe account-card__stripe--tiktok" aria-hidden="true"></span>
+
+                  <header class="account-card__top">
+                    <div class="account-card__identity">
+                      <span class="account-card__avatar account-card__avatar--tiktok">
+                        <img src="/img/tiktok-logo.svg" alt="TikTok Shop" />
+                      </span>
+                      <div class="account-card__names">
+                        <span class="account-nickname" :title="account.shop_name || account.shop_id">
+                          {{ account.shop_name || account.shop_id }}
+                        </span>
+                        <span class="account-id">
+                          Loja {{ account.shop_id }}<template v-if="account.region"> · {{ account.region }}</template>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div class="status-pill" :data-status="account.status">
+                      <span class="status-dot" :class="account.status"></span>
+                      {{ getStatusText(account.status) }}
+                    </div>
+                  </header>
+
+                  <div class="account-card__meta">
+                    <span class="meta-item">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                      Conectada em {{ formatDate(account.connected_at) }}
+                    </span>
+                    <span v-if="account.refresh_expires_at" class="meta-item">
+                      Autorização válida até {{ formatDay(account.refresh_expires_at) }}
+                    </span>
+                  </div>
+
+                  <p v-if="account.status === 'reconnect_needed'" class="account-card__alert" role="status">
+                    A autorização desta loja expirou ou foi revogada. Conecte o TikTok Shop de novo para voltar a sincronizar.
+                  </p>
+                  <p v-else-if="account.has_shop_cipher === false" class="account-card__alert" role="status">
+                    O TikTok não devolveu o identificador desta loja na conexão. Conecte o TikTok Shop de novo.
+                  </p>
+
+                  <footer class="account-card__foot">
+                    <button
+                      @mousedown="press"
+                      @click="handleSyncTikTok(account)"
+                      class="btn-sync"
+                      :disabled="tiktokSyncState.isSyncing || account.status === 'reconnect_needed'"
+                      title="Sincronizar vendas desta loja"
+                    >
+                      <svg class="btn-sync__icon" :class="{ 'is-spinning': tiktokSyncState.isSyncing }" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline points="21 3 21 9 15 9" /></svg>
+                      {{ tiktokSyncState.isSyncing ? 'Sincronizando...' : 'Sincronizar' }}
+                    </button>
+
+                    <div class="account-actions">
+                      <button
+                        v-if="userRole === 'master'"
+                        @mousedown="press"
+                        @click="requestDelete(account, 'tiktok')"
+                        class="action-btn delete-btn"
+                        aria-label="Excluir Loja"
+                        title="Excluir Loja"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0" /><path d="M10 11l0 6" /><path d="M14 11l0 6" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
+                      </button>
+                    </div>
+                  </footer>
+                </article>
+              </div>
+            </section>
+
             <!-- =================== VAZIO =================== -->
-            <div v-if="accounts.mercadoLivre.length === 0 && accounts.shopee.length === 0" class="no-accounts">
+            <div v-if="totalAccounts === 0" class="no-accounts">
               <div class="no-accounts__logos">
                 <img src="/img/ml-logo.svg" alt="Mercado Livre" />
                 <img src="/img/shopee-logo.svg" alt="Shopee" />
+                <img src="/img/tiktok-logo.svg" alt="TikTok Shop" />
               </div>
               <h3 class="no-accounts__title">Nenhuma conta conectada ainda</h3>
               <p class="no-accounts__text">
-                Conecte uma conta do Mercado Livre ou uma loja Shopee para começar a sincronizar suas vendas.
+                Conecte uma conta do Mercado Livre, uma loja Shopee ou uma loja TikTok Shop para começar a sincronizar suas vendas.
               </p>
               <div class="no-accounts__actions">
                 <MercadoLivreConnect />
                 <ShopeeConnect />
+                <TikTokConnect />
               </div>
             </div>
           </div>
@@ -361,21 +469,25 @@ import SidebarComponent from '../components/SidebarComponent.vue';
 import TopbarComponent from '../components/TopbarComponent.vue';
 import MercadoLivreConnect from '../components/MercadoLivreConnect.vue';
 import ShopeeConnect from '../components/ShopeeConnect.vue';
+import TikTokConnect from '../components/TikTokConnect.vue';
 import ToastNotification from '../components/ToastNotification.vue';
 
 import { useAuth } from '@/composables/useAuth';
 import { useApi } from '@/composables/useApi';
 import { useSyncManager } from '@/composables/useSyncManager';
 import { useShopeeSyncManager } from '@/composables/useShopeeSyncManager';
+import { useTikTokSyncManager } from '@/composables/useTikTokSyncManager';
 
 const {
   user, userRole, isAuthReady,
   fetchMercadoLivreAccounts: fetchAccountsFromAuth,
   fetchShopeeAccounts: fetchShopeeAccountsFromAuth,
+  fetchTikTokAccounts: fetchTikTokAccountsFromAuth,
 } = useAuth();
 const api = useApi();
 const { syncState, syncAccount: syncMlAccount } = useSyncManager();
 const { syncState: shopeeSyncState, syncAccount: syncShopeeAccount } = useShopeeSyncManager();
+const { syncState: tiktokSyncState, syncAccount: syncTikTokAccount } = useTikTokSyncManager();
 const route = useRoute();
 const router = useRouter();
 
@@ -388,15 +500,15 @@ const mlGrid = ref(null);
 const shopeeGrid = ref(null);
 let ctx;
 
-const accounts = ref({ mercadoLivre: [], shopee: [] });
+const accounts = ref({ mercadoLivre: [], shopee: [], tiktok: [] });
 const isLoading = ref(true);
 
 const totalAccounts = computed(
-  () => accounts.value.mercadoLivre.length + accounts.value.shopee.length
+  () => accounts.value.mercadoLivre.length + accounts.value.shopee.length + accounts.value.tiktok.length
 );
 
 const activeAccountsCount = computed(() =>
-  [...accounts.value.mercadoLivre, ...accounts.value.shopee].filter(
+  [...accounts.value.mercadoLivre, ...accounts.value.shopee, ...accounts.value.tiktok].filter(
     (acc) => acc.status === 'active'
   ).length
 );
@@ -419,6 +531,15 @@ const showSimpleNotification = (title, message, type = 'info') => {
  * tela (a do ML roda na Tabela de Vendas).
  */
 const activeToast = computed(() => {
+  if (tiktokSyncState.value.isVisible) {
+    return {
+      isVisible: true,
+      title: tiktokSyncState.value.title,
+      description: tiktokSyncState.value.description,
+      progress: tiktokSyncState.value.progress,
+      type: tiktokSyncState.value.type,
+    };
+  }
   if (shopeeSyncState.value.isVisible) {
     return {
       isVisible: true,
@@ -450,7 +571,8 @@ const activeToast = computed(() => {
 });
 
 const dismissToast = () => {
-  if (shopeeSyncState.value.isVisible) shopeeSyncState.value.isVisible = false;
+  if (tiktokSyncState.value.isVisible) tiktokSyncState.value.isVisible = false;
+  else if (shopeeSyncState.value.isVisible) shopeeSyncState.value.isVisible = false;
   else if (syncState.value.isVisible) syncState.value.isVisible = false;
   else notification.value.show = false;
 };
@@ -465,9 +587,10 @@ const addExtraProperties = (acc) => ({
 const fetchAllAccounts = async (force = false) => {
   isLoading.value = true;
   try {
-    const [mlData, shopeeData] = await Promise.all([
+    const [mlData, shopeeData, tiktokData] = await Promise.all([
       fetchAccountsFromAuth(force),
       fetchShopeeAccountsFromAuth(force),
+      fetchTikTokAccountsFromAuth(force),
     ]);
 
     if (mlData && mlData.error) {
@@ -487,8 +610,24 @@ const fetchAllAccounts = async (force = false) => {
     } else {
       accounts.value.shopee = shopeeData || [];
     }
+
+    if (tiktokData && tiktokData.error) {
+      showSimpleNotification('Erro', tiktokData.error);
+      accounts.value.tiktok = [];
+    } else {
+      accounts.value.tiktok = Array.isArray(tiktokData) ? tiktokData : [];
+    }
   } finally {
     isLoading.value = false;
+  }
+};
+
+const handleSyncTikTok = async (account) => {
+  try {
+    await syncTikTokAccount(account.shop_id, account.shop_name || account.shop_id);
+    await fetchAllAccounts(true);
+  } catch (error) {
+    showSimpleNotification('Erro', error.message || 'Não foi possível sincronizar a loja.', 'error');
   }
 };
 
@@ -552,10 +691,13 @@ const confirmDelete = async () => {
   }
 
   const account = accountToDelete.value;
-  const isShopee = account.platform === 'shopee';
-  const id = isShopee ? account.shop_id : account.user_id;
-  const label = isShopee ? (account.shop_name || account.shop_id) : account.nickname;
-  const endpoint = isShopee ? `/shopee/contas/${id}` : `/ml/contas/${id}`;
+  // Shopee e TikTok são lojas (shop_id); o Mercado Livre é conta (user_id).
+  const isShop = account.platform === 'shopee' || account.platform === 'tiktok';
+  const id = isShop ? account.shop_id : account.user_id;
+  const label = isShop ? (account.shop_name || account.shop_id) : account.nickname;
+  const endpoint = isShop
+    ? `/${account.platform}/contas/${encodeURIComponent(id)}`
+    : `/ml/contas/${id}`;
 
   try {
     await api.delete(endpoint);
@@ -638,8 +780,14 @@ const hoverCard = (e, entering) => {
 // };
 
 const getStatusText = (status) => {
-  const map = { active: 'Ativa', attention: 'Atenção', error: 'Erro' };
+  const map = { active: 'Ativa', attention: 'Atenção', error: 'Erro', reconnect_needed: 'Reconectar' };
   return map[status] || 'Inativa';
+};
+
+/** Só a data: a validade da autorização do TikTok é longa, a hora não ajuda. */
+const formatDay = (timestamp) => {
+  if (!timestamp) return 'N/A';
+  return new Date(timestamp).toLocaleDateString('pt-BR');
 };
 
 let lastRouteFeedback = '';
@@ -687,6 +835,7 @@ onMounted(() => {
       } else {
         accounts.value.mercadoLivre = [];
         accounts.value.shopee = [];
+        accounts.value.tiktok = [];
         isLoading.value = false;
       }
     },
@@ -778,6 +927,7 @@ onUnmounted(() => {
 .stat-card__icon--active { background: #ecfdf5; color: #059669; }
 .stat-card__icon--ml { background: #fff9db; }
 .stat-card__icon--shopee { background: #fff1ec; }
+.stat-card__icon--tiktok { background: #f3f4f6; }
 .stat-card__logo { width: 22px; height: 22px; object-fit: contain; border-radius: 5px; }
 .stat-card__body { display: flex; flex-direction: column; min-width: 0; }
 .stat-card__value { font-size: 1.4rem; font-weight: 700; line-height: 1.1; color: var(--text); font-variant-numeric: tabular-nums; }
@@ -794,6 +944,7 @@ onUnmounted(() => {
 .section-head__logo img { width: 26px; height: 26px; object-fit: contain; border-radius: 6px; }
 .section-head__logo--ml { background: #fffdf2; border-color: #f2e6a8; }
 .section-head__logo--shopee { background: #fff6f2; border-color: #f8c6b4; }
+.section-head__logo--tiktok { background: #ffffff; border-color: #d1d5db; }
 .section-head__title { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
 .section-head__sub { margin: 0.1rem 0 0; font-size: 0.8rem; color: var(--subtle); }
 
@@ -871,6 +1022,7 @@ onUnmounted(() => {
 .account-card__stripe { position: absolute; inset: 0 auto 0 0; width: 3px; }
 .account-card__stripe--ml { background: linear-gradient(180deg, #f8d135, #ffe680); }
 .account-card__stripe--shopee { background: linear-gradient(180deg, #ee4d2d, #ff8b6b); }
+.account-card__stripe--tiktok { background: linear-gradient(180deg, #ec2b89, #00efe8); }
 
 .account-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
 .account-card__identity { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
@@ -881,6 +1033,17 @@ onUnmounted(() => {
 .account-card__avatar img { width: 25px; height: 25px; object-fit: contain; border-radius: 6px; }
 .account-card__avatar--ml { background: #fffdf2; border-color: #f2e6a8; }
 .account-card__avatar--shopee { background: #fff6f2; border-color: #f8c6b4; }
+.account-card__avatar--tiktok { background: #ffffff; border-color: #d1d5db; }
+.account-card__alert {
+  margin: 0.75rem 0 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
 .account-card__names { display: flex; flex-direction: column; min-width: 0; }
 .account-nickname {
   font-weight: 650; color: #111827; font-size: 0.95rem; line-height: 1.25;

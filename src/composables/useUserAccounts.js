@@ -20,11 +20,15 @@ import { useApi } from './useApi';
  *   somaria uma requisição por montagem numa tela sensível a tempo de resposta.
  */
 export function useUserAccounts(userIdRef, options = {}) {
-  const comShopee = options.shopee === true;
+  // `shopee: true` (nome mantido por compatibilidade) liga todas as lojas:
+  // Shopee e TikTok Shop. O único consumidor é o painel de contas do master.
+  const comShopee = options.shopee === true || options.tiktok === true;
   const accounts = ref([]);
   const shopeeAccounts = ref([]);
+  const tiktokAccounts = ref([]);
   const isLoading = ref(false);
   const isLoadingShopee = ref(false);
+  const isLoadingTikTok = ref(false);
   const error = ref(null);
   const api = useApi();
 
@@ -74,10 +78,35 @@ export function useUserAccounts(userIdRef, options = {}) {
     }
   };
 
-  /** Os dois canais em paralelo. */
+  /** Lojas do TikTok Shop. */
+  const fetchTikTokAccounts = async (uid) => {
+    if (!uid) {
+      tiktokAccounts.value = [];
+      return [];
+    }
+    isLoadingTikTok.value = true;
+    try {
+      // GET /api/tiktok/contas/:uid — exige ser o dono ou master.
+      const data = await api.get(`/tiktok/contas/${uid}`);
+      tiktokAccounts.value = Array.isArray(data) ? data : [];
+      return tiktokAccounts.value;
+    } catch (e) {
+      // Backend ainda sem a integração: canal vazio, sem alarme na tela.
+      if (e?.status !== 404) {
+        console.error(`Erro ao buscar lojas TikTok Shop para o usuário ${uid}:`, e);
+        error.value = error.value || 'Não foi possível carregar as lojas TikTok Shop do usuário.';
+      }
+      tiktokAccounts.value = [];
+      return [];
+    } finally {
+      isLoadingTikTok.value = false;
+    }
+  };
+
+  /** Todos os canais em paralelo. */
   const fetchAllAccounts = async (uid) => {
     error.value = null;
-    await Promise.all([fetchAccounts(uid), fetchShopeeAccounts(uid)]);
+    await Promise.all([fetchAccounts(uid), fetchShopeeAccounts(uid), fetchTikTokAccounts(uid)]);
   };
 
   /**
@@ -87,21 +116,24 @@ export function useUserAccounts(userIdRef, options = {}) {
    * token, então o master recebia 404 ao tentar desconectar a conta de um
    * cliente. Estas levam o uid alvo na URL.
    *
-   * @param {'ml'|'shopee'} platform
-   * @param {string|number} accountId user_id do ML ou shop_id da Shopee
+   * @param {'ml'|'shopee'|'tiktok'} platform
+   * @param {string|number} accountId user_id do ML ou shop_id da loja
    */
   const removeAccount = async (platform, accountId) => {
     const uid = userIdRef?.value;
     if (!uid || !accountId) return { success: false, message: 'Conta inválida.' };
 
-    const endpoint = platform === 'shopee'
-      ? `/shopee/contas/${uid}/${accountId}`
+    const isShop = platform === 'shopee' || platform === 'tiktok';
+    const endpoint = isShop
+      ? `/${platform}/contas/${uid}/${encodeURIComponent(accountId)}`
       : `/ml/contas/${uid}/${accountId}`;
 
     try {
       const data = await api.delete(endpoint);
       if (platform === 'shopee') {
         shopeeAccounts.value = shopeeAccounts.value.filter((a) => String(a.shop_id) !== String(accountId));
+      } else if (platform === 'tiktok') {
+        tiktokAccounts.value = tiktokAccounts.value.filter((a) => String(a.shop_id) !== String(accountId));
       } else {
         accounts.value = accounts.value.filter((a) => String(a.user_id) !== String(accountId));
       }
@@ -112,8 +144,10 @@ export function useUserAccounts(userIdRef, options = {}) {
     }
   };
 
-  const isLoadingAny = computed(() => isLoading.value || isLoadingShopee.value);
-  const totalAccounts = computed(() => accounts.value.length + shopeeAccounts.value.length);
+  const isLoadingAny = computed(() => isLoading.value || isLoadingShopee.value || isLoadingTikTok.value);
+  const totalAccounts = computed(
+    () => accounts.value.length + shopeeAccounts.value.length + tiktokAccounts.value.length
+  );
 
   watch(userIdRef, (newId) => {
     if (!newId) return;
@@ -124,13 +158,16 @@ export function useUserAccounts(userIdRef, options = {}) {
   return {
     accounts,
     shopeeAccounts,
+    tiktokAccounts,
     isLoading,
     isLoadingShopee,
+    isLoadingTikTok,
     isLoadingAny,
     totalAccounts,
     error,
     fetchAccounts,
     fetchShopeeAccounts,
+    fetchTikTokAccounts,
     fetchAllAccounts,
     removeAccount,
   };

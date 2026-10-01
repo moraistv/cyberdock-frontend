@@ -549,6 +549,7 @@
 /* eslint-disable no-unused-vars */
 import { defineProps, ref, onMounted, onUnmounted, computed, watch, nextTick, toRefs, reactive } from 'vue';
 import { formatVariation } from '@/utils/variation';
+import { saleMarketplace, marketplaceLabel, marketplaceLogo } from '@/utils/marketplaces';
 import gsap from 'gsap';
 import { useSalesForUser } from '@/composables/useSalesForUser';
 import { useUserStorage } from '@/composables/useUserStorage';
@@ -701,20 +702,14 @@ const filters = reactive({
 });
 
 // Descrição do produto: prioridade 1 = descrição cadastrada no Armazenamento.
-// Sem ela, cai no título original do anúncio do Mercado Livre.
-// Canal da venda. A lista vem da view unificada, então `marketplace` é a fonte
-// preferida; `channel` fica como fallback para respostas antigas em cache.
-const MK_LOGOS = { ML: '/img/ml-logo.svg', Shopee: '/img/shopee-logo.svg' };
-
-function saleMarketplace(sale) {
-    const raw = String(sale?.marketplace || sale?.channel || 'ML').toLowerCase();
-    return raw.includes('shopee') ? 'Shopee' : 'ML';
-}
+// Sem ela, cai no título original do anúncio no canal da venda.
+// Canal da venda: a regra (marketplace, com `channel` de fallback) fica em
+// @/utils/marketplaces, junto com rótulo e logo de ML, Shopee e TikTok Shop.
 function saleMarketplaceLabel(sale) {
-    return saleMarketplace(sale) === 'Shopee' ? 'Shopee' : 'Mercado Livre';
+    return marketplaceLabel(saleMarketplace(sale));
 }
 function saleLogo(sale) {
-    return MK_LOGOS[saleMarketplace(sale)];
+    return marketplaceLogo(saleMarketplace(sale));
 }
 
 function hasInternalDescription(sale) {

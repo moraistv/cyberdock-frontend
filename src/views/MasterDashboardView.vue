@@ -305,11 +305,9 @@ import { useAuth } from '@/composables/useAuth';
 import { useDashboardStats } from '@/composables/useDashboardStats';
 import { useSalesFilterFacets } from '@/composables/useSalesFilterFacets';
 import { useMasterStorageSummary } from '@/composables/useMasterStorageSummary';
+import { MK_LOGOS, MK_COLORS, marketplaceLabel } from '@/utils/marketplaces';
 
 const { isAuthReady, user } = useAuth();
-
-const MK_LOGOS = { ML: '/img/ml-logo.svg', Shopee: '/img/shopee-logo.svg' };
-const MK_COLORS = { ML: '#f8d135', Shopee: '#ee4d2d' };
 
 /* Atalhos do prazo de despacho.
  *
@@ -522,7 +520,7 @@ const marketplaceSeries = computed(() => byMarketplace.value.map((d) => d.value)
 const marketplaceChartOptions = computed(() => ({
   ...BASE_CHART,
   chart: { ...BASE_CHART.chart, type: 'donut' },
-  labels: byMarketplace.value.map((d) => (d.marketplace === 'ML' ? 'Mercado Livre' : d.marketplace)),
+  labels: byMarketplace.value.map((d) => marketplaceLabel(d.marketplace)),
   colors: byMarketplace.value.map((d) => MK_COLORS[d.marketplace] || '#94a3b8'),
   legend: { position: 'bottom', fontSize: '12px' },
   plotOptions: { pie: { donut: { size: '62%' } } },

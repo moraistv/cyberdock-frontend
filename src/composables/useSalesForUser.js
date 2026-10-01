@@ -1,6 +1,16 @@
 // src/composables/useSalesForUser.js
 import { ref, watch } from 'vue';
 import { useApi } from './useApi';
+import { saleMarketplace } from '@/utils/marketplaces';
+
+/* /sales/user/:uid lê de public.unified_sales, então a lista traz ML, Shopee e
+ * TikTok Shop. Status e abatimento iam todos para /sales/*, que procura o
+ * pedido em public.sales: venda de loja falhava com "não encontrada". */
+const PROCESS_ROUTES = [
+  ['ML', '/sales/process'],
+  ['Shopee', '/shopee/process'],
+  ['TikTok', '/tiktok/process'],
+];
 
 export function useSalesForUser(uidRef) {
   const sales = ref([]);
@@ -39,7 +49,11 @@ export function useSalesForUser(uidRef) {
     const isDespachado = /despachado/i.test(String(newStatus || ''));
 
     try {
-      const payload = {
+      // A venda vive em sales (ML), shopee_sales ou tiktok_sales; cada tabela
+      // tem a sua rota (mesma regra do useMasterSales).
+      const channel = saleMarketplace(sale);
+      let endpoint = '/sales/status';
+      let payload = {
         saleId: sale.id,
         sku: sale.sku,
         uid: sale.uid,
@@ -47,8 +61,15 @@ export function useSalesForUser(uidRef) {
         // 👇 força para "Despachado" (backend deve aceitar sem reprocessar estoque)
         force: Boolean(isDespachado),
       };
+      if (channel === 'Shopee') {
+        endpoint = '/shopee/status';
+        payload = { orderSn: sale.id, sku: sale.sku, uid: sale.uid, shippingStatus: newStatus };
+      } else if (channel === 'TikTok') {
+        endpoint = '/tiktok/status';
+        payload = { orderId: sale.id, sku: sale.sku, uid: sale.uid, shippingStatus: newStatus };
+      }
 
-      const res = await api.put('/sales/status', payload);
+      const res = await api.put(endpoint, payload);
 
       // Atualiza localmente
       const idx = sales.value.findIndex(
@@ -82,28 +103,24 @@ export function useSalesForUser(uidRef) {
 
   const processSales = async (salesToProcess, chunkSize = 200) => {
     try {
-      const compact = salesToProcess.map((s) => ({
-        id: s.id,
-        sku: s.sku,
-        uid: s.uid,
-        quantity: s.quantity,
-      }));
+      // A lista mistura canais e cada um abate estoque na própria tabela.
+      const items = { ML: [], Shopee: [], TikTok: [] };
+      for (const s of salesToProcess) {
+        const channel = saleMarketplace(s);
+        if (channel === 'Shopee') items.Shopee.push({ orderSn: s.id, sku: s.sku, uid: s.uid });
+        else if (channel === 'TikTok') items.TikTok.push({ orderId: s.id, sku: s.sku, uid: s.uid });
+        else items.ML.push({ id: s.id, sku: s.sku, uid: s.uid, quantity: s.quantity });
+      }
 
-      const batches = chunk(compact, chunkSize);
       const aggregate = { success: [], failed: [] };
+      // As rotas das lojas identificam o pedido por orderSn/orderId; a tela lê `saleId`.
+      const withSaleId = (r) => ({ ...r, saleId: r.saleId ?? r.orderSn ?? r.orderId ?? null });
 
-      for (const batch of batches) {
-        const res = await api.post('/sales/process', { salesToProcess: batch });
-        if (res?.success || res?.failed) {
-          aggregate.success.push(...(res.success || []));
-          aggregate.failed.push(...(res.failed || []));
-        } else if (
-          res?.message &&
-          res?.success !== undefined &&
-          res?.failed !== undefined
-        ) {
-          aggregate.success.push(...res.success);
-          aggregate.failed.push(...res.failed);
+      for (const [channel, endpoint] of PROCESS_ROUTES) {
+        for (const batch of chunk(items[channel], chunkSize)) {
+          const res = await api.post(endpoint, { salesToProcess: batch });
+          aggregate.success.push(...(res?.success || []).map(withSaleId));
+          aggregate.failed.push(...(res?.failed || []).map(withSaleId));
         }
       }
 

@@ -1,6 +1,7 @@
 // src/composables/useMasterSales.js
 import { ref } from 'vue';
 import { useApi } from './useApi';
+import { saleMarketplace } from '@/utils/marketplaces';
 
 export function useMasterSales() {
   const sales = ref([]);
@@ -130,24 +131,26 @@ export function useMasterSales() {
     const isDespachado = /despachado/i.test(String(newStatus || ''));
 
     try {
-      // A venda vive em sales (ML) ou shopee_sales; cada tabela tem sua rota.
-      const isShopee = saleChannel(sale) === 'Shopee';
-      const payload = isShopee
-        ? {
-            orderSn: sale.id,
-            sku: sale.sku,
-            uid: sale.uid,
-            shippingStatus: newStatus,
-          }
-        : {
-            saleId: sale.id,
-            sku: sale.sku,
-            uid: sale.uid,
-            shippingStatus: newStatus,
-            force: Boolean(isDespachado),
-          };
+      // A venda vive em sales (ML), shopee_sales ou tiktok_sales; cada tabela
+      // tem a sua rota.
+      const channel = saleChannel(sale);
+      let endpoint = '/sales/status';
+      let payload = {
+        saleId: sale.id,
+        sku: sale.sku,
+        uid: sale.uid,
+        shippingStatus: newStatus,
+        force: Boolean(isDespachado),
+      };
+      if (channel === 'Shopee') {
+        endpoint = '/shopee/status';
+        payload = { orderSn: sale.id, sku: sale.sku, uid: sale.uid, shippingStatus: newStatus };
+      } else if (channel === 'TikTok') {
+        endpoint = '/tiktok/status';
+        payload = { orderId: sale.id, sku: sale.sku, uid: sale.uid, shippingStatus: newStatus };
+      }
 
-      const res = await api.put(isShopee ? '/shopee/status' : '/sales/status', payload);
+      const res = await api.put(endpoint, payload);
 
       // Atualiza localmente
       const idx = sales.value.findIndex(
@@ -178,22 +181,23 @@ export function useMasterSales() {
   };
 
   /** Canal da venda, com o mesmo fallback usado nas telas. */
-  const saleChannel = (sale) => {
-    const raw = String(sale?.marketplace || sale?.channel || 'ML').toLowerCase();
-    return raw.includes('shopee') || raw === 'sp' ? 'Shopee' : 'ML';
-  };
+  const saleChannel = (sale) => saleMarketplace(sale);
 
   const processSales = async (salesToProcess, chunkSize = 200) => {
     try {
       // Cada marketplace abate estoque na sua própria tabela: /sales/process
-      // procura em public.sales e não encontraria um pedido Shopee. Agora que o
-      // tabelão lista os dois canais, o lote é separado por destino.
+      // procura em public.sales e não encontraria um pedido Shopee ou TikTok.
+      // O tabelão lista todos os canais, então o lote é separado por destino.
       const mlBatchItems = [];
       const shopeeBatchItems = [];
+      const tiktokBatchItems = [];
 
       for (const sale of salesToProcess) {
-        if (saleChannel(sale) === 'Shopee') {
+        const channel = saleChannel(sale);
+        if (channel === 'Shopee') {
           shopeeBatchItems.push({ orderSn: sale.id, sku: sale.sku, uid: sale.uid });
+        } else if (channel === 'TikTok') {
+          tiktokBatchItems.push({ orderId: sale.id, sku: sale.sku, uid: sale.uid });
         } else {
           mlBatchItems.push({ id: sale.id, sku: sale.sku, uid: sale.uid });
         }
@@ -213,6 +217,7 @@ export function useMasterSales() {
 
       if (mlBatchItems.length) await runBatches('/sales/process', mlBatchItems);
       if (shopeeBatchItems.length) await runBatches('/shopee/process', shopeeBatchItems);
+      if (tiktokBatchItems.length) await runBatches('/tiktok/process', tiktokBatchItems);
 
       return aggregate;
     } catch (err) {

@@ -41,11 +41,12 @@
                         </span>
                         <div class="live-account-info">
                             <span class="live-account-name">
-                                <!-- Numa sincronização global com 30+ contas dos dois canais, o
+                                <!-- Numa sincronização global com 30+ contas de vários canais, o
                                      nome sozinho não diz de onde a conta é. A logo resolve sem
                                      gastar largura, que é escassa nesta linha. -->
                                 <img v-if="MK_LOGOS[acc.marketplace]" :src="MK_LOGOS[acc.marketplace]"
-                                     :alt="acc.marketplace" :title="acc.marketplace" class="live-account-logo" />
+                                     :alt="marketplaceLabel(acc.marketplace)" :title="marketplaceLabel(acc.marketplace)"
+                                     class="live-account-logo" />
                                 {{ acc.nickname }}
                             </span>
                             <span class="live-account-msg">
@@ -72,6 +73,7 @@
 /* global defineProps */
 import { computed } from 'vue';
 import UniversalModal from './UniversalModal.vue';
+import { MK_LOGOS, marketplaceLabel } from '@/utils/marketplaces';
 
 const props = defineProps({
     open: { type: Boolean, default: false },
@@ -81,11 +83,6 @@ const props = defineProps({
 
 // eslint-disable-next-line no-undef
 defineEmits(['close']);
-
-const MK_LOGOS = {
-    ML: '/img/ml-logo.svg',
-    Shopee: '/img/shopee-logo.svg',
-};
 
 /**
  * Mensagem sem o prefixo "[NOME DA CONTA]".

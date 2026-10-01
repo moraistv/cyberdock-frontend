@@ -203,7 +203,7 @@ function packageLabel(group) {
 
 function statusLabel(item) {
   const status = String(item.shipping_status_live || item.shipping_status || '').toLowerCase();
-  if (['shipped', 'delivered', 'completed', 'expedited'].includes(status)) return 'Despachado';
+  if (['shipped', 'delivered', 'completed', 'expedited', 'in_transit'].includes(status)) return 'Despachado';
   if (['cancelled', 'canceled'].includes(status)) return 'Cancelado';
   return status ? status.replaceAll('_', ' ') : 'A despachar';
 }

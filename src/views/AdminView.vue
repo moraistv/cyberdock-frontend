@@ -10,20 +10,16 @@
             <h1 class="title">Tabelão de Vendas (Master)</h1>
             <p class="subtitle">Visão global e unificada de todas as vendas de todos os clientes.</p>
             <div class="mk-legend">
-              <span class="mk-legend__item">
-                <img src="/img/ml-logo.svg" alt="" class="mk-legend__logo" />
-                Mercado Livre
-              </span>
-              <span class="mk-legend__item">
-                <img src="/img/shopee-logo.svg" alt="" class="mk-legend__logo" />
-                Shopee
+              <span v-for="mk in MARKETPLACE_OPTIONS" :key="mk.value" class="mk-legend__item">
+                <img :src="mk.logo" alt="" class="mk-legend__logo" />
+                {{ mk.label }}
               </span>
             </div>
           </div>
           <div class="header-actions">
             <button @click="handleGlobalSync" :disabled="isGlobalSyncing || isFetchingAccounts"
                 :class="['btn', 'sync-btn', 'btn-primary']"
-                title="Sincronizar todas as contas do Mercado Livre e lojas Shopee do sistema">
+                title="Sincronizar todas as contas do Mercado Livre, lojas Shopee e lojas TikTok Shop do sistema">
                 <svg v-if="isGlobalSyncing" class="sync-spinner"
                     xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -112,7 +108,7 @@
                   </span>
                   <div class="sr-account-info">
                       <span class="sr-account-name">{{ account.nickname }}</span>
-                      <span class="sr-account-id">{{ account.marketplace === 'Shopee' ? 'Shopee' : 'Mercado Livre' }} · ID {{ account.userId }}<span v-if="account.durationMs" class="sr-account-time"> · {{ formatDuration(account.durationMs) }}</span></span>
+                      <span class="sr-account-id">{{ marketplaceLabel(account.marketplace) }}<template v-if="account.userId"> · ID {{ account.userId }}</template><span v-if="account.durationMs" class="sr-account-time"> · {{ formatDuration(account.durationMs) }}</span></span>
                   </div>
                   <div class="sr-account-badges" v-if="account.status === 'success'">
                       <span class="sr-badge is-new" v-if="account.newSalesCount > 0">{{ account.newSalesCount }} nova{{ account.newSalesCount > 1 ? 's' : '' }}</span>
@@ -158,6 +154,8 @@ import ToastNotification from '../components/ToastNotification.vue';
 import { useApi } from '@/composables/useApi';
 import { useSyncManager } from '@/composables/useSyncManager';
 import { useShopeeSyncManager } from '@/composables/useShopeeSyncManager';
+import { useTikTokSyncManager } from '@/composables/useTikTokSyncManager';
+import { MARKETPLACE_OPTIONS, marketplaceLabel } from '@/utils/marketplaces';
 
 const api = useApi();
 const { syncState, liveAccounts, syncAccountsBatch } = useSyncManager();
@@ -166,27 +164,36 @@ const {
     liveAccounts: shopeeLiveAccounts,
     syncAccountsBatch: syncShopeeAccountsBatch,
 } = useShopeeSyncManager();
+const {
+    syncState: tiktokSyncState,
+    liveAccounts: tiktokLiveAccounts,
+    syncAccountsBatch: syncTikTokAccountsBatch,
+} = useTikTokSyncManager();
 
-// O painel ao vivo mostra as contas dos dois canais numa fila só.
+// O painel ao vivo mostra as contas de todos os canais numa fila só.
 const unifiedLiveAccounts = computed(() => [
     ...(liveAccounts.value || []).map(account => ({ ...account, marketplace: 'ML' })),
     ...(shopeeLiveAccounts.value || []).map(account => ({ ...account, marketplace: 'Shopee' })),
+    ...(tiktokLiveAccounts.value || []).map(account => ({ ...account, marketplace: 'TikTok' })),
 ]);
 
-const isGlobalSyncing = computed(() => syncState.value.isSyncing || shopeeSyncState.value.isSyncing);
+const isGlobalSyncing = computed(() =>
+    syncState.value.isSyncing || shopeeSyncState.value.isSyncing || tiktokSyncState.value.isSyncing
+);
 
-// Badge do botão soma as novidades dos dois canais.
+// Badge do botão soma as novidades de todos os canais.
 const unifiedNewSalesCount = computed(() =>
-    (syncState.value.newSalesCount || 0) + (shopeeSyncState.value.newSalesCount || 0)
+    (syncState.value.newSalesCount || 0)
+    + (shopeeSyncState.value.newSalesCount || 0)
+    + (tiktokSyncState.value.newSalesCount || 0)
 );
 
 // O toast segue um canal que AINDA está sincronizando. `isVisible` dura 8s
 // depois da conclusão; usá-lo como prioridade fazia o toast verde da Shopee
 // esconder o progresso ML enquanto as 30 contas ainda rodavam.
 const activeSyncState = computed(() => {
-    if (shopeeSyncState.value.isSyncing) return shopeeSyncState.value;
-    if (syncState.value.isSyncing) return syncState.value;
-    return shopeeSyncState.value.isVisible ? shopeeSyncState.value : syncState.value;
+    const states = [shopeeSyncState.value, tiktokSyncState.value, syncState.value];
+    return states.find((s) => s.isSyncing) || states.find((s) => s.isVisible) || syncState.value;
 });
 
 const masterTableRef = ref(null);
@@ -253,33 +260,57 @@ const handleGlobalSync = async () => {
     let successCount = 0;
     let errorCount = 0;
     let totalAccounts = 0;
+    let tiktokDiscoveryError = null;
     const accountResults = [];
 
     try {
-        // Descobre os dois canais em paralelo. A ausência de contas em um deles
-        // não impede o outro de sincronizar.
-        const [mlAccountsData, shopeeAccountsData] = await Promise.all([
+        // Descobre os canais em paralelo. A ausência de contas em um deles não
+        // impede os outros; falha de descoberta do TikTok vira item explícito
+        // no resumo em vez de um falso "100% concluído".
+        const [mlAccountsData, shopeeAccountsData, tiktokAccountsData] = await Promise.all([
             api.get('/ml/all-accounts'),
             api.get('/shopee/all-accounts'),
+            api.get('/tiktok/all-accounts').catch((err) => {
+                tiktokDiscoveryError = err?.data?.error || err?.message || 'Não foi possível listar as lojas TikTok Shop.';
+                console.warn('Lojas TikTok Shop fora da sincronização global:', tiktokDiscoveryError);
+                return [];
+            }),
         ]);
         const accounts = Array.isArray(mlAccountsData) ? mlAccountsData : [];
         const shopeeAccounts = Array.isArray(shopeeAccountsData) ? shopeeAccountsData : [];
+        const tiktokAccounts = Array.isArray(tiktokAccountsData) ? tiktokAccountsData : [];
+        const syncableAccounts = accounts.length + shopeeAccounts.length + tiktokAccounts.length;
 
-        if (accounts.length === 0 && shopeeAccounts.length === 0) {
+        if (syncableAccounts === 0 && !tiktokDiscoveryError) {
             syncResults.value = {
                 title: 'Atenção', type: 'warning', accounts: [],
                 summary: { total: 0, successful: 0, failed: 0 },
-                message: 'Nenhuma conta ativa do Mercado Livre ou loja Shopee no sistema inteiro para sincronizar.'
+                message: 'Nenhuma conta ativa do Mercado Livre, loja Shopee ou loja TikTok Shop no sistema inteiro para sincronizar.'
             };
             isSyncResultsModalOpen.value = true;
             isFetchingAccounts.value = false;
             return;
         }
 
-        totalAccounts = accounts.length + shopeeAccounts.length;
+        totalAccounts = syncableAccounts + (tiktokDiscoveryError ? 1 : 0);
+        if (tiktokDiscoveryError) {
+            errorCount = 1;
+            accountResults.push({
+                marketplace: 'TikTok',
+                nickname: 'Listagem de lojas TikTok Shop',
+                userId: null,
+                uid: null,
+                status: 'error',
+                newSalesCount: 0,
+                updatedCount: 0,
+                skippedCount: 0,
+                durationMs: 0,
+                message: tiktokDiscoveryError,
+            });
+        }
 
-        // Abre o painel de progresso ao vivo enquanto sincroniza.
-        isSyncLiveOpen.value = true;
+        // Sem conta sincronizável não há EventSource para mostrar.
+        isSyncLiveOpen.value = syncableAccounts > 0;
 
         const emptyBatch = {
             results: [],
@@ -299,16 +330,20 @@ const handleGlobalSync = async () => {
          * efeito visto na loja Shopee — presa em "Iniciando..." até as contas do
          * Mercado Livre liberarem conexão, o que parecia lentidão daquela loja.
          *
-         * Com os dois canais somando menos que o limite, cada conta abre o
-         * canal na hora e o progresso aparece de verdade. O ritmo de chamadas à
-         * API do Mercado Livre continua controlado no servidor.
+         * Com os canais somando menos que o limite, cada conta abre o canal na
+         * hora e o progresso aparece de verdade. O ritmo de chamadas à API do
+         * Mercado Livre continua controlado no servidor.
+         *
+         * O TikTok Shop entra com uma conta por vez: 2 + 2 + 1 = 5. A sexta
+         * conexão fica livre para os POSTs que iniciam os jobs no HTTP/1.1.
          */
-        const ML_CONCURRENCY = 3;
+        const ML_CONCURRENCY = 2;
         const SHOPEE_CONCURRENCY = 2;
+        const TIKTOK_CONCURRENCY = 1;
 
         // Os canais têm limitadores independentes no backend, então rodam
         // juntos. A tabela é recarregada uma única vez, no final.
-        const [batch, shopeeBatch] = await Promise.all([
+        const [batch, shopeeBatch, tiktokBatch] = await Promise.all([
             accounts.length
                 ? syncAccountsBatch(
                     accounts.map(account => ({
@@ -330,10 +365,20 @@ const handleGlobalSync = async () => {
                     { concurrency: SHOPEE_CONCURRENCY }
                 )
                 : Promise.resolve(emptyBatch),
+            tiktokAccounts.length
+                ? syncTikTokAccountsBatch(
+                    tiktokAccounts.map(account => ({
+                        shopId: account.shop_id,
+                        accountNickname: account.shop_name || String(account.shop_id),
+                        clientUid: account.uid,
+                    })),
+                    { concurrency: TIKTOK_CONCURRENCY }
+                )
+                : Promise.resolve(emptyBatch),
         ]);
 
-        successCount = batch.summary.successful + shopeeBatch.summary.successful;
-        errorCount = batch.summary.failed + shopeeBatch.summary.failed;
+        successCount = batch.summary.successful + shopeeBatch.summary.successful + tiktokBatch.summary.successful;
+        errorCount += batch.summary.failed + shopeeBatch.summary.failed + tiktokBatch.summary.failed;
         for (const r of batch.results) {
             accountResults.push({
                 marketplace: 'ML',
@@ -348,19 +393,21 @@ const handleGlobalSync = async () => {
                 message: r.status === 'error' ? (r.message || 'Erro desconhecido') : ''
             });
         }
-        for (const r of shopeeBatch.results) {
-            accountResults.push({
-                marketplace: 'Shopee',
-                nickname: r.accountNickname,
-                userId: r.shopId,
-                uid: r.clientUid,
-                status: r.status,
-                newSalesCount: r.newSalesCount || 0,
-                updatedCount: r.updatedCount || 0,
-                skippedCount: r.skippedCount || 0,
-                durationMs: r.durationMs || 0,
-                message: r.status === 'error' ? (r.message || 'Erro desconhecido') : ''
-            });
+        for (const [marketplace, shopBatch] of [['Shopee', shopeeBatch], ['TikTok', tiktokBatch]]) {
+            for (const r of shopBatch.results) {
+                accountResults.push({
+                    marketplace,
+                    nickname: r.accountNickname,
+                    userId: r.shopId,
+                    uid: r.clientUid,
+                    status: r.status,
+                    newSalesCount: r.newSalesCount || 0,
+                    updatedCount: r.updatedCount || 0,
+                    skippedCount: r.skippedCount || 0,
+                    durationMs: r.durationMs || 0,
+                    message: r.status === 'error' ? (r.message || 'Erro desconhecido') : ''
+                });
+            }
         }
 
         // Fecha o painel ao vivo antes de mostrar o resumo.
@@ -382,12 +429,12 @@ const handleGlobalSync = async () => {
                 successful: successCount,
                 failed: errorCount
             },
-            totalNewSales: batch.totalNewSales + shopeeBatch.totalNewSales,
-            totalUpdated: batch.totalUpdated + shopeeBatch.totalUpdated,
-            totalSkipped: batch.totalSkipped + shopeeBatch.totalSkipped,
+            totalNewSales: batch.totalNewSales + shopeeBatch.totalNewSales + tiktokBatch.totalNewSales,
+            totalUpdated: batch.totalUpdated + shopeeBatch.totalUpdated + tiktokBatch.totalUpdated,
+            totalSkipped: batch.totalSkipped + shopeeBatch.totalSkipped + tiktokBatch.totalSkipped,
             // Os canais rodam em paralelo, então o tempo total é o do mais
-            // demorado, não a soma dos dois.
-            totalDurationMs: Math.max(batch.totalDurationMs, shopeeBatch.totalDurationMs)
+            // demorado, não a soma.
+            totalDurationMs: Math.max(batch.totalDurationMs, shopeeBatch.totalDurationMs, tiktokBatch.totalDurationMs)
         };
         isSyncResultsModalOpen.value = true;
 

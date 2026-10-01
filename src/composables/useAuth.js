@@ -11,6 +11,8 @@ const isAuthReady = ref(false);
 const mlAccounts = ref([]);
 // ✅ NOVO: estado reativo das lojas Shopee
 const shopeeAccounts = ref([]);
+// Lojas TikTok Shop, no mesmo formato das lojas Shopee.
+const tiktokAccounts = ref([]);
 
 // useAuth() é chamado por vários componentes na mesma página (Sidebar,
 // Topbar, a própria view). Sem esta guarda, o onMounted abaixo roda uma vez
@@ -21,6 +23,7 @@ let authBootStarted = false;
 let authWatcherStarted = false;
 let mlAccountsRequest = null;
 let shopeeAccountsRequest = null;
+let tiktokAccountsRequest = null;
 // Dados do usuário: o Topbar remonta a cada navegação e pedia /auth/user de
 // novo toda vez. Uma janela curta elimina a repetição sem deixar o dado velho.
 let userDataRequest = null;
@@ -58,6 +61,7 @@ export function useAuth() {
             // ✅ limpa contas ao sair
             mlAccounts.value = [];
             shopeeAccounts.value = [];
+            tiktokAccounts.value = [];
         }
     };
 
@@ -105,8 +109,11 @@ export function useAuth() {
         /* Vazio quando não há destino guardado: a tela inicial depende do papel,
          * que só é conhecido depois da resposta do login. */
         const safeTarget = typeof pending === 'string' && /^\/(?!\/)/.test(pending) ? pending : '';
-        const isShopeeResume = safeTarget.startsWith('/shopee/callback') ||
-            (safeTarget.startsWith('/contas') && safeTarget.includes('success='));
+        // O retorno de conta que já foi gravada volta para /contas com
+        // `success=`; ele vale para as duas integrações.
+        const isAccountsResume = safeTarget.startsWith('/contas') && safeTarget.includes('success=');
+        const isTikTokResume = safeTarget.startsWith('/tiktok/callback');
+        const isShopeeResume = safeTarget.startsWith('/shopee/callback') || isAccountsResume;
         // A tentativa Shopee passou a viver em localStorage (o retorno pode
         // abrir outra aba); sessionStorage segue sendo lido para não invalidar
         // uma conexão iniciada antes desta versão.
@@ -126,6 +133,11 @@ export function useAuth() {
         const expectedShopeeUid = isShopeeResume
             ? readShopeeKey('shopeeOAuthExpectedUid')
             : null;
+        // Mesma proteção para o TikTok: a conexão iniciada por um usuário não
+        // pode ser concluída na sessão de outro.
+        const expectedTikTokUid = (isTikTokResume || isAccountsResume)
+            ? readShopeeKey('tiktokOAuthExpectedUid')
+            : null;
 
         const response = await fetch(`${API_BASE_URL}/auth/login`, {
             method: 'POST',
@@ -139,16 +151,28 @@ export function useAuth() {
         if (expectedShopeeUid && authenticatedUser?.uid !== expectedShopeeUid) {
             throw new Error('Esta conexão Shopee foi iniciada por outro usuário. Entre com o usuário correto.');
         }
+        if (expectedTikTokUid && authenticatedUser?.uid !== expectedTikTokUid) {
+            throw new Error('Esta conexão TikTok Shop foi iniciada por outro usuário. Entre com o usuário correto.');
+        }
 
         setUserSession(data.token);
         await refreshUserData();
-        // As duas listas são compartilhadas por toda a aplicação.
-        await Promise.all([fetchMercadoLivreAccounts(true), fetchShopeeAccounts(true)]);
+        // As listas de contas são compartilhadas por toda a aplicação.
+        await Promise.all([
+            fetchMercadoLivreAccounts(true),
+            fetchShopeeAccounts(true),
+            fetchTikTokAccounts(true),
+        ]);
 
         if (isShopeeResume && safeTarget.startsWith('/contas')) {
             forgetShopeeKeys('shopeeOAuthExpectedUid');
         } else if (!isShopeeResume) {
             forgetShopeeKeys('shopeeOAuthAttempt', 'shopeeOAuthExpectedUid');
+        }
+        if (isAccountsResume) {
+            forgetShopeeKeys('tiktokOAuthExpectedUid');
+        } else if (!isTikTokResume) {
+            forgetShopeeKeys('tiktokOAuthAttempt', 'tiktokOAuthExpectedUid');
         }
         // Sem destino guardado, cada papel tem a sua tela inicial.
         if (router) await router.push(safeTarget || homeRouteForRole(authenticatedUser?.role));
@@ -235,6 +259,41 @@ export function useAuth() {
         return shopeeAccountsRequest;
     }
 
+    // Popula tiktokAccounts.value. O dono vem do JWT no backend.
+    async function fetchTikTokAccounts(force = false) {
+        const uid = loggedInUser.value?.uid;
+        if (!uid) {
+            tiktokAccounts.value = [];
+            return [];
+        }
+        if (!force && tiktokAccounts.value.length) return tiktokAccounts.value;
+        if (tiktokAccountsRequest) return tiktokAccountsRequest;
+
+        tiktokAccountsRequest = (async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/tiktok/contas`, {
+                    headers: { 'Authorization': `Bearer ${token.value}` }
+                });
+                // Backend ainda sem a integração (rollout): lista vazia, sem erro na tela.
+                if (response.status === 404) {
+                    tiktokAccounts.value = [];
+                    return tiktokAccounts.value;
+                }
+                const data = await response.json();
+                if (!response.ok) throw new Error(data?.error || 'Erro ao buscar lojas TikTok Shop');
+                tiktokAccounts.value = Array.isArray(data) ? data : [];
+                return tiktokAccounts.value;
+            } catch (err) {
+                console.error('Erro em fetchTikTokAccounts:', err);
+                tiktokAccounts.value = [];
+                return { error: err.message };
+            } finally {
+                tiktokAccountsRequest = null;
+            }
+        })();
+        return tiktokAccountsRequest;
+    }
+
     // onMounted é registrado uma vez PARA CADA componente que chama useAuth()
     // (Sidebar, Topbar, a view da página...). A guarda `authBootStarted`
     // garante que o trabalho de boot (ler token, revalidar sessão, buscar
@@ -277,6 +336,7 @@ export function useAuth() {
             refreshUserData();
             fetchMercadoLivreAccounts();
             fetchShopeeAccounts();
+            fetchTikTokAccounts();
         }
     });
 
@@ -286,10 +346,11 @@ export function useAuth() {
         authWatcherStarted = true;
         watch(() => loggedInUser.value?.uid, async (uid, previousUid) => {
             if (uid && uid !== previousUid && isAuthReady.value) {
-                await Promise.all([fetchMercadoLivreAccounts(), fetchShopeeAccounts()]);
+                await Promise.all([fetchMercadoLivreAccounts(), fetchShopeeAccounts(), fetchTikTokAccounts()]);
             } else if (!uid) {
                 mlAccounts.value = [];
                 shopeeAccounts.value = [];
+                tiktokAccounts.value = [];
             }
         });
     }
@@ -311,6 +372,8 @@ export function useAuth() {
         fetchMercadoLivreAccounts,
         shopeeAccounts,
         fetchShopeeAccounts,
+        tiktokAccounts,
+        fetchTikTokAccounts,
         refreshUserData,
     };
 }

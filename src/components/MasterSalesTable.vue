@@ -515,12 +515,22 @@
                                         </button>
                                     </template>
 
-                                    <button v-if="!isShopeeSale(sale) && getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
+                                    <!-- TikTok Shop: a etiqueta é do TikTok e só existe depois que o
+                                         envio é organizado no Seller Center. O backend junta os
+                                         pacotes do pedido num PDF só. -->
+                                    <button v-if="isTikTokSale(sale)" @click="handleTikTokLabel(sale)" class="btn-label pdf"
+                                            :disabled="tiktokLabelBusy === shopeeLabelKey(sale)"
+                                            title="Etiqueta TikTok Shop (PDF)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                        {{ tiktokLabelBusy === shopeeLabelKey(sale) ? 'Gerando...' : 'Etiqueta' }}
+                                    </button>
+
+                                    <button v-if="isMlSale(sale) && getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                                         PDF
                                     </button>
                                     
-                                    <button v-if="!isShopeeSale(sale) && getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
+                                    <button v-if="isMlSale(sale) && getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
                                         ZPL
                                     </button>
@@ -559,6 +569,7 @@ import { useApi } from '@/composables/useApi';
 import { useAuth } from '@/composables/useAuth';
 import { API_BASE_URL } from '@/config';
 import { formatVariation } from '@/utils/variation';
+import { MK_LOGOS, MARKETPLACE_OPTIONS, saleMarketplace, marketplaceLabel as mkLabel } from '@/utils/marketplaces';
 import { useNotification } from '@/composables/useNotification';
 import UniversalModal from './UniversalModal.vue';
 
@@ -606,7 +617,9 @@ function getCustomerName(sale) {
         if (buyerId) return `Cliente #${buyerId}`;
 
         // Distingue "a plataforma não informa" de "não temos o dado".
-        if (sale.marketplace === 'Shopee') return 'Não informado pela Shopee';
+        const channel = saleMarketplace(sale);
+        if (channel === 'Shopee') return 'Não informado pela Shopee';
+        if (channel === 'TikTok') return 'Não informado pelo TikTok Shop';
         return 'N/A';
     } catch (error) {
         return 'N/A';
@@ -681,32 +694,15 @@ const {
  * vazia. */
 const { facets, fetchFacets, cancelFacets, pruneSelection } = useSalesFilterFacets();
 
-// Logos oficiais dos canais, iguais aos da tela do usuário.
-const MK_LOGOS = {
-    ML: '/img/ml-logo.svg',
-    Shopee: '/img/shopee-logo.svg',
-};
-
-const marketplaceOptions = [
-    { value: 'ML', label: 'Mercado Livre', logo: MK_LOGOS.ML },
-    { value: 'Shopee', label: 'Shopee', logo: MK_LOGOS.Shopee },
-];
-
-/**
- * Canal da venda. O backend envia `marketplace` pela view unificada e
- * `channel` continua chegando como apelido do campo antigo.
- */
-function saleMarketplace(sale) {
-    const raw = String(sale?.marketplace || sale?.channel || 'ML').toLowerCase();
-    return raw.includes('shopee') || raw === 'sp' ? 'Shopee' : 'ML';
-}
+// Logos, rótulos e opções dos canais vêm de src/utils/marketplaces.js.
+const marketplaceOptions = MARKETPLACE_OPTIONS;
 
 function marketplaceLogo(sale) {
     return MK_LOGOS[saleMarketplace(sale)];
 }
 
 function marketplaceLabel(sale) {
-    return saleMarketplace(sale) === 'Shopee' ? 'Shopee' : 'Mercado Livre';
+    return mkLabel(saleMarketplace(sale));
 }
 
 const selectedMarketplaces = ref([]);
@@ -774,6 +770,8 @@ async function handleDownloadLabel(shipmentId, sellerId, type) {
 const shopeeLabelBusy = ref(null);
 
 const isShopeeSale = (sale) => saleMarketplace(sale) === 'Shopee';
+const isTikTokSale = (sale) => saleMarketplace(sale) === 'TikTok';
+const isMlSale = (sale) => saleMarketplace(sale) === 'ML';
 const shopeeLabelKey = (sale) => `${sale?.id}-${sale?.sku}`;
 
 async function handleShopeeLabel(sale, type = 'pdf') {
@@ -833,6 +831,68 @@ async function handleShopeeLabel(sale, type = 'pdf') {
     }
 }
 
+/* --------------------------- Etiqueta TikTok Shop ---------------------------
+ *
+ * Mesmo desenho da Shopee: a etiqueta é do TikTok, o backend busca o documento
+ * de cada pacote, estampa SKU e quantidade e devolve um PDF só. `ownerUid` faz
+ * o servidor usar a loja do DONO da venda, e só é aceito de quem é master.
+ */
+const tiktokLabelBusy = ref(null);
+
+async function handleTikTokLabel(sale) {
+    if (tiktokLabelBusy.value) return;
+
+    const orderId = sale?.id;
+    const shopId = sale?.seller_id ?? sale?.account_id;
+    if (!orderId || !shopId) {
+        notify.error('Este pedido não tem identificação da loja TikTok Shop para gerar etiqueta.');
+        return;
+    }
+
+    const query = new URLSearchParams({ orderId: String(orderId), shopId: String(shopId) });
+    if (sale?.uid) query.set('ownerUid', String(sale.uid));
+
+    tiktokLabelBusy.value = shopeeLabelKey(sale);
+    try {
+        // Checa antes: o operador recebe o motivo em vez de um download vazio.
+        const info = await api.get(`/tiktok/label-info?${query.toString()}`);
+        if (info && info.canPrint === false) {
+            // Envio ainda não organizado é espera, não erro do sistema.
+            if (info.awaitingShipment || info.status === 'not_applicable') notify.warning(info.reason);
+            else notify.error(info.reason || 'O TikTok Shop não liberou a etiqueta deste pedido.');
+            return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/tiktok/download-label?${query.toString()}`, {
+            headers: { Authorization: `Bearer ${token.value}` },
+        });
+
+        if (!response.ok) {
+            let detail = null;
+            try { detail = await response.json(); } catch { /* resposta sem JSON */ }
+            const message = detail?.error || 'Não foi possível obter a etiqueta no TikTok Shop.';
+            if (detail?.awaitingShipment) notify.warning(message);
+            else notify.error(message);
+            return;
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `tiktok-etiqueta-${orderId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        notify.success('Etiqueta TikTok Shop gerada.');
+    } catch (error) {
+        notify.error(error?.data?.error || error?.data?.reason || error?.message || 'Falha ao gerar a etiqueta TikTok Shop.');
+    } finally {
+        tiktokLabelBusy.value = null;
+    }
+}
+
 /**
  * Imprime etiquetas EM MASSA das vendas selecionadas.
  * - Coleta as selecionadas, filtra somente as imprimíveis (exclui FULL e status finais).
@@ -861,6 +921,10 @@ async function printSelectedLabels(type = 'pdf') {
          * ao operador — então explicamos onde está o botão certo. */
         if (isShopeeSale(sale)) {
             skipped.push({ sku: sale.sku || sale.id, reason: 'Etiqueta Shopee: use o botão PDF/Térmica da própria linha' });
+            continue;
+        }
+        if (isTikTokSale(sale)) {
+            skipped.push({ sku: sale.sku || sale.id, reason: 'Etiqueta TikTok Shop: use o botão Etiqueta da própria linha' });
             continue;
         }
         const info = getLabelInfo(sale);

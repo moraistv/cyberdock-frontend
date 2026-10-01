@@ -427,11 +427,10 @@ import { useAuth } from '@/composables/useAuth'
 import { useUserStorage } from '@/composables/useUserStorage'
 import { useDashboardStats } from '@/composables/useDashboardStats'
 import { useSalesFilterFacets } from '@/composables/useSalesFilterFacets'
+import { MK_LOGOS, MK_COLORS, marketplaceLabel } from '@/utils/marketplaces'
 
 /* -------------------- Estado / dados -------------------- */
-const { user, isAuthReady, mlAccounts, shopeeAccounts } = useAuth()
-
-const MK_LOGOS = { ML: '/img/ml-logo.svg', Shopee: '/img/shopee-logo.svg' }
+const { user, isAuthReady, mlAccounts, shopeeAccounts, tiktokAccounts } = useAuth()
 
 const periodOptions = [
   { value: 'all', label: 'Todas' },
@@ -600,6 +599,9 @@ const accountLabels = computed(() => {
   }
   for (const account of shopeeAccounts.value || []) {
     map.set(`Shopee:${account.shop_id}`, account.shop_name || String(account.shop_id))
+  }
+  for (const account of tiktokAccounts.value || []) {
+    map.set(`TikTok:${account.shop_id}`, account.shop_name || String(account.shop_id))
   }
   return map
 })
@@ -827,13 +829,13 @@ const statusChartOptions = computed(() => ({
   yaxis: { labels: { formatter: (v) => Math.trunc(v) } },
 }))
 
-// Cores fixas por canal, para o gráfico casar com os logos da interface.
-const MK_COLORS = { ML: '#f8d135', Shopee: '#ee4d2d' }
+// Cores fixas por canal (@/utils/marketplaces), para o gráfico casar com os
+// logos da interface.
 const marketplaceSeries = computed(() => byMarketplace.value.map((d) => d.value))
 const marketplaceChartOptions = computed(() => ({
   ...BASE_CHART,
   chart: { ...BASE_CHART.chart, type: 'donut' },
-  labels: byMarketplace.value.map((d) => (d.marketplace === 'ML' ? 'Mercado Livre' : d.marketplace)),
+  labels: byMarketplace.value.map((d) => marketplaceLabel(d.marketplace)),
   colors: byMarketplace.value.map((d) => MK_COLORS[d.marketplace] || '#94a3b8'),
   legend: { position: 'bottom', fontSize: '12px' },
   plotOptions: { pie: { donut: { size: '62%' } } },

@@ -13,6 +13,7 @@ const AdminView = () => import('../views/AdminView.vue');
 const MasterDashboardView = () => import('../views/MasterDashboardView.vue');
 const ManageUsersView = () => import('../views/ManageUsersView.vue');
 const ShopeeCallbackView = () => import('../views/ShopeeCallbackView.vue');
+const TikTokCallbackView = () => import('../views/TikTokCallbackView.vue');
 // MasterResumoCobranca e ServiceHistory NÃO têm rota própria: são componentes
 // embutidos na tela de usuários, que é quem monta Sidebar e Topbar. Como rota
 // solta, abriam sem menu e sem caminho de volta — e o resumo de cobrança ainda
@@ -93,6 +94,14 @@ const routes = [
     component: ShopeeCallbackView,
     // noCache: processa o retorno do OAuth no onMounted, o que exige uma
     // montagem nova a cada visita.
+    meta: { noCache: true }
+  },
+  {
+    // Retorno da autorização do TikTok Shop. Pública pelo mesmo motivo da
+    // Shopee: o backend só conclui com a tentativa opaca devolvida no `state`.
+    path: '/tiktok/callback',
+    name: 'TikTokCallback',
+    component: TikTokCallbackView,
     meta: { noCache: true }
   },
   {

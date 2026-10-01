@@ -9,7 +9,7 @@
                     <div>
                         <h1 class="dashboard-title">Tabela de vendas</h1>
                         <p class="dashboard-subtitle">
-                            As suas vendas do Mercado Livre e da Shopee são sincronizadas automaticamente.
+                            As suas vendas do Mercado Livre, da Shopee e do TikTok Shop são sincronizadas automaticamente.
                         </p>
                         <div class="mk-legend">
                             <span class="mk-legend__item">
@@ -20,13 +20,17 @@
                                 <img src="/img/shopee-logo.svg" alt="" class="mk-legend__logo" />
                                 Shopee
                             </span>
+                            <span class="mk-legend__item">
+                                <img src="/img/tiktok-logo.svg" alt="" class="mk-legend__logo" />
+                                TikTok Shop
+                            </span>
                         </div>
                     </div>
                                     <div class="header-buttons">
                     <button @click="handleUnifiedSync" :disabled="isUnifiedSyncing || isFetchingAccounts"
                         class="btn-sync-sales"
                         :class="{ 'is-busy': isUnifiedSyncing || isFetchingAccounts }"
-                        title="Buscar vendas novas no Mercado Livre e na Shopee">
+                        title="Buscar vendas novas no Mercado Livre, na Shopee e no TikTok Shop">
                         <svg class="btn-sync-sales__icon"
                             :class="{ 'is-spinning': isUnifiedSyncing || isFetchingAccounts }"
                             xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -349,7 +353,7 @@
                     <div v-else-if="sales.length === 0" class="empty-state">
                         <h3 class="empty-state-title">Nenhuma venda encontrada</h3>
                         <p class="empty-state-text">Clique em "Sincronizar Vendas" para buscar os dados do Mercado
-                            Livre ou da Shopee.</p>
+                            Livre, da Shopee ou do TikTok Shop.</p>
                     </div>
 
                     <div v-else>
@@ -539,12 +543,21 @@
                                                 </button>
                                             </template>
 
-                                            <button v-if="!isShopeeSale(sale) && getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
+                                            <!-- TikTok Shop: a etiqueta é do TikTok e só sai depois que o
+                                                 envio é organizado no Seller Center. -->
+                                            <button v-if="isTikTokSale(sale)" @click="handleTikTokLabel(sale)" class="btn-label pdf"
+                                                    :disabled="tiktokLabelBusy === shopeeLabelKey(sale)"
+                                                    title="Etiqueta TikTok Shop (PDF)">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                                {{ tiktokLabelBusy === shopeeLabelKey(sale) ? 'Gerando...' : 'Etiqueta' }}
+                                            </button>
+
+                                            <button v-if="isMlSale(sale) && getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'pdf')" class="btn-label pdf" title="Etiqueta PDF">
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                                                 PDF
                                             </button>
 
-                                            <button v-if="!isShopeeSale(sale) && getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
+                                            <button v-if="isMlSale(sale) && getLabelInfo(sale).canPrint" @click="handleDownloadLabel(getLabelInfo(sale).shipmentId, getLabelInfo(sale).sellerId, 'zpl')" class="btn-label zpl" title="Etiqueta ZPL">
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><polyline points="6 14 18 14 18 22 6 22"></polyline></svg>
                                                 ZPL
                                             </button>
@@ -654,7 +667,7 @@
                         </span>
                         <div class="sr-account-info">
                             <span class="sr-account-name">{{ account.nickname }}</span>
-                            <span class="sr-account-id">{{ account.marketplace === 'Shopee' ? 'Shopee' : 'Mercado Livre' }} · ID {{ account.userId }}<span v-if="account.durationMs" class="sr-account-time"> · {{ formatDuration(account.durationMs) }}</span></span>
+                            <span class="sr-account-id">{{ mkLabel(account.marketplace) }}<template v-if="account.userId"> · ID {{ account.userId }}</template><span v-if="account.durationMs" class="sr-account-time"> · {{ formatDuration(account.durationMs) }}</span></span>
                         </div>
                         <div class="sr-account-badges" v-if="account.status === 'success'">
                             <span class="sr-badge is-new" v-if="account.newSalesCount > 0">{{ account.newSalesCount }} nova{{ account.newSalesCount > 1 ? 's' : '' }}</span>
@@ -700,35 +713,27 @@ import { useSalesFilterFacets } from '@/composables/useSalesFilterFacets';
 import { useStatusesForUser } from '@/composables/useStatusesForUser';
 import { useSyncManager } from '@/composables/useSyncManager';
 import { useShopeeSyncManager } from '@/composables/useShopeeSyncManager';
+import { useTikTokSyncManager } from '@/composables/useTikTokSyncManager';
 import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
 import { useApi } from '@/composables/useApi';
 import { useNotification } from '@/composables/useNotification';
+import {
+    MK_LOGOS, MARKETPLACE_OPTIONS, saleMarketplace, marketplacePlatform, marketplaceLabel as mkLabel,
+} from '@/utils/marketplaces';
 
 const notify = useNotification();
 
 // ===== UTILITY FUNCTIONS FOR CUSTOMER DATA =====
-
-const MK_LOGOS = {
-    ML: '/img/ml-logo.svg',
-    Shopee: '/img/shopee-logo.svg',
-};
-
-/**
- * Marketplace da venda. O backend envia `marketplace` pela view unificada;
- * `channel` é o campo antigo e serve de fallback para dados já em cache.
- */
-function saleMarketplace(sale) {
-    const raw = String(sale?.marketplace || sale?.channel || 'ML').toLowerCase();
-    return raw.includes('shopee') || raw === 'sp' ? 'Shopee' : 'ML';
-}
+// Canal, logo e rótulo vêm de src/utils/marketplaces.js: o ternário antigo
+// transformaria toda venda do TikTok em "Mercado Livre".
 
 function marketplaceLogo(sale) {
     return MK_LOGOS[saleMarketplace(sale)];
 }
 
 function marketplaceLabel(sale) {
-    return saleMarketplace(sale) === 'Shopee' ? 'Shopee' : 'Mercado Livre';
+    return mkLabel(saleMarketplace(sale));
 }
 
 /**
@@ -861,6 +866,7 @@ const {
     user, userRole, isAuthReady, token,
     mlAccounts, fetchMercadoLivreAccounts,
     shopeeAccounts, fetchShopeeAccounts,
+    tiktokAccounts, fetchTikTokAccounts,
 } = useAuth();
 const {
     sales, isLoading, error, totalSales, totalIsExact, hasNextPage,
@@ -886,19 +892,32 @@ const {
     liveAccounts: shopeeLiveAccounts,
     syncAccountsBatch: syncShopeeAccountsBatch,
 } = useShopeeSyncManager();
-const isUnifiedSyncing = computed(() => syncState.value.isSyncing || shopeeSyncState.value.isSyncing);
+const {
+    syncState: tiktokSyncState,
+    liveAccounts: tiktokLiveAccounts,
+    syncAccountsBatch: syncTikTokAccountsBatch,
+} = useTikTokSyncManager();
+const isUnifiedSyncing = computed(() =>
+    syncState.value.isSyncing || shopeeSyncState.value.isSyncing || tiktokSyncState.value.isSyncing
+);
 const unifiedNewSalesCount = computed(() =>
-    (syncState.value.newSalesCount || 0) + (shopeeSyncState.value.newSalesCount || 0)
+    (syncState.value.newSalesCount || 0)
+    + (shopeeSyncState.value.newSalesCount || 0)
+    + (tiktokSyncState.value.newSalesCount || 0)
 );
 const unifiedLiveAccounts = computed(() => [
     ...(liveAccounts.value || []).map(account => ({ ...account, marketplace: 'ML' })),
     ...(shopeeLiveAccounts.value || []).map(account => ({ ...account, marketplace: 'Shopee' })),
+    ...(tiktokLiveAccounts.value || []).map(account => ({ ...account, marketplace: 'TikTok' })),
 ]);
-const activeSyncState = computed(() =>
-    shopeeSyncState.value.isSyncing || shopeeSyncState.value.isVisible
-        ? shopeeSyncState.value
-        : syncState.value
-);
+// O toast segue um canal que AINDA está sincronizando; só depois mostra o
+// resultado de quem já terminou. `isVisible` dura 8s após a conclusão, então
+// usá-lo como prioridade deixava o toast verde de uma loja esconder o
+// progresso dos outros canais (mesma regra do AdminView).
+const activeSyncState = computed(() => {
+    const states = [shopeeSyncState.value, tiktokSyncState.value, syncState.value];
+    return states.find((s) => s.isSyncing) || states.find((s) => s.isVisible) || syncState.value;
+});
 const isSyncLiveOpen = ref(false);
 const { systemStatuses } = useSystemStatus();
 const { downloadLabel, downloadLabelsForSales, getLabelInfo: composableLabelInfo } = useLabels();
@@ -955,7 +974,67 @@ function getLabelInfo(sale) {
 const shopeeLabelBusy = ref(null);
 
 const isShopeeSale = (sale) => saleMarketplace(sale) === 'Shopee';
+const isTikTokSale = (sale) => saleMarketplace(sale) === 'TikTok';
+const isMlSale = (sale) => saleMarketplace(sale) === 'ML';
 const shopeeLabelKey = (sale) => `${sale?.id}-${sale?.sku}`;
+
+/* --------------------------- Etiqueta TikTok Shop ---------------------------
+ *
+ * O backend busca o documento de cada pacote no TikTok, estampa SKU e
+ * quantidade e devolve um PDF só. Aqui só disparamos e mostramos a resposta.
+ */
+const tiktokLabelBusy = ref(null);
+
+async function handleTikTokLabel(sale) {
+    if (tiktokLabelBusy.value) return;
+
+    const orderId = sale?.id;
+    const shopId = sale?.seller_id ?? sale?.account_id;
+    if (!orderId || !shopId) {
+        notify.error('Este pedido não tem identificação da loja TikTok Shop para gerar etiqueta.');
+        return;
+    }
+
+    const params = new URLSearchParams({ orderId: String(orderId), shopId: String(shopId) });
+    tiktokLabelBusy.value = shopeeLabelKey(sale);
+    try {
+        const info = await api.get(`/tiktok/label-info?${params.toString()}`);
+        if (info && info.canPrint === false) {
+            // Envio ainda não organizado é espera, não erro do sistema.
+            if (info.awaitingShipment || info.status === 'not_applicable') notify.warning(info.reason);
+            else notify.error(info.reason || 'O TikTok Shop não liberou a etiqueta deste pedido.');
+            return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/tiktok/download-label?${params.toString()}`, {
+            headers: { Authorization: `Bearer ${token.value}` },
+        });
+
+        if (!response.ok) {
+            let detail = null;
+            try { detail = await response.json(); } catch { /* resposta sem JSON */ }
+            const message = detail?.error || 'Não foi possível obter a etiqueta no TikTok Shop.';
+            if (detail?.awaitingShipment) notify.warning(message);
+            else notify.error(message);
+            return;
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `tiktok-etiqueta-${orderId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        notify.success('Etiqueta TikTok Shop gerada.');
+    } catch (error) {
+        notify.error(error?.data?.error || error?.data?.reason || error?.message || 'Falha ao gerar a etiqueta TikTok Shop.');
+    } finally {
+        tiktokLabelBusy.value = null;
+    }
+}
 
 async function handleShopeeLabel(sale, type = 'pdf') {
     const key = shopeeLabelKey(sale);
@@ -1156,13 +1235,15 @@ async function processSingleSale(sale) {
     isProcessing.value = true;
     try {
         // Cada marketplace tem seu endpoint de abatimento, porque a venda é
-        // atualizada na tabela correspondente (sales x shopee_sales). O payload
-        // é sempre uma lista, no mesmo formato do processamento em lote.
-        const isShopee = saleMarketplace(sale) === 'Shopee';
-        const endpoint = isShopee ? '/shopee/process' : '/sales/process';
-        const item = isShopee
-            ? { orderSn: sale.id, sku: sale.sku, uid: sale.uid }
-            : { id: sale.id, sku: sale.sku, uid: sale.uid };
+        // atualizada na tabela correspondente (sales, shopee_sales ou
+        // tiktok_sales). O payload é sempre uma lista, no mesmo formato do
+        // processamento em lote.
+        const base = { sku: sale.sku, uid: sale.uid };
+        const { endpoint, item } = {
+            ML: { endpoint: '/sales/process', item: { id: sale.id, ...base } },
+            Shopee: { endpoint: '/shopee/process', item: { orderSn: sale.id, ...base } },
+            TikTok: { endpoint: '/tiktok/process', item: { orderId: sale.id, ...base } },
+        }[saleMarketplace(sale)];
 
         const result = await api.post(endpoint, { salesToProcess: [item] });
 
@@ -1212,10 +1293,7 @@ const isMarketplaceDropdownOpen = ref(false);
 const marketplaceFilterContainerRef = ref(null);
 const marketplaceFilterDropdownRef = ref(null);
 
-const marketplaceOptions = [
-    { value: 'ML', label: 'Mercado Livre', logo: '/img/ml-logo.svg' },
-    { value: 'Shopee', label: 'Shopee', logo: '/img/shopee-logo.svg' },
-];
+const marketplaceOptions = MARKETPLACE_OPTIONS;
 
 /** Marca/desmarca um valor numa das listas de filtro (usado pelos dropdowns). */
 function toggleInList(list, value) {
@@ -1251,7 +1329,14 @@ const allAccountOptions = computed(() => {
         label: a.shop_name || String(a.shop_id),
         logo: MK_LOGOS.Shopee,
     }));
-    return [...ml, ...shopee];
+    const tiktok = (tiktokAccounts.value || []).map((a) => ({
+        key: `tt-${a.shop_id}`,
+        id: a.shop_id,
+        value: `TikTok:${a.shop_id}`,
+        label: a.shop_name || String(a.shop_id),
+        logo: MK_LOGOS.TikTok,
+    }));
+    return [...ml, ...shopee, ...tiktok];
 });
 
 const selectedMarketplaceLabel = computed(() => {
@@ -1539,32 +1624,43 @@ const handleSync = async () => {
     const startedAt = Date.now();
 
     try {
-        // Descobre os dois canais em paralelo. Ausência de contas em um canal
-        // não bloqueia o outro; só paramos quando nenhum dos dois está conectado.
-        const [mlAccountsResult, shopeeAccountsResult] = await Promise.all([
+        // Descobre os canais em paralelo. Ausência de contas em um canal não
+        // bloqueia os outros; só paramos quando nenhum está conectado.
+        const [mlAccountsResult, shopeeAccountsResult, tiktokAccountsResult] = await Promise.all([
             fetchMercadoLivreAccounts(),
             fetchShopeeAccounts(),
+            fetchTikTokAccounts(),
         ]);
         if (mlAccountsResult?.error) throw new Error(mlAccountsResult.error);
         if (shopeeAccountsResult?.error) throw new Error(shopeeAccountsResult.error);
+        const tiktokDiscoveryError = tiktokAccountsResult?.error
+            ? String(tiktokAccountsResult.error)
+            : null;
+        if (tiktokDiscoveryError) {
+            console.warn('Lojas TikTok Shop fora do sync:', tiktokDiscoveryError);
+        }
 
         const mlToSync = Array.isArray(mlAccountsResult) ? mlAccountsResult : [];
         const shopeeToSync = Array.isArray(shopeeAccountsResult) ? shopeeAccountsResult : [];
-        const totalAccounts = mlToSync.length + shopeeToSync.length;
+        // Loja marcada para reconexão ou sem shop_cipher só repetiria erro.
+        const tiktokToSync = (Array.isArray(tiktokAccountsResult) ? tiktokAccountsResult : [])
+            .filter((account) => account.status !== 'reconnect_needed' && account.has_shop_cipher !== false);
+        const syncableAccounts = mlToSync.length + shopeeToSync.length + tiktokToSync.length;
+        const totalAccounts = syncableAccounts + (tiktokDiscoveryError ? 1 : 0);
 
-        if (totalAccounts === 0) {
+        if (syncableAccounts === 0 && !tiktokDiscoveryError) {
             syncResults.value = {
                 title: 'Atenção',
                 type: 'warning',
                 accounts: [],
                 summary: { total: 0, successful: 0, failed: 0 },
-                message: 'Nenhuma conta do Mercado Livre ou loja Shopee está conectada para sincronizar.',
+                message: 'Nenhuma conta do Mercado Livre, loja Shopee ou loja TikTok Shop está conectada para sincronizar.',
             };
             isSyncResultsModalOpen.value = true;
             return;
         }
 
-        isSyncLiveOpen.value = true;
+        isSyncLiveOpen.value = syncableAccounts > 0;
         const emptyBatch = {
             results: [],
             summary: { total: 0, successful: 0, failed: 0 },
@@ -1574,9 +1670,9 @@ const handleSync = async () => {
             totalDurationMs: 0,
         };
 
-        // Os canais têm limitadores independentes no backend; os batches podem
-        // rodar juntos sem criar uma recarga da tabela por conta.
-        const [mlBatch, shopeeBatch] = await Promise.all([
+        // Cada conta segura um EventSource; 2 + 2 + 1 = 5 deixa a sexta
+        // conexão HTTP/1.1 livre para os POSTs que iniciam os jobs.
+        const [mlBatch, shopeeBatch, tiktokBatch] = await Promise.all([
             mlToSync.length
                 ? syncAccountsBatch(
                     mlToSync.map(account => ({
@@ -1585,7 +1681,7 @@ const handleSync = async () => {
                         clientUid: null,
                         daysToSync: null,
                     })),
-                    { concurrency: 3 }
+                    { concurrency: 2 }
                 )
                 : Promise.resolve(emptyBatch),
             shopeeToSync.length
@@ -1597,6 +1693,18 @@ const handleSync = async () => {
                         force: false,
                     })),
                     { concurrency: 2 }
+                )
+                : Promise.resolve(emptyBatch),
+            // Uma loja TikTok por vez completa o limite 2 + 2 + 1 = 5.
+            tiktokToSync.length
+                ? syncTikTokAccountsBatch(
+                    tiktokToSync.map(account => ({
+                        shopId: account.shop_id,
+                        accountNickname: account.shop_name || String(account.shop_id),
+                        clientUid: null,
+                        force: false,
+                    })),
+                    { concurrency: 1 }
                 )
                 : Promise.resolve(emptyBatch),
         ]);
@@ -1624,15 +1732,39 @@ const handleSync = async () => {
                 durationMs: result.durationMs || 0,
                 message: result.status === 'error' ? (result.message || 'Erro desconhecido') : '',
             })),
+            ...tiktokBatch.results.map(result => ({
+                marketplace: 'TikTok',
+                nickname: result.accountNickname,
+                userId: result.shopId,
+                status: result.status,
+                newSalesCount: result.newSalesCount || 0,
+                updatedCount: result.updatedCount || 0,
+                skippedCount: result.skippedCount || 0,
+                durationMs: result.durationMs || 0,
+                message: result.status === 'error' ? (result.message || 'Erro desconhecido') : '',
+            })),
+            ...(tiktokDiscoveryError ? [{
+                marketplace: 'TikTok',
+                nickname: 'Listagem de lojas TikTok Shop',
+                userId: null,
+                status: 'error',
+                newSalesCount: 0,
+                updatedCount: 0,
+                skippedCount: 0,
+                durationMs: 0,
+                message: tiktokDiscoveryError,
+            }] : []),
         ];
 
-        const successCount = mlBatch.summary.successful + shopeeBatch.summary.successful;
-        const errorCount = mlBatch.summary.failed + shopeeBatch.summary.failed;
-        const totalNewSales = mlBatch.totalNewSales + shopeeBatch.totalNewSales;
-        const totalUpdated = mlBatch.totalUpdated + shopeeBatch.totalUpdated;
-        const totalSkipped = mlBatch.totalSkipped + shopeeBatch.totalSkipped;
+        const batches = [mlBatch, shopeeBatch, tiktokBatch];
+        const sum = (pick) => batches.reduce((total, batch) => total + (pick(batch) || 0), 0);
+        const successCount = sum((batch) => batch.summary.successful);
+        const errorCount = sum((batch) => batch.summary.failed) + (tiktokDiscoveryError ? 1 : 0);
+        const totalNewSales = sum((batch) => batch.totalNewSales);
+        const totalUpdated = sum((batch) => batch.totalUpdated);
+        const totalSkipped = sum((batch) => batch.totalSkipped);
 
-        // Uma única consulta atualiza a fila completa depois dos dois canais.
+        // Uma única consulta atualiza a fila completa depois de todos os canais.
         await triggerServerFetch(false);
         syncResults.value = {
             title: errorCount > 0 ? 'Sincronização finalizada com problemas' : 'Sincronização finalizada',
@@ -1760,6 +1892,7 @@ onMounted(async () => {
     // vendas chega, sem esperar pelas contas.
     fetchMercadoLivreAccounts();
     fetchShopeeAccounts();
+    fetchTikTokAccounts();
 
     if (isAuthReady.value && user.value) {
         triggerServerFetch(false);
@@ -1818,7 +1951,7 @@ async function showJsonModal(sale) {
     isJsonModalOpen.value = true;
     selectedSaleJson.value = 'Carregando payload completo...';
     try {
-        const mk = saleMarketplace(sale) === 'Shopee' ? 'shopee' : 'ml';
+        const mk = marketplacePlatform(saleMarketplace(sale));
         const result = await api.get(
             `/sales/raw/${mk}/${encodeURIComponent(sale.id)}/${encodeURIComponent(sale.sku)}`
         );

@@ -116,7 +116,7 @@
                   <!-- O rótulo traz o canal porque a mesma loja costuma usar o
                        mesmo nome no Mercado Livre e na Shopee. -->
                   <option v-for="acc in accountOptions" :key="acc.value" :value="acc.value">
-                    {{ acc.label }} · {{ acc.marketplace === 'Shopee' ? 'Shopee' : 'Mercado Livre' }} ({{ acc.count }})
+                    {{ acc.label }} · {{ mkLabel(acc.marketplace) }} ({{ acc.count }})
                   </option>
                 </select>
               </div>
@@ -407,6 +407,7 @@ import { useApi } from '@/composables/useApi';
 import { useAuth } from '@/composables/useAuth';
 import { useNotification } from '@/composables/useNotification';
 import { formatVariation } from '@/utils/variation';
+import { MK_LOGOS, saleMarketplace, marketplaceLabel as mkLabel } from '@/utils/marketplaces';
 
 const api = useApi();
 const { user } = useAuth();
@@ -472,19 +473,20 @@ const groupedItems = computed(() => {
 
 function packageLabel(group) {
   if (group.shipping_id) return `Envio ${group.shipping_id}`;
-  return `${itemMarketplace(group) === 'Shopee' ? 'Pedido Shopee' : 'Pedido'} ${group.id}`;
+  const prefix = { Shopee: 'Pedido Shopee', TikTok: 'Pedido TikTok' }[itemMarketplace(group)] || 'Pedido';
+  return `${prefix} ${group.id}`;
 }
 
 function statusLabel(item) {
   const status = String(item.shipping_status_live || item.shipping_status || '').toLowerCase();
-  if (['shipped', 'delivered', 'completed', 'expedited'].includes(status)) return 'Despachado';
+  if (['shipped', 'delivered', 'completed', 'expedited', 'in_transit'].includes(status)) return 'Despachado';
   if (['cancelled', 'canceled'].includes(status)) return 'Cancelado';
   return status ? status.replaceAll('_', ' ') : 'A despachar';
 }
 
 function statusClass(item) {
   const status = String(item.shipping_status_live || item.shipping_status || '').toLowerCase();
-  if (['shipped', 'delivered', 'completed', 'expedited'].includes(status)) return 'chip--status-done';
+  if (['shipped', 'delivered', 'completed', 'expedited', 'in_transit'].includes(status)) return 'chip--status-done';
   if (['cancelled', 'canceled'].includes(status)) return 'chip--status-cancelled';
   return 'chip--status-pending';
 }
@@ -752,15 +754,9 @@ const hasAnyFilter = computed(() =>
   Boolean(filters.shippingLimitEnd)
 );
 
-const MK_LOGOS = {
-  ML: '/img/ml-logo.svg',
-  Shopee: '/img/shopee-logo.svg',
-};
-
 /** Canal do item; `channel` é o apelido antigo mantido pelo backend. */
 function itemMarketplace(item) {
-  const raw = String(item?.marketplace || item?.channel || 'ML').toLowerCase();
-  return raw.includes('shopee') || raw === 'sp' ? 'Shopee' : 'ML';
+  return saleMarketplace(item);
 }
 
 function marketplaceLogo(item) {
@@ -768,7 +764,7 @@ function marketplaceLogo(item) {
 }
 
 function marketplaceLabel(item) {
-  return itemMarketplace(item) === 'Shopee' ? 'Shopee' : 'Mercado Livre';
+  return mkLabel(itemMarketplace(item));
 }
 
 function descricaoTitle(item) {

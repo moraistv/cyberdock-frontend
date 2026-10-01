@@ -81,6 +81,10 @@
                         <img src="/img/shopee-logo.svg" alt="Shopee" />
                         Shopee
                     </span>
+                    <span class="marketplace" title="TikTok Shop">
+                        <img src="/img/tiktok-logo.svg" alt="TikTok Shop" />
+                        TikTok Shop
+                    </span>
                 </div>
             </div>
         </aside>
@@ -91,6 +95,7 @@
                 <div class="mobile-marketplaces" aria-label="Marketplaces integrados">
                     <img src="/img/ml-logo.svg" alt="Mercado Livre" />
                     <img src="/img/shopee-logo.svg" alt="Shopee" />
+                    <img src="/img/tiktok-logo.svg" alt="TikTok Shop" />
                 </div>
             </header>
 

@@ -56,21 +56,19 @@
         </div>
         <div class="admin-metrics-section">
           <div v-if="isLoadingAccounts" class="metrics-grid">
-            <div v-for="i in 4" :key="i" class="metric-item-skeleton">
+            <div v-for="i in channelMetrics.length + 2" :key="i" class="metric-item-skeleton"
+                 :class="{ 'is-channel': i <= channelMetrics.length }">
               <div class="skeleton-value"></div>
               <div class="skeleton-label"></div>
             </div>
           </div>
           <div v-else class="metrics-grid">
-            <div class="metric-item">
-              <img src="/img/ml-logo.svg" alt="" class="metric-logo" />
-              <span class="metric-value">{{ adminMetrics.mlAccounts }}</span>
-              <span class="metric-label">Contas ML</span>
-            </div>
-            <div class="metric-item">
-              <img src="/img/shopee-logo.svg" alt="" class="metric-logo" />
-              <span class="metric-value">{{ adminMetrics.shopeeAccounts }}</span>
-              <span class="metric-label">Lojas Shopee</span>
+            <!-- Um cartão por canal, três na mesma linha: o rótulo curto fica
+                 embaixo porque, lado a lado, não cabe na largura da sidebar. -->
+            <div v-for="mk in channelMetrics" :key="mk.code" class="metric-item is-channel" :title="mk.title">
+              <img :src="mk.logo" alt="" class="metric-logo" />
+              <span class="metric-value">{{ mk.count }}</span>
+              <span class="metric-label">{{ mk.label }}</span>
             </div>
             <div class="metric-item">
               <span class="metric-icon is-ok">
@@ -143,17 +141,14 @@ import { useRoute } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { useAdminMode } from '@/composables/useAdminMode';
 import { useSidebar } from '@/composables/useSidebar';
+import { MARKETPLACES } from '@/utils/marketplaces';
 
 const {
-  user, userRole, fetchMercadoLivreAccounts, fetchShopeeAccounts,
-  mlAccounts, shopeeAccounts,
+  user, userRole, fetchMercadoLivreAccounts, fetchShopeeAccounts, fetchTikTokAccounts,
+  mlAccounts, shopeeAccounts, tiktokAccounts,
 } = useAuth();
 const { isIconOnly, isMobileOpen, isMobile, toggle, closeMobile } = useSidebar();
 
-const MK_LOGOS = {
-  ML: '/img/ml-logo.svg',
-  Shopee: '/img/shopee-logo.svg',
-};
 const { isAdminMode } = useAdminMode();
 
 const route = useRoute();
@@ -222,29 +217,57 @@ watch(() => [route.path, navItems.value], () => {
 
 const connectedAccounts = ref([]);
 const connectedShopeeAccounts = ref([]);
+const connectedTikTokAccounts = ref([]);
 const isLoadingAccounts = ref(true);
 const accountsError = ref(null);
 const isAccountsSectionCollapsed = ref(false);
 
-/**
- * Métricas do painel admin derivadas das contas que a sidebar JÁ carregou.
-/** Lista única dos dois marketplaces, normalizada para o item da sidebar. */
+const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
+/* Status do TikTok Shop no vocabulário da sidebar (active | attention | error).
+ *
+ * O access token é renovado pelo próprio sync. O que pede ação do usuário é a
+ * loja marcada para reconexão (refresh recusado) ou o refresh token perto de
+ * vencer, porque depois dele só autorizando de novo. */
+function tiktokSidebarStatus(acc) {
+  if (acc.status === 'reconnect_needed') return 'error';
+  if (acc.status === 'active' && acc.refresh_expires_at) {
+    const left = new Date(acc.refresh_expires_at).getTime() - Date.now();
+    if (Number.isFinite(left) && left < THREE_DAYS_MS) return 'attention';
+  }
+  return acc.status || 'active';
+}
+
+const accountItem = (code, key, nickname, status) => ({
+  key,
+  nickname,
+  status,
+  code,
+  marketplace: MARKETPLACES[code].label,
+  logo: MARKETPLACES[code].logo,
+});
+
+/** Lista única de todos os canais, normalizada para o item da sidebar. */
 const allConnectedAccounts = computed(() => [
-  ...connectedAccounts.value.map((acc) => ({
-    key: `ml-${acc.user_id}`,
-    nickname: acc.nickname || String(acc.user_id),
-    status: acc.status,
-    marketplace: 'Mercado Livre',
-    logo: MK_LOGOS.ML,
-  })),
-  ...connectedShopeeAccounts.value.map((acc) => ({
-    key: `sp-${acc.shop_id}`,
-    nickname: acc.shop_name || String(acc.shop_id),
-    status: acc.status,
-    marketplace: 'Shopee',
-    logo: MK_LOGOS.Shopee,
-  })),
+  ...connectedAccounts.value.map((acc) =>
+    accountItem('ML', `ml-${acc.user_id}`, acc.nickname || String(acc.user_id), acc.status)),
+  ...connectedShopeeAccounts.value.map((acc) =>
+    accountItem('Shopee', `sp-${acc.shop_id}`, acc.shop_name || String(acc.shop_id), acc.status)),
+  ...connectedTikTokAccounts.value.map((acc) =>
+    accountItem('TikTok', `tt-${acc.shop_id}`, acc.shop_name || String(acc.shop_id), tiktokSidebarStatus(acc))),
 ]);
+
+/** Contagem por canal para o painel admin, na ordem de MARKETPLACES. */
+const channelMetrics = computed(() => {
+  const list = allConnectedAccounts.value;
+  return Object.values(MARKETPLACES).map((mk) => ({
+    code: mk.code,
+    logo: mk.logo,
+    label: mk.shortLabel,
+    title: `${mk.label}: contas conectadas`,
+    count: list.filter((a) => a.code === mk.code).length,
+  }));
+});
 
 /**
  * Métricas do painel admin derivadas das contas que a sidebar JÁ carregou.
@@ -258,8 +281,6 @@ const allConnectedAccounts = computed(() => [
 const adminMetrics = computed(() => {
   const list = allConnectedAccounts.value;
   return {
-    mlAccounts: list.filter((a) => a.marketplace === 'Mercado Livre').length,
-    shopeeAccounts: list.filter((a) => a.marketplace === 'Shopee').length,
     active: list.filter((a) => a.status === 'active').length,
     attention: list.filter((a) => a.status !== 'active').length,
   };
@@ -269,19 +290,23 @@ async function fetchAccounts() {
   if (!user.value || !user.value.uid) {
     connectedAccounts.value = [];
     connectedShopeeAccounts.value = [];
+    connectedTikTokAccounts.value = [];
     isLoadingAccounts.value = false;
     return;
   }
   // As contas já vêm de um cache compartilhado no useAuth. Sem esta guarda o
   // skeleton reaparecia em toda navegação, porque o Sidebar é remontado a cada
   // troca de página — o menu "piscava" mesmo sem nenhuma requisição nova.
-  const hasCachedAccounts = mlAccounts.value.length > 0 || shopeeAccounts.value.length > 0;
+  const hasCachedAccounts = mlAccounts.value.length > 0
+    || shopeeAccounts.value.length > 0
+    || tiktokAccounts.value.length > 0;
   isLoadingAccounts.value = !hasCachedAccounts;
   accountsError.value = null;
   try {
-    const [accountsData, shopeeData] = await Promise.all([
+    const [accountsData, shopeeData, tiktokData] = await Promise.all([
       fetchMercadoLivreAccounts(),
       fetchShopeeAccounts(),
+      fetchTikTokAccounts(),
     ]);
     if (accountsData && accountsData.error) throw new Error(accountsData.error);
 
@@ -299,10 +324,12 @@ async function fetchAccounts() {
     // A Shopee renova o token no próprio job de sincronização, então aqui só
     // refletimos o status salvo; não há alerta de expiração como no ML.
     connectedShopeeAccounts.value = (shopeeData && shopeeData.error) ? [] : (shopeeData || []);
+    connectedTikTokAccounts.value = (tiktokData && tiktokData.error) ? [] : (tiktokData || []);
   } catch (err) {
     accountsError.value = err.message;
     connectedAccounts.value = [];
     connectedShopeeAccounts.value = [];
+    connectedTikTokAccounts.value = [];
   } finally {
     isLoadingAccounts.value = false;
   }
@@ -526,11 +553,15 @@ watch(() => route.fullPath, (newPath) => {
 .admin-metrics-section {
   padding: 0 1rem 1.25rem 1rem;
 }
+/* Seis trilhas: os cartões de canal ocupam duas (três por linha) e os de
+   status ocupam três (dois por linha). */
 .metrics-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.5rem;
 }
+.metrics-grid > * { grid-column: span 3; }
+.metrics-grid > .is-channel { grid-column: span 2; }
 /* Cartão em LINHA (ícone + número + rótulo) em vez de coluna centralizada: na
    largura da sidebar o layout antigo quebrava rótulos curtos no meio, virando
    "Usuários / Online" e "Novos / (Mês)" em duas linhas. */
@@ -544,6 +575,17 @@ watch(() => route.fullPath, (newPath) => {
   border-radius: 9px;
   background-color: #f9fafb;
   text-align: left;
+}
+/* Canal: logo e número na primeira linha, rótulo curto embaixo. */
+.metric-item.is-channel {
+  flex-wrap: wrap;
+  justify-content: center;
+  row-gap: 0.2rem;
+  padding: 0.45rem 0.35rem;
+}
+.metric-item.is-channel .metric-label {
+  flex-basis: 100%;
+  text-align: center;
 }
 .metric-logo,
 .metric-icon {
