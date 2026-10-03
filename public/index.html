@@ -12,30 +12,37 @@
     <title>CyberDock | Gestão de fulfillment</title>
     <script>
       /*
-        Retorno da autorização da Shopee.
+        Retorno da autorização da Shopee e do TikTok Shop.
 
-        A Shopee só aceita redirecionar para o domínio do site, mas quem grava a
-        loja é a API. Esta etapa ficava a cargo do aplicativo Vue, e por isso
-        falhava calada: bastava o pacote em cache estar velho (o servidor chegou
-        a devolver HTML no lugar de .js) ou o armazenamento da aba não existir
-        mais, e a loja era autorizada na Shopee sem nunca chegar ao sistema.
+        Os marketplaces redirecionam para o domínio do site, mas quem grava a
+        loja é a API. Deixar esta etapa só com o aplicativo Vue falha em um caso
+        importante: o marketplace conclui a autorização, mas um pacote antigo
+        em cache, um chunk indisponível ou uma falha ao carregar o aplicativo
+        impede o código de chegar ao backend. A loja fica autorizada fora e não
+        aparece no CyberDock.
 
-        Este trecho roda direto no HTML, antes de qualquer pacote, então não
-        depende do aplicativo carregar. A API reconhece a tentativa pelo cookie
-        criado no início da conexão, grava a conta e volta para /contas.
+        Este trecho roda direto no HTML, antes de qualquer pacote. Ele preserva
+        code/state e envia o retorno ao callback correspondente da API, que
+        reconhece a tentativa, grava a conta e volta para /contas.
 
-        `handoff=1` marca o retorno que a própria API já devolveu para cá, o que
-        impede os dois lados de ficarem se empurrando o mesmo endereço.
+        `handoff=1` marca um retorno que a própria API já devolveu para o site e
+        impede os dois lados de ficarem redirecionando o mesmo endereço.
       */
       (function () {
         try {
-          if (window.location.pathname !== '/shopee/callback') return;
+          var callbacks = {
+            '/shopee/callback': '/shopee/callback',
+            '/tiktok/callback': '/tiktok/callback'
+          };
+          var callback = callbacks[window.location.pathname];
+          if (!callback) return;
+
           var query = window.location.search || '';
           if (!query || query.indexOf('handoff=1') !== -1) return;
           var api = window.location.hostname === 'localhost'
             ? 'http://localhost:3001/api'
             : 'https://api.cyberdock.com.br/api';
-          window.location.replace(api + '/shopee/callback' + query);
+          window.location.replace(api + callback + query);
         } catch (error) {
           /* Qualquer imprevisto aqui deixa o aplicativo tentar do jeito antigo. */
         }
