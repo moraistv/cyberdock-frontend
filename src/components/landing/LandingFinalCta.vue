@@ -10,11 +10,11 @@
         <div class="panel__content">
           <p class="lp-eyebrow">Próximo passo</p>
           <h2 id="final-titulo" class="panel__title">
-            Faça a conta.
-            <span class="lp-grad">A tabela é aberta.</span>
+            Mais tempo para vender.
+            <span>Seu envio com a CyberDock.</span>
           </h2>
           <p class="panel__text">
-            Monte o seu cenário na calculadora e veja o custo mensal antes de falar com qualquer pessoa.
+            Comece pelos seus números. Simule o custo de armazenamento, expedição e dos serviços que sua loja precisa.
           </p>
 
           <div class="panel__actions">
@@ -114,8 +114,9 @@ const go = (id) => scrollToSection(id);
   color: #fff;
 }
 
-.panel__title .lp-grad {
+.panel__title > span {
   display: block;
+  color: #a8daf8;
 }
 
 .panel__text {
@@ -133,6 +134,9 @@ const go = (id) => scrollToSection(id);
 }
 
 @media (max-width: 560px) {
+  .panel__content { padding: 28px 24px; }
+  .panel__title { font-size: 2rem; max-width: none; }
+  .panel__actions { width: 100%; margin-top: 24px; }
   .panel__actions .lp-btn {
     width: 100%;
   }

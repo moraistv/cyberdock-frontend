@@ -208,8 +208,9 @@ function onRange(event) {
 .field__step {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  flex: none;
   border: 0;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
@@ -311,5 +312,14 @@ function onRange(event) {
 .field__hint {
   font-size: 0.8125rem;
   color: var(--lp-on-dark-muted);
+}
+
+@media (max-width: 560px) {
+  .field__top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .field__control { width: 100%; border-radius: 12px; }
+  .field__input { flex: 1; width: 0; padding-inline: 8px; font-size: 1.125rem; }
+  .field__unit { font-size: .8125rem; }
+  .field__range { height: 44px; }
+  .field__step { border-radius: 8px; }
 }
 </style>

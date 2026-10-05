@@ -15,9 +15,9 @@
  * ========================================================================== */
 
 .lp {
-  --lp-ink: #050d1a;
-  --lp-ink-2: #0a1628;
-  --lp-ink-3: #112640;
+  --lp-ink: #102b43;
+  --lp-ink-2: #16354f;
+  --lp-ink-3: #1b4564;
   --lp-blue: #1e90d6;
   --lp-blue-bright: #4db3f0;
   --lp-blue-deep: #0369a1;
@@ -31,9 +31,9 @@
   --lp-on-dark-muted: #a9bdd1;
 
   --lp-radius-s: 12px;
-  --lp-radius-m: 20px;
-  --lp-radius-l: 28px;
-  --lp-radius-xl: 40px;
+  --lp-radius-m: 16px;
+  --lp-radius-l: 20px;
+  --lp-radius-xl: 24px;
 
   --lp-shadow-s: 0 1px 2px rgba(5, 13, 26, 0.06), 0 2px 8px -2px rgba(5, 13, 26, 0.08);
   --lp-shadow-m: 0 1px 2px rgba(5, 13, 26, 0.05), 0 16px 36px -16px rgba(5, 13, 26, 0.25);
@@ -158,7 +158,7 @@ html.lp-page {
 
 .lp-section {
   position: relative;
-  padding-block: clamp(76px, 9vw, 132px);
+  padding-block: clamp(64px, 7vw, 104px);
 }
 
 /* --------------------------------------------------------------------------
@@ -191,7 +191,7 @@ html.lp-page {
  * encostavam umas nas outras. */
 .lp-h2 {
   margin-top: 16px;
-  font-size: clamp(2rem, 3.2vw + 0.6rem, 3.5rem);
+  font-size: clamp(2rem, 3vw + 0.6rem, 3.25rem);
   font-weight: 740;
   line-height: 1.08;
   letter-spacing: -0.015em;
@@ -252,8 +252,8 @@ html.lp-page {
   gap: 10px;
   min-height: 54px;
   padding: 0 28px;
-  border: 2px solid var(--btn-bd);
-  border-radius: 999px;
+  border: 1px solid var(--btn-bd);
+  border-radius: 10px;
   background: var(--btn-bg);
   color: var(--btn-fg);
   font: inherit;
@@ -413,4 +413,14 @@ html.lp-page {
   .lp-btn:hover .lp-icon {
     transform: none;
   }
+}
+
+@media (max-width: 760px) {
+  html.lp-page { scroll-padding-bottom: 100px; }
+  .lp { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .lp:has(.nav--open) .mobile-actions { display: none; }
+  .lp-section { padding-block: 56px; }
+  .lp-h2 { font-size: clamp(1.875rem, 7.5vw, 2.5rem); line-height: 1.15; }
+  .lp-lead { font-size: 1rem; margin-top: 16px; }
+  .lp-eyebrow { font-size: .6875rem; letter-spacing: .1em; }
 }

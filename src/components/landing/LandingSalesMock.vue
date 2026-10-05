@@ -359,31 +359,45 @@ const logoOf = (channel) => marketplaceLogo(channel);
 
 @media (max-width: 560px) {
   .mock {
-    padding-top: 48px;
+    padding: 14px 0;
   }
 
   .mock__label {
-    right: -4px;
-    width: 132px;
+    display: none;
   }
 
   .mock__sim {
-    left: -4px;
+    position: relative;
+    left: auto;
+    bottom: auto;
+    margin: 12px 12px 0;
+    padding: 16px;
+    border-radius: 12px;
+    transform: none;
+    animation: none;
+    box-shadow: none;
   }
 
   .mock__row {
-    grid-template-columns: 36px minmax(0, 1fr);
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 12px 0;
   }
 
   .mock__status {
-    grid-column: 2;
-    justify-self: start;
+    font-size: .625rem;
+    padding: 5px 7px;
   }
 
   .mock__logo {
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
   }
+  .mock__filters { gap: 5px; padding-inline: 12px; }
+  .mock__chip { font-size: .6875rem; padding: 5px 8px; }
+  .mock__product strong { font-size: .75rem; }
+  .mock__product small { font-size: .6875rem; }
+  .mock__foot { padding: 0 12px 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

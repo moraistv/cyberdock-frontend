@@ -3,7 +3,8 @@
     <div class="lp-container">
       <header class="steps__head">
         <p v-reveal class="lp-eyebrow">Como funciona</p>
-        <h2 id="passos-titulo" v-reveal="60" class="lp-h2">Do estoque na nossa mão ao pedido a caminho.</h2>
+        <h2 id="passos-titulo" v-reveal="60" class="lp-h2">Sua próxima venda.<br> Nossa próxima entrega.</h2>
+        <p v-reveal="120" class="lp-lead">Entenda como sua loja e a CyberDock trabalham juntas.</p>
       </header>
 
       <ol v-reveal="100" class="steps__list" role="list">
@@ -27,155 +28,16 @@ import { STEPS } from '@/utils/landingContent';
 </script>
 
 <style scoped>
-.steps {
-  background: #fff;
-}
 
-.steps__head {
-  display: grid;
-  justify-items: start;
-  max-width: 760px;
-}
+.steps { background: #fff; border-top: 1px solid var(--lp-line); }
+.steps__head { max-width: 760px; }
+.steps__list { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: 44px; gap: 28px; }
+.step { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 18px; position: relative; }
+.step__node { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--lp-line); border-radius: 10px; color: var(--lp-blue-deep); background: var(--lp-sky-2); font-weight: 700; font-size: 1rem; font-variant-numeric: tabular-nums; }
+.step__body { min-width: 0; }
+.step__icon { display: inline-flex; margin-bottom: 12px; color: var(--lp-blue-deep); --icon-size: 24px; }
+.step__title { font-size: 1.125rem; font-weight: 700; color: var(--lp-ink); line-height: 1.35; }
+.step__text { margin-top: 10px; font-size: .9375rem; line-height: 1.65; color: var(--lp-muted); }
+@media (min-width: 900px) { .steps__list { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; } .step { display: flex; flex-direction: column; gap: 24px; border-top: 1px solid var(--lp-line); padding-top: 22px; } .step__icon { display: none; } }
 
-.steps__list {
-  --node: 56px;
-
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 28px;
-  margin-top: clamp(44px, 5vw, 72px);
-}
-
-/* A trilha que liga os passos "desenha" quando a lista entra na tela. */
-.steps__list::before {
-  content: '';
-  position: absolute;
-  left: calc(var(--node) / 2 - 1px);
-  top: calc(var(--node) / 2);
-  bottom: calc(var(--node) / 2);
-  width: 2px;
-  background: linear-gradient(180deg, var(--lp-blue-deep), var(--lp-blue-bright));
-  transform: scaleY(0);
-  transform-origin: top;
-  transition: transform 1.4s var(--lp-ease) 0.2s;
-}
-
-.steps__list.is-in::before {
-  transform: scaleY(1);
-}
-
-.step {
-  position: relative;
-  display: grid;
-  grid-template-columns: var(--node) minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
-  /* Sem isto, a sobra de altura do <li> (esticado pela linha mais alta da grade)
-   * era dividida entre as linhas internas e empurrava o cartão para baixo. */
-  align-content: start;
-}
-
-.step__node {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: var(--node);
-  height: var(--node);
-  border-radius: 50%;
-  background: var(--lp-ink);
-  color: #fff;
-  font-size: 1.25rem;
-  font-weight: 760;
-  box-shadow: 0 0 0 6px #fff, 0 0 0 8px var(--lp-blue);
-}
-
-.step__body {
-  padding: 24px;
-  border: 1px solid var(--lp-line);
-  border-radius: var(--lp-radius-m);
-  background: var(--lp-sky-2);
-  transition: transform 0.4s var(--lp-ease), box-shadow 0.4s var(--lp-ease), background-color 0.3s ease;
-}
-
-.step__body:hover {
-  transform: translateY(-4px);
-  background: #fff;
-  box-shadow: var(--lp-shadow-m);
-}
-
-.step__icon {
-  display: inline-grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  margin-bottom: 14px;
-  border-radius: 14px;
-  background: #fff;
-  color: var(--lp-blue-deep);
-  font-size: 1.375rem;
-  box-shadow: var(--lp-shadow-s);
-}
-
-.step__title {
-  font-size: 1.25rem;
-  font-weight: 730;
-  letter-spacing: -0.015em;
-  color: var(--lp-ink);
-}
-
-.step__text {
-  margin-top: 8px;
-  color: var(--lp-muted);
-}
-
-@media (min-width: 900px) {
-  .steps__list {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 24px;
-  }
-
-  .steps__list::before {
-    left: calc(var(--node) / 2);
-    right: 0;
-    top: calc(var(--node) / 2 - 1px);
-    bottom: auto;
-    width: auto;
-    height: 2px;
-    background: linear-gradient(90deg, var(--lp-blue-deep), var(--lp-blue-bright));
-    transform: scaleX(0);
-    transform-origin: left;
-  }
-
-  .steps__list.is-in::before {
-    transform: scaleX(1);
-  }
-
-  /* Em colunas: nó em cima, cartão embaixo, e todos os cartões com a mesma
-   * altura (o cartão cresce até o fim do <li>). */
-  .step {
-    display: flex;
-    flex-direction: column;
-    gap: 28px;
-  }
-
-  .step__node {
-    flex: none;
-  }
-
-  .step__body {
-    flex: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .steps__list::before {
-    transform: none;
-  }
-
-  .step__body:hover {
-    transform: none;
-  }
-}
 </style>

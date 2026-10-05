@@ -114,9 +114,8 @@ export const CHANNELS = Object.freeze([
  * HERO
  * ------------------------------------------------------------------------- */
 export const HERO_POINTS = Object.freeze([
-  'Tabela de preços aberta, aqui na página',
-  'Calculadora de custo mensal',
-  'Painel com as vendas de todos os canais',
+  'Preços por serviço, sem complicar a conta',
+  'Estoque e pedidos no mesmo painel',
 ]);
 
 /**
@@ -155,7 +154,7 @@ export const SERVICES = Object.freeze([
     id: 'storage',
     icon: 'warehouse',
     title: 'Armazenamento',
-    text: 'Seu estoque guardado na CyberDock e organizado por SKU no painel.',
+    text: 'Um lugar para o seu estoque. Produtos organizados por SKU e movimentações disponíveis no painel.',
     prefix: 'a partir de',
     price: formatCents(PRICE_CENTS.storageFirstCubicMeter),
     unit: 'por mês',
@@ -165,7 +164,7 @@ export const SERVICES = Object.freeze([
     id: 'shipping',
     icon: 'package-check',
     title: 'Expedição',
-    text: 'Embalagem padrão CYBER e envio de cada venda.',
+    text: 'Da embalagem padrão CYBER à saída do pedido. A cobrança acompanha o número de vendas expedidas.',
     prefix: 'a partir de',
     price: formatCents(essential.cents),
     unit: 'por venda',
@@ -175,7 +174,7 @@ export const SERVICES = Object.freeze([
     id: 'assembly',
     icon: 'layers',
     title: 'Montagem de Full',
-    text: 'Preparação completa no padrão Full, cobrada por pacote.',
+    text: 'Seus produtos preparados no padrão Full. O valor por pacote varia conforme o tamanho de cada montagem.',
     prefix: 'de',
     price: `${formatCents(assemblyLowest.cents)} a ${formatCents(assemblyHighest.cents)}`,
     unit: 'por pacote',
@@ -272,25 +271,25 @@ export const STEPS = Object.freeze([
   {
     id: 'stock',
     icon: 'warehouse',
-    title: 'Seu estoque chega',
+    title: 'Envie seu estoque',
     text: 'Você envia o estoque para a CyberDock ou agenda a Coleta CyberSegura. Ele fica organizado por SKU no painel.',
   },
   {
     id: 'connect',
     icon: 'link',
-    title: 'Contas conectadas',
+    title: 'Conecte suas lojas',
     text: 'Conecte Mercado Livre, Shopee e TikTok Shop. As vendas aparecem em uma tabela só.',
   },
   {
     id: 'ship',
     icon: 'package-check',
-    title: 'Embalamos e enviamos',
+    title: 'Deixe o envio com a gente',
     text: 'Cada venda sai com a embalagem padrão CYBER e etiqueta com SKU e quantidade.',
   },
   {
     id: 'track',
     icon: 'receipt',
-    title: 'Você acompanha',
+    title: 'Acompanhe a operação',
     text: 'Status dos pedidos, movimentações do estoque e resumo de cobrança, tudo no painel.',
   },
 ]);
@@ -402,19 +401,19 @@ export const CALCULATOR_DEFAULTS = Object.freeze({
 export const CALCULATOR_PRESETS = Object.freeze([
   {
     id: 'start',
-    label: 'Começando',
+    label: '100 vendas',
     hint: '1 m³ e 100 vendas',
     values: { ...CALCULATOR_DEFAULTS, cubicMeters: 1, monthlySales: 100 },
   },
   {
     id: 'growing',
-    label: 'Crescendo',
+    label: '300 vendas',
     hint: '2 m³ e 300 vendas',
     values: { ...CALCULATOR_DEFAULTS },
   },
   {
     id: 'scale',
-    label: 'Em escala',
+    label: '1.000 + Full',
     hint: '5 m³, 1.000 vendas e Full',
     values: {
       ...CALCULATOR_DEFAULTS,

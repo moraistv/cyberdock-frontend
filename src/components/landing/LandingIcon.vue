@@ -29,6 +29,8 @@ const ICONS = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   minus: '<path d="M5 12h14"/>',
+  play: '<path d="m8 5 11 7-11 7V5Z"/>',
+  pause: '<path d="M8 5v14M16 5v14"/>',
   menu: '<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',

@@ -225,8 +225,8 @@ onBeforeUnmount(() => {
   flex: none;
   width: 48px;
   height: 48px;
-  border: 2px solid var(--lp-ink);
-  border-radius: 50%;
+  border: 1px solid var(--lp-ink);
+  border-radius: 10px;
   background: transparent;
   color: var(--lp-ink);
   font-size: 1.25rem;

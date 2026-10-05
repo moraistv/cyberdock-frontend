@@ -25,6 +25,7 @@
     </main>
 
     <LandingFooter />
+    <LandingMobileActions />
   </div>
 </template>
 
@@ -38,6 +39,7 @@ import LandingFinalCta from '@/components/landing/LandingFinalCta.vue';
 import LandingFooter from '@/components/landing/LandingFooter.vue';
 import LandingHero from '@/components/landing/LandingHero.vue';
 import LandingNav from '@/components/landing/LandingNav.vue';
+import LandingMobileActions from '@/components/landing/LandingMobileActions.vue';
 import LandingPlatform from '@/components/landing/LandingPlatform.vue';
 import LandingPricing from '@/components/landing/LandingPricing.vue';
 import LandingServices from '@/components/landing/LandingServices.vue';

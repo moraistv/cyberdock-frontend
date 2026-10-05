@@ -3,8 +3,8 @@
     <div class="lp-container">
       <header class="services__head">
         <p v-reveal class="lp-eyebrow">Serviços</p>
-        <h2 id="servicos-titulo" v-reveal="60" class="lp-h2">Da entrada do estoque ao envio da venda.</h2>
-        <p v-reveal="120" class="lp-lead">Cinco serviços, cada um com o seu preço na tabela.</p>
+        <h2 id="servicos-titulo" v-reveal="60" class="lp-h2">A operação por trás<br> de cada pedido.</h2>
+        <p v-reveal="120" class="lp-lead">Do estoque ao despacho, encontre os serviços que fazem sentido para a sua loja.</p>
       </header>
 
       <div class="services__grid">
@@ -12,7 +12,6 @@
           v-for="(service, index) in SERVICES"
           :key="service.id"
           v-reveal="index * 70"
-          v-spotlight
           class="card"
           :class="`card--${service.id}`"
         >
@@ -63,7 +62,7 @@
 <script setup>
 import LandingIcon from '@/components/landing/LandingIcon.vue';
 import { scrollToSection } from '@/composables/useLandingScroll';
-import { vReveal, vSpotlight } from '@/composables/useReveal';
+import { vReveal } from '@/composables/useReveal';
 import { SERVICES } from '@/utils/landingContent';
 
 const go = (id) => scrollToSection(id);
@@ -103,7 +102,7 @@ const cubes = GRID
 
 <style scoped>
 .services {
-  background: linear-gradient(180deg, #fff 0%, var(--lp-sky-2) 100%);
+  background: #fff;
 }
 
 .services__head {
@@ -131,7 +130,7 @@ const cubes = GRID
   border: 1px solid var(--lp-line);
   border-radius: var(--lp-radius-l);
   background: #fff;
-  box-shadow: var(--lp-shadow-s);
+  box-shadow: none;
   transition:
     var(--lp-reveal-transition),
     transform 0.4s var(--lp-ease),
@@ -152,13 +151,13 @@ const cubes = GRID
 }
 
 .card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
   border-color: rgba(30, 144, 214, 0.55);
   box-shadow: var(--lp-shadow-m);
 }
 
 .card:hover::before {
-  opacity: 1;
+  opacity: 0;
 }
 
 .card__icon {
@@ -167,8 +166,8 @@ const cubes = GRID
   width: 52px;
   height: 52px;
   margin-bottom: 20px;
-  border-radius: 16px;
-  background: linear-gradient(145deg, var(--lp-sky), #d3eafa);
+  border-radius: 10px;
+  background: var(--lp-sky);
   color: var(--lp-blue-deep);
   font-size: 1.5rem;
 }
@@ -381,5 +380,15 @@ const cubes = GRID
   .card--storage:hover .card__art {
     transform: none;
   }
+}
+
+@media (max-width: 560px) {
+  .services__grid { gap: 12px; margin-top: 28px; }
+  .card { padding: 22px; border-radius: 14px; }
+  .card__art { display: none; }
+  .card__icon { width: 40px; height: 40px; margin-bottom: 14px; }
+  .card__title { font-size: 1.25rem; }
+  .card__text { font-size: .9375rem; }
+  .card__price { padding-top: 20px; }
 }
 </style>

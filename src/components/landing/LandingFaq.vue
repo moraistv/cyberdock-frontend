@@ -3,9 +3,9 @@
     <div class="lp-container faq__grid">
       <header class="faq__head">
         <p v-reveal class="lp-eyebrow">Perguntas</p>
-        <h2 id="perguntas-titulo" v-reveal="60" class="lp-h2">Perguntas frequentes.</h2>
+        <h2 id="perguntas-titulo" v-reveal="60" class="lp-h2">Antes de começar,<br> tire suas dúvidas.</h2>
         <p v-reveal="120" class="lp-lead">
-          Respostas direto da tabela de preços e do que o painel faz hoje.
+          Como os serviços funcionam, o que está incluído e como calculamos os valores.
         </p>
       </header>
 

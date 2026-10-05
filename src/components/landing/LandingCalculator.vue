@@ -10,10 +10,10 @@
       <header class="calc__head">
         <p v-reveal class="lp-eyebrow">Calculadora</p>
         <h2 id="calc-titulo" v-reveal="60" class="lp-h2">
-          Quanto a sua operação custa <span class="lp-grad">por mês?</span>
+          Seus números.<br> <span>Seu custo mensal.</span>
         </h2>
         <p v-reveal="120" class="lp-lead">
-          Ajuste os números e veja a estimativa na hora, com a mesma tabela de preços desta página.
+          Informe seu espaço de estoque e suas vendas. O cálculo se atualiza na hora, com cada serviço discriminado.
         </p>
       </header>
 
@@ -24,7 +24,7 @@
                entradas. Está no topo do painel (e não no pé) porque um elemento
                sticky de rodapé fica grudado no início do contêiner quando a tela
                ainda está acima dele, e cobria os primeiros campos. -->
-          <button type="button" class="minibar" @click="goToResult">
+          <button type="button" class="minibar" :aria-label="`Ver detalhamento: ${formatCents(estimate.totalCents)} por mês`" @click="goToResult">
             <span class="minibar__label">Estimativa</span>
             <strong class="minibar__value">{{ formatCents(estimate.totalCents) }}<small>/mês</small></strong>
             <span class="minibar__go">
@@ -34,7 +34,10 @@
           </button>
 
           <div class="presets" role="group" aria-labelledby="presets-titulo">
-            <p id="presets-titulo" class="presets__label">Comece por um cenário</p>
+            <div class="presets__head">
+              <p id="presets-titulo" class="presets__label">Comece com um exemplo</p>
+              <button type="button" class="calc__reset" @click="resetEstimate">Restaurar exemplo</button>
+            </div>
             <div class="presets__list">
               <button
                 v-for="preset in CALCULATOR_PRESETS"
@@ -97,6 +100,12 @@
             />
           </section>
 
+          <details class="extras" :open="extrasOpen" @toggle="extrasOpen = $event.target.open">
+            <summary class="extras__summary">
+              <span><LandingIcon name="plus" /><strong>Adicionar serviços opcionais</strong></span>
+              <span class="extras__caption">{{ optionalServices ? `Serviços adicionados: ${optionalServices}` : 'Full, transbordo e coleta' }} <LandingIcon name="chevron-down" /></span>
+            </summary>
+            <p class="extras__hint">Preencha apenas o que sua loja utiliza. Fechar esta área mantém os valores no cálculo.</p>
           <section class="block" aria-labelledby="bloco-full">
             <h3 id="bloco-full" class="block__title">
               <LandingIcon name="layers" />
@@ -155,6 +164,7 @@
               :hint="`${formatCents(PRICE_CENTS.secureCollectionTrip)} por viagem, até 1 m³ e 40 km da sede.`"
             />
           </section>
+          </details>
         </div>
 
         <!-- ===================== RESULTADO ===================== -->
@@ -223,7 +233,7 @@
           </div>
 
           <p class="receipt__fine">
-            Simulação com base na tabela de preços desta página. Serve como referência, não como proposta.
+            Estimativa para um mês completo, com base na tabela pública. No primeiro mês, o armazenamento é proporcional à entrada do estoque. Esta simulação não é uma proposta.
           </p>
         </aside>
       </div>
@@ -263,6 +273,8 @@ const LINE_COLORS = {
 
 const state = reactive({ ...CALCULATOR_DEFAULTS });
 const estimate = computed(() => calculateEstimate(state));
+const extrasOpen = ref(false);
+const optionalServices = computed(() => estimate.value.lines.filter(line => !['storage', 'shipping'].includes(line.key)).length);
 
 /* O total caminha até o valor novo; o texto lido por leitor de tela espera a
  * pessoa parar de mexer (debounce), senão cada passo da régua seria anunciado. */
@@ -289,6 +301,13 @@ const activePreset = computed(() => {
 
 function applyPreset(preset) {
   Object.assign(state, preset.values);
+  extrasOpen.value = Boolean(state.assemblyPackages || state.fullTrips || state.collectionTrips);
+}
+
+function resetEstimate() {
+  Object.assign(state, CALCULATOR_DEFAULTS);
+  extrasOpen.value = false;
+  announcement.value = 'Exemplo restaurado: 2 metros cúbicos e 300 vendas no plano Essencial.';
 }
 
 /* ---- Dicas dos campos ---- */
@@ -440,6 +459,19 @@ onBeforeUnmount(() => {
   border-radius: var(--lp-radius-xl);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.03));
 }
+
+.presets__head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.calc__reset { min-height: 44px; border: 0; padding: 0; background: transparent; color: #a8daf8; font: inherit; font-size: .8125rem; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.extras { margin-top: 30px; border-top: 1px solid rgba(255,255,255,.18); }
+.extras__summary { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; min-height: 76px; padding-block: 18px; cursor: pointer; list-style: none; }
+.extras__summary::-webkit-details-marker { display: none; }
+.extras__summary > span { display: inline-flex; align-items: center; gap: 8px; }
+.extras__summary strong { font-size: .9375rem; font-weight: 650; }
+.extras__caption { font-size: .75rem; color: var(--lp-on-dark-muted); }
+.extras__caption .lp-icon { transition: transform .2s ease; }
+.extras[open] .extras__caption .lp-icon { transform: rotate(180deg); }
+.extras__hint { color: var(--lp-on-dark-muted); font-size: .8125rem; }
+.extras .block { margin-top: 24px; padding-top: 24px; }
 
 .presets__label {
   font-size: 0.8125rem;
@@ -610,6 +642,8 @@ onBeforeUnmount(() => {
 /* Com a barra presa no topo, o foco por teclado precisa parar abaixo dela. */
 @media (max-width: 979px) {
   .calc__panel .preset,
+  .calc__panel .extras__summary,
+  .calc__panel .calc__reset,
   .calc__panel .plan,
   .calc__panel .field,
   .calc__panel .block__title {
@@ -915,6 +949,39 @@ onBeforeUnmount(() => {
   .minibar__go {
     padding: 8px;
   }
+}
+
+@media (max-width: 560px) {
+  .calc__glow { display: none; }
+  .calc__grid { opacity: .5; }
+  .calc__panel { padding: 20px; border-radius: 16px; }
+  .calc__layout { gap: 24px; margin-top: 28px; }
+  .presets__list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+  .preset { padding: 12px 8px; border-radius: 10px; align-content: start; }
+  .preset strong { font-size: .8125rem; line-height: 1.3; }
+  .preset small { font-size: .6875rem; line-height: 1.4; margin-top: 4px; }
+  .plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plan__box { padding: 12px; border-radius: 10px; }
+  .plan__name { font-size: .875rem; }
+  .plan__price { font-size: 1rem; }
+  .plan__price small { display: block; font-size: .75rem; }
+  .minibar { display: grid; grid-template-columns: minmax(0, 1fr) auto; border-radius: 12px; padding: 12px; gap: 2px 8px; }
+  .minibar__label { grid-column: 1; font-size: .625rem; }
+  .minibar__value { grid-column: 1; margin: 0; font-size: 1.0625rem; }
+  .minibar__go { grid-column: 2; grid-row: 1 / span 2; padding: 8px; }
+  .receipt { border-radius: 16px 16px 0 0; padding: 24px 20px; }
+  .receipt__whole { font-size: clamp(2rem, 10vw, 3.25rem); }
+  .receipt__currency { font-size: 1.125rem; }
+  .receipt__fraction { font-size: 1.25rem; }
+  .line { grid-template-columns: 8px minmax(0, 1fr) auto; gap: 8px; font-size: .875rem; }
+  .line__dot { width: 8px; height: 8px; }
+  .receipt__sale { padding: 14px 12px; font-size: .8125rem; }
+  .receipt__sale strong { font-size: 1.125rem; flex: none; }
+}
+
+@media (max-width: 420px) {
+  .line { grid-template-columns: 8px minmax(0, 1fr); gap: 4px 8px; }
+  .line__value { grid-column: 2; margin-top: 4px; font-size: 1rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
