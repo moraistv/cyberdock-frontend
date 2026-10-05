@@ -1,0 +1,416 @@
+/* ==========================================================================
+ * Landing page da CyberDock: base compartilhada.
+ *
+ * Tudo vive sob a classe .lp (a raiz da LandingView), então nada aqui vaza para
+ * o painel. Cada componente da landing tem o próprio <style scoped> para o que
+ * é só dele; o que é usado por mais de um fica neste arquivo.
+ *
+ * PALETA. O azul é o do logo (#1e90d6). Como ele dá só 3,5:1 contra branco, o
+ * texto azul sobre fundo claro usa --lp-blue-deep (#0369a1, 5,9:1) e texto
+ * branco só vai sobre #0369a1 ou mais escuro. O azul do logo fica para áreas
+ * grandes, bordas, ícones e texto grande.
+ *
+ * O App.vue zera margin e padding de tudo (`* { margin: 0; padding: 0 }`), então
+ * os espaçamentos daqui são sempre explícitos.
+ * ========================================================================== */
+
+.lp {
+  --lp-ink: #050d1a;
+  --lp-ink-2: #0a1628;
+  --lp-ink-3: #112640;
+  --lp-blue: #1e90d6;
+  --lp-blue-bright: #4db3f0;
+  --lp-blue-deep: #0369a1;
+  --lp-blue-night: #06416d;
+  --lp-sky: #eaf5fd;
+  --lp-sky-2: #f5fafe;
+  --lp-line: #d5e6f3;
+  --lp-text: #0b1a2e;
+  --lp-muted: #475a70;
+  --lp-on-dark: #eaf3fb;
+  --lp-on-dark-muted: #a9bdd1;
+
+  --lp-radius-s: 12px;
+  --lp-radius-m: 20px;
+  --lp-radius-l: 28px;
+  --lp-radius-xl: 40px;
+
+  --lp-shadow-s: 0 1px 2px rgba(5, 13, 26, 0.06), 0 2px 8px -2px rgba(5, 13, 26, 0.08);
+  --lp-shadow-m: 0 1px 2px rgba(5, 13, 26, 0.05), 0 16px 36px -16px rgba(5, 13, 26, 0.25);
+  --lp-shadow-l: 0 2px 4px rgba(5, 13, 26, 0.05), 0 36px 70px -28px rgba(6, 65, 109, 0.5);
+
+  --lp-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --lp-gutter: clamp(20px, 4.5vw, 44px);
+  --lp-nav-h: 76px;
+
+  /* Transição de entrada (v-reveal). Os cartões com hover a reaproveitam dentro
+   * da própria lista de transições para não perder a entrada. */
+  --lp-reveal-transition: opacity 0.9s var(--lp-ease) var(--lp-delay, 0ms),
+    translate 0.9s var(--lp-ease) var(--lp-delay, 0ms);
+
+  position: relative;
+  min-height: 100vh;
+  color: var(--lp-text);
+  background: #fff;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.55;
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.lp *,
+.lp *::before,
+.lp *::after {
+  box-sizing: border-box;
+}
+
+/* Resets com :where(), que tem especificidade ZERO. Com `.lp a { color: inherit }`
+ * a regra (0,1,1) ganhava de `.lp-btn { color: var(--btn-fg) }` (0,1,0) e os
+ * botões escuros ficavam com texto escuro sobre fundo escuro. */
+:where(.lp) img,
+:where(.lp) svg {
+  display: block;
+  max-width: 100%;
+}
+
+:where(.lp) ul,
+:where(.lp) ol {
+  list-style: none;
+}
+
+:where(.lp) a {
+  color: inherit;
+}
+
+:where(.lp) :is(h1, h2, h3, h4, p) {
+  text-wrap: pretty;
+}
+
+:where(.lp) :is(h1, h2, h3) {
+  text-wrap: balance;
+}
+
+/* Rolagem com o menu fixo por cima da página. O LandingView marca o <html> com
+ * .lp-page só enquanto a landing está na tela, então o painel não herda isto.
+ *
+ * Vale para âncoras (a seção para abaixo do menu) e para o foco por teclado: sem
+ * isto, ao navegar com Tab o campo focado podia ficar escondido atrás do menu
+ * (WCAG 2.4.11, Foco não obscurecido). */
+html.lp-page {
+  scroll-padding-top: 88px;
+}
+
+.lp :focus-visible {
+  outline: 3px solid var(--lp-blue);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.lp-dark :focus-visible {
+  outline-color: var(--lp-blue-bright);
+}
+
+/* Seções e botões focados por programa (scrollToSection) não mostram anel. */
+.lp [tabindex='-1']:focus {
+  outline: none;
+}
+
+/* --------------------------------------------------------------------------
+ * Utilidades
+ * ------------------------------------------------------------------------ */
+.lp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.lp-skip {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: var(--lp-ink);
+  color: #fff;
+  font-weight: 650;
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 0.2s var(--lp-ease);
+}
+
+.lp-skip:focus {
+  transform: translateY(0);
+}
+
+.lp-container {
+  width: min(100% - 2 * var(--lp-gutter), 1200px);
+  margin-inline: auto;
+}
+
+.lp-section {
+  position: relative;
+  padding-block: clamp(76px, 9vw, 132px);
+}
+
+/* --------------------------------------------------------------------------
+ * Tipografia
+ * ------------------------------------------------------------------------ */
+.lp-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lp-blue-deep);
+}
+
+/* Nó de circuito seguido de trilha: a mesma ideia das linhas do logo. */
+.lp-eyebrow::before {
+  content: '';
+  flex: none;
+  width: 36px;
+  height: 12px;
+  background:
+    radial-gradient(circle at 6px 6px, transparent 3px, currentColor 3.6px 5.4px, transparent 6px) left center / 12px 12px no-repeat,
+    linear-gradient(currentColor, currentColor) 12px 50% / 24px 2px no-repeat;
+}
+
+/* O Google Sans Flex já fecha o espaçamento sozinho em corpo grande (eixo
+ * óptico), então o tracking negativo aqui é leve: com -0.03em as letras
+ * encostavam umas nas outras. */
+.lp-h2 {
+  margin-top: 16px;
+  font-size: clamp(2rem, 3.2vw + 0.6rem, 3.5rem);
+  font-weight: 740;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  color: var(--lp-ink);
+}
+
+.lp-lead {
+  margin-top: 20px;
+  max-width: 60ch;
+  font-size: clamp(1.0625rem, 0.35vw + 1rem, 1.25rem);
+  line-height: 1.6;
+  color: var(--lp-muted);
+}
+
+/* Texto grande (títulos): WCAG pede 3:1. O azul do logo chega a 3,5:1 sobre
+ * branco, mas o #4db3f0 que estava no fim do gradiente ficava em 2,3:1. O
+ * gradiente agora termina em #1b86c9 (4,0:1 sobre branco). */
+.lp-grad {
+  background: linear-gradient(100deg, var(--lp-blue-deep) 0%, #1b86c9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  /* Cada linha quebrada recebe o gradiente inteiro, em vez de uma fatia dele. */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* Azul mais claro que o do logo: sobre o brilho azul do fundo escuro, o
+ * #4db3f0 ficava em 4,4:1. */
+.lp-dark .lp-eyebrow {
+  color: #8fd0f6;
+}
+
+.lp-dark .lp-h2 {
+  color: #fff;
+}
+
+.lp-dark .lp-lead {
+  color: var(--lp-on-dark-muted);
+}
+
+.lp-dark .lp-grad {
+  background-image: linear-gradient(100deg, #8fd0f6 0%, var(--lp-blue-bright) 55%, #fff 100%);
+}
+
+/* --------------------------------------------------------------------------
+ * Botões
+ * ------------------------------------------------------------------------ */
+.lp-btn {
+  --btn-bg: var(--lp-ink);
+  --btn-fg: #fff;
+  --btn-bd: var(--lp-ink);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 0 28px;
+  border: 2px solid var(--btn-bd);
+  border-radius: 999px;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform 0.3s var(--lp-ease),
+    box-shadow 0.3s var(--lp-ease),
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.lp-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px -12px rgba(5, 13, 26, 0.5);
+}
+
+.lp-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.lp-btn .lp-icon {
+  transition: transform 0.3s var(--lp-ease);
+}
+
+.lp-btn:hover .lp-icon {
+  transform: translateX(3px);
+}
+
+.lp-btn--sm {
+  min-height: 46px;
+  padding: 0 22px;
+  font-size: 0.9375rem;
+}
+
+.lp-btn--ghost {
+  --btn-bg: transparent;
+  --btn-fg: var(--lp-ink);
+}
+
+.lp-btn--ghost:hover {
+  --btn-bg: var(--lp-ink);
+  --btn-fg: #fff;
+}
+
+.lp-btn--blue {
+  --btn-bg: var(--lp-blue-deep);
+  --btn-bd: var(--lp-blue-deep);
+}
+
+.lp-btn--blue:hover {
+  box-shadow: 0 14px 28px -12px rgba(3, 105, 161, 0.7);
+}
+
+.lp-btn--light {
+  --btn-bg: #fff;
+  --btn-fg: var(--lp-ink);
+  --btn-bd: #fff;
+}
+
+.lp-btn--outline-light {
+  --btn-bg: transparent;
+  --btn-fg: #fff;
+  --btn-bd: rgba(255, 255, 255, 0.5);
+}
+
+.lp-btn--outline-light:hover {
+  --btn-bg: rgba(255, 255, 255, 0.12);
+  --btn-bd: #fff;
+  box-shadow: none;
+}
+
+.lp-btn--bright {
+  --btn-bg: var(--lp-blue-bright);
+  --btn-fg: var(--lp-ink);
+  --btn-bd: var(--lp-blue-bright);
+}
+
+.lp-btn--bright:hover {
+  box-shadow: 0 14px 30px -12px rgba(77, 179, 240, 0.75);
+}
+
+.lp-btn[disabled] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+ * Entrada ao rolar (v-reveal). Só esconde quando a raiz tem .lp--js.
+ * `translate` (e não transform) deixa o transform livre para os hovers.
+ * ------------------------------------------------------------------------ */
+.lp-reveal {
+  transition: var(--lp-reveal-transition);
+}
+
+.lp--js .lp-reveal:not(.is-in) {
+  opacity: 0;
+  translate: 0 28px;
+}
+
+/* --------------------------------------------------------------------------
+ * Animações compartilhadas
+ * ------------------------------------------------------------------------ */
+@keyframes lp-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--lp-tilt, 0deg));
+  }
+
+  50% {
+    transform: translateY(-9px) rotate(var(--lp-tilt, 0deg));
+  }
+}
+
+@keyframes lp-flow {
+  to {
+    stroke-dashoffset: -48;
+  }
+}
+
+@keyframes lp-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp *,
+  .lp *::before,
+  .lp *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  .lp--js .lp-reveal:not(.is-in) {
+    opacity: 1;
+    translate: none;
+  }
+
+  .lp-btn:hover,
+  .lp-btn:hover .lp-icon {
+    transform: none;
+  }
+}

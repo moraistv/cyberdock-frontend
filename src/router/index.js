@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { homeRouteForRole } from '../utils/homeRoute';
-const PaginaInicial = () => import('../views/PaginaInicial.vue');
+const LandingView = () => import('../views/LandingView.vue');
 const AuthComponent = () => import('../views/AuthComponent.vue');
 const DashboardView = () => import('../views/DashboardView.vue');
 const ContasView = () => import('../views/ContasView.vue');
@@ -21,9 +21,14 @@ const TikTokCallbackView = () => import('../views/TikTokCallbackView.vue');
 
 const routes = [
   {
+    // Landing pública. Quem já está logado é desviado para a tela inicial do
+    // papel no guard abaixo, então aqui só chega visitante.
+    // noCache: a página aplica título e descrição no onMounted e os restaura ao
+    // sair, o que exige uma montagem nova a cada visita.
     path: '/',
-    name: 'PaginaInicial',
-    component: PaginaInicial,
+    name: 'Landing',
+    component: LandingView,
+    meta: { noCache: true },
   },
   {
     // noCache: o login precisa do ciclo de vida limpo a cada visita, para não
@@ -244,11 +249,11 @@ router.beforeEach(async (to, from, next) => {
   const isAuthenticated = payload && payload.exp * 1000 > Date.now();
   const userRole = payload ? payload.role : null;
 
-  // A raiz é apenas um portão: manda para a tela inicial do papel quando
-  // logado, senão para o login. Resolver aqui evita renderizar a tela
-  // intermediária.
+  // A raiz é a landing para visitante e um portão para quem já tem sessão:
+  // logado vai direto para a tela inicial do papel, sem renderizar a landing.
   if (to.path === '/') {
-    next(isAuthenticated ? homeRouteForRole(userRole) : '/auth');
+    if (isAuthenticated) next(homeRouteForRole(userRole));
+    else next();
   } else if (requiresAuth && !isAuthenticated) {
     /* Guarda o destino COMPLETO, com query string.
      *
