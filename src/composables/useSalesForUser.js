@@ -71,17 +71,15 @@ export function useSalesForUser(uidRef) {
 
       const res = await api.put(endpoint, payload);
 
-      // Atualiza localmente
+      // Atualiza localmente. processed_at só pode vir do backend que realmente
+      // executou a baixa; não usamos o relógio do navegador para inventá-lo.
       const idx = sales.value.findIndex(
-        (s) => s.id === sale.id && s.sku === sale.sku
+        (s) => s.id === sale.id && s.sku === sale.sku && s.uid === sale.uid
       );
       if (idx !== -1) {
         const updated = { ...sales.value[idx], shipping_status: newStatus };
-        // Se despachado, garante processed_at para feedback instantâneo,
-        // mas o backend decide a verdade final.
-        if (isDespachado && !updated.processed_at) {
-          updated.processed_at = new Date().toISOString();
-        }
+        const processedAt = res?.sale?.processed_at || res?.sale?.processedAt || null;
+        if (processedAt) updated.processed_at = processedAt;
         sales.value[idx] = updated;
       }
 
@@ -102,33 +100,63 @@ export function useSalesForUser(uidRef) {
   };
 
   const processSales = async (salesToProcess, chunkSize = 200) => {
-    try {
-      // A lista mistura canais e cada um abate estoque na própria tabela.
-      const items = { ML: [], Shopee: [], TikTok: [] };
-      for (const s of salesToProcess) {
-        const channel = saleMarketplace(s);
-        if (channel === 'Shopee') items.Shopee.push({ orderSn: s.id, sku: s.sku, uid: s.uid });
-        else if (channel === 'TikTok') items.TikTok.push({ orderId: s.id, sku: s.sku, uid: s.uid });
-        else items.ML.push({ id: s.id, sku: s.sku, uid: s.uid, quantity: s.quantity });
-      }
+    // A lista mistura canais e cada um abate estoque na própria tabela.
+    const items = { ML: [], Shopee: [], TikTok: [] };
+    for (const sale of salesToProcess) {
+      const channel = saleMarketplace(sale);
+      if (channel === 'Shopee') items.Shopee.push({ orderSn: sale.id, sku: sale.sku, uid: sale.uid });
+      else if (channel === 'TikTok') items.TikTok.push({ orderId: sale.id, sku: sale.sku, uid: sale.uid });
+      else items.ML.push({ id: sale.id, sku: sale.sku, uid: sale.uid });
+    }
 
-      const aggregate = { success: [], failed: [] };
-      // As rotas das lojas identificam o pedido por orderSn/orderId; a tela lê `saleId`.
-      const withSaleId = (r) => ({ ...r, saleId: r.saleId ?? r.orderSn ?? r.orderId ?? null });
+    const labels = { ML: 'Mercado Livre', Shopee: 'Shopee', TikTok: 'TikTok Shop' };
+    const aggregate = { processedNow: [], alreadyProcessed: [], failed: [] };
+    const resultId = (item) => item?.saleId ?? item?.orderSn ?? item?.orderId ?? item?.id ?? null;
 
-      for (const [channel, endpoint] of PROCESS_ROUTES) {
-        for (const batch of chunk(items[channel], chunkSize)) {
+    for (const [channel, endpoint] of PROCESS_ROUTES) {
+      for (const batch of chunk(items[channel], chunkSize)) {
+        try {
           const res = await api.post(endpoint, { salesToProcess: batch });
-          aggregate.success.push(...(res?.success || []).map(withSaleId));
-          aggregate.failed.push(...(res?.failed || []).map(withSaleId));
+          for (const item of res?.success || []) {
+            const normalized = {
+              ...item,
+              marketplace: labels[channel],
+              orderId: resultId(item),
+              saleId: resultId(item),
+              outcome: item.alreadyProcessed ? 'already_processed' : 'processed_now',
+            };
+            if (item.alreadyProcessed) aggregate.alreadyProcessed.push(normalized);
+            else aggregate.processedNow.push(normalized);
+          }
+          for (const item of res?.failed || []) {
+            aggregate.failed.push({
+              ...item,
+              marketplace: labels[channel],
+              orderId: resultId(item),
+              saleId: resultId(item),
+              outcome: 'failed',
+            });
+          }
+        } catch (err) {
+          for (const item of batch) {
+            aggregate.failed.push({
+              marketplace: labels[channel],
+              orderId: resultId(item),
+              saleId: resultId(item),
+              sku: item.sku,
+              uid: item.uid,
+              outcome: 'failed',
+              reason: err?.message || 'Falha de comunicação durante o processamento.',
+            });
+          }
         }
       }
-
-      return aggregate;
-    } catch (err) {
-      console.error('Erro ao processar vendas em lote:', err);
-      throw new Error('Falha ao processar vendas em lote.');
     }
+
+    return {
+      ...aggregate,
+      success: [...aggregate.processedNow, ...aggregate.alreadyProcessed],
+    };
   };
 
   const subscribeToSync = (clientId) => {

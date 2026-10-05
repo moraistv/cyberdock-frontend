@@ -300,8 +300,8 @@
                 <div class="sale-cards-list" ref="salesTableBodyRef">
                     <div v-for="sale in paginatedUserSales" :key="`${sale.id}-${sale.sku}`" 
                          class="sale-card"
-                         :class="{ 
-                            'sale-card--cancelled': userRole === 'master' && (sale.raw_api_data?.status === 'cancelled'),
+                         :class="{
+                            'sale-card--cancelled': userRole === 'master' && isCancelledSale(sale),
                             'sale-card--unprocessed': !sale.processed_at
                          }">
                         
@@ -550,6 +550,7 @@
 import { defineProps, ref, onMounted, onUnmounted, computed, watch, nextTick, toRefs, reactive } from 'vue';
 import { formatVariation } from '@/utils/variation';
 import { saleMarketplace, marketplaceLabel, marketplaceLogo } from '@/utils/marketplaces';
+import { marketplaceStatusLabel, tiktokShippingModeLabel } from '@/utils/marketplacePresentation';
 import gsap from 'gsap';
 import { useSalesForUser } from '@/composables/useSalesForUser';
 import { useUserStorage } from '@/composables/useUserStorage';
@@ -1516,7 +1517,16 @@ const accountFilterOptions = computed(() => {
     return optionsFrom(rows, (s) => normalizeId(getSaleAccountId(s)), (value) => labels.get(value) || value);
 });
 
-function getSaleStatusLabel(statusValue) {
+function isCancelledSale(sale) {
+    const status = sale?.sale_status || sale?.raw_api_data?.status || '';
+    return ['cancelled', 'canceled'].includes(String(status).toLowerCase());
+}
+
+function getSaleStatusLabel(statusValue, marketplace) {
+    return marketplaceStatusLabel(marketplace, statusValue, legacySaleStatusLabel);
+}
+
+function legacySaleStatusLabel(statusValue) {
     if (!statusValue) return 'Pendente';
     const map = {
         paid: 'Pago',
@@ -1532,6 +1542,9 @@ function getSaleStatusLabel(statusValue) {
 
 function getShippingTypeLabel(typeValue) {
     if (!typeValue) return 'N/A';
+    const raw = String(typeValue).trim();
+    const tiktokLabel = tiktokShippingModeLabel(raw);
+    if (tiktokLabel !== raw) return tiktokLabel;
     const map = {
         'me1': 'Mercado Envios',
         'me2': 'Mercado Envios 2',
@@ -1667,6 +1680,7 @@ const SUMMARY_ICON_SUCCESS = '<svg width="1em" height="1em" viewBox="0 0 24 24" 
 const SUMMARY_ICON_FAILED = '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:#dc2626;vertical-align:-0.15em;"><path d="M18 6 6 18" /><path d="M6 6l12 12" /></svg>';
 
 async function processAllSales() {
+    if (isProcessing.value) return;
     isProcessing.value = true;
     try {
         await loadStorageData();
@@ -1687,15 +1701,20 @@ async function processAllSales() {
         const results = await processSalesApi(salesToProcess);
         summaryModalTitle.value = 'Resumo do Processamento';
         let contentHtml = '<p>O processamento em lote foi concluído.</p>';
-        if (results.success?.length > 0) {
-            contentHtml += `<div class="summary-section success"><h4>${SUMMARY_ICON_SUCCESS} ${results.success.length} Vendas Processadas com Sucesso</h4><ul>`;
-            results.success.forEach(s => { contentHtml += `<li>Venda #${s.saleId} (SKU: ${s.sku})</li>`; });
-            contentHtml += `</ul></div>`;
+        if (results.processedNow?.length > 0) {
+            contentHtml += `<div class="summary-section success"><h4>${SUMMARY_ICON_SUCCESS} ${results.processedNow.length} Processadas agora</h4><ul>`;
+            results.processedNow.forEach((s) => { contentHtml += `<li>${s.marketplace} #${s.saleId} (SKU: ${s.sku})</li>`; });
+            contentHtml += '</ul></div>';
+        }
+        if (results.alreadyProcessed?.length > 0) {
+            contentHtml += `<div class="summary-section"><h4>${results.alreadyProcessed.length} Já estavam processadas</h4><ul>`;
+            results.alreadyProcessed.forEach((s) => { contentHtml += `<li>${s.marketplace} #${s.saleId} (SKU: ${s.sku})</li>`; });
+            contentHtml += '</ul></div>';
         }
         if (results.failed?.length > 0) {
-            contentHtml += `<div class="summary-section failed"><h4>${SUMMARY_ICON_FAILED} ${results.failed.length} Vendas Falharam</h4><ul>`;
-            results.failed.forEach(f => { contentHtml += `<li>Venda #${f.saleId} (SKU: ${f.sku}): <strong>${f.reason}</strong></li>`; });
-            contentHtml += `</ul></div>`;
+            contentHtml += `<div class="summary-section failed"><h4>${SUMMARY_ICON_FAILED} ${results.failed.length} Falharam</h4><ul>`;
+            results.failed.forEach((f) => { contentHtml += `<li>${f.marketplace} #${f.saleId} (SKU: ${f.sku}): <strong>${f.reason}</strong></li>`; });
+            contentHtml += '</ul></div>';
         }
         summaryModalContent.value = contentHtml;
         isSummaryModalOpen.value = true;
@@ -1712,7 +1731,7 @@ async function processAllSales() {
 }
 
 async function processSelectedSales() {
-    if (selectedSaleKeys.value.size === 0) return;
+    if (isProcessing.value || selectedSaleKeys.value.size === 0) return;
     isProcessing.value = true;
     try {
         await loadStorageData();
@@ -1730,15 +1749,20 @@ async function processSelectedSales() {
         const results = await processSalesApi(salesToProcess);
         summaryModalTitle.value = 'Resumo do Processamento (Selecionadas)';
         let contentHtml = '<p>O processamento das vendas selecionadas foi concluído.</p>';
-        if (results.success?.length > 0) {
-            contentHtml += `<div class="summary-section success"><h4>${results.success.length} venda(s) processada(s) com sucesso</h4><ul>`;
-            results.success.forEach(s => { contentHtml += `<li>Venda #${s.saleId} (SKU: ${s.sku})</li>`; });
-            contentHtml += `</ul></div>`;
+        if (results.processedNow?.length > 0) {
+            contentHtml += `<div class="summary-section success"><h4>${results.processedNow.length} processada(s) agora</h4><ul>`;
+            results.processedNow.forEach((s) => { contentHtml += `<li>${s.marketplace} #${s.saleId} (SKU: ${s.sku})</li>`; });
+            contentHtml += '</ul></div>';
+        }
+        if (results.alreadyProcessed?.length > 0) {
+            contentHtml += `<div class="summary-section"><h4>${results.alreadyProcessed.length} já estava(m) processada(s)</h4><ul>`;
+            results.alreadyProcessed.forEach((s) => { contentHtml += `<li>${s.marketplace} #${s.saleId} (SKU: ${s.sku})</li>`; });
+            contentHtml += '</ul></div>';
         }
         if (results.failed?.length > 0) {
-            contentHtml += `<div class="summary-section failed"><h4>${results.failed.length} venda(s) falharam</h4><ul>`;
-            results.failed.forEach(f => { contentHtml += `<li>Venda #${f.saleId} (SKU: ${f.sku}): <strong>${f.reason}</strong></li>`; });
-            contentHtml += `</ul></div>`;
+            contentHtml += `<div class="summary-section failed"><h4>${results.failed.length} falharam</h4><ul>`;
+            results.failed.forEach((f) => { contentHtml += `<li>${f.marketplace} #${f.saleId} (SKU: ${f.sku}): <strong>${f.reason}</strong></li>`; });
+            contentHtml += '</ul></div>';
         }
         summaryModalContent.value = contentHtml;
         isSummaryModalOpen.value = true;

@@ -438,7 +438,7 @@
                                             <span class="sale-card__spec">
                                                 <span class="sale-card__spec-label">Venda:</span>
                                                 <span class="sale-card__spec-value">
-                                                    {{ getSaleStatusLabel(sale.raw_api_data?.status || sale.sale_status) }}
+                                                    {{ getSaleStatusLabel(sale.raw_api_data?.status || sale.sale_status, saleMarketplace(sale)) }}
                                                 </span>
                                             </span>
                                             <span class="sale-card__divider">|</span>
@@ -721,6 +721,7 @@ import { useNotification } from '@/composables/useNotification';
 import {
     MK_LOGOS, MARKETPLACE_OPTIONS, saleMarketplace, marketplacePlatform, marketplaceLabel as mkLabel,
 } from '@/utils/marketplaces';
+import { marketplaceStatusLabel } from '@/utils/marketplacePresentation';
 
 const notify = useNotification();
 
@@ -946,7 +947,17 @@ function getProductLink(sale) {
     return null;
 }
 
-function getSaleStatusLabel(statusValue) {
+/**
+ * Rótulo do status da venda. O valor cru segue sendo o value do filtro e da
+ * API; só o texto muda. `marketplace` é o canal da venda. Sem ele (opção de
+ * filtro, que mistura canais), só o que é status do TikTok é traduzido.
+ */
+function getSaleStatusLabel(statusValue, marketplace) {
+    return marketplaceStatusLabel(marketplace, statusValue, legacySaleStatusLabel);
+}
+
+// Mercado Livre e Shopee: os rótulos que a tela já tinha.
+function legacySaleStatusLabel(statusValue) {
     if (!statusValue) return 'Pendente';
     const map = { paid: 'Pago', ready_to_ship: 'Pronto para Envio', shipped: 'Enviado', delivered: 'Entregue', cancelled: 'Cancelado', canceled: 'Cancelado', pending: 'Pendente', handling: 'Em Manuseio' };
     const key = String(statusValue).toLowerCase();
@@ -1252,7 +1263,13 @@ async function processSingleSale(sale) {
         const failure = result?.failed?.[0];
         if (failure) throw new Error(failure.reason || 'Falha ao processar a venda.');
 
-        sale.processed_at = new Date().toISOString();
+        const success = result?.success?.[0];
+        if (!success) throw new Error('O servidor não confirmou o processamento da venda.');
+
+        /* Nunca fabrica horário no navegador. Em replay, preserva exatamente a
+         * data original; em baixa nova, usa o processedAt confirmado pelo banco. */
+        const processedAt = success.processedAt || success.processed_at;
+        if (processedAt) sale.processed_at = processedAt;
     } catch (err) {
         console.error('Erro ao processar venda:', err);
         notify.fromError(err, 'Erro ao processar venda');

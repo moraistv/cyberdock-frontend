@@ -408,6 +408,7 @@ import { useAuth } from '@/composables/useAuth';
 import { useNotification } from '@/composables/useNotification';
 import { formatVariation } from '@/utils/variation';
 import { MK_LOGOS, saleMarketplace, marketplaceLabel as mkLabel } from '@/utils/marketplaces';
+import { tiktokOrderStatusLabel } from '@/utils/marketplacePresentation';
 
 const api = useApi();
 const { user } = useAuth();
@@ -481,6 +482,7 @@ function statusLabel(item) {
   const status = String(item.shipping_status_live || item.shipping_status || '').toLowerCase();
   if (['shipped', 'delivered', 'completed', 'expedited', 'in_transit'].includes(status)) return 'Despachado';
   if (['cancelled', 'canceled'].includes(status)) return 'Cancelado';
+  if (item.shipping_status_live && saleMarketplace(item) === 'TikTok') return tiktokOrderStatusLabel(status);
   return status ? status.replaceAll('_', ' ') : 'A despachar';
 }
 

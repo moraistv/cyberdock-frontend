@@ -351,7 +351,7 @@
 
                     <div class="status-pill" :data-status="account.status">
                       <span class="status-dot" :class="account.status"></span>
-                      {{ getStatusText(account.status) }}
+                      {{ getStatusText(account.status, 'tiktok') }}
                     </div>
                   </header>
 
@@ -477,6 +477,7 @@ import { useApi } from '@/composables/useApi';
 import { useSyncManager } from '@/composables/useSyncManager';
 import { useShopeeSyncManager } from '@/composables/useShopeeSyncManager';
 import { useTikTokSyncManager } from '@/composables/useTikTokSyncManager';
+import { tiktokAccountStatusLabel } from '@/utils/marketplacePresentation';
 
 const {
   user, userRole, isAuthReady,
@@ -779,7 +780,9 @@ const hoverCard = (e, entering) => {
 //   }
 // };
 
-const getStatusText = (status) => {
+const getStatusText = (status, platform) => {
+  // TikTok: o texto vem de marketplacePresentation. ML e Shopee seguem no mapa abaixo.
+  if (platform === 'tiktok') return tiktokAccountStatusLabel(status);
   const map = { active: 'Ativa', attention: 'Atenção', error: 'Erro', reconnect_needed: 'Reconectar' };
   return map[status] || 'Inativa';
 };

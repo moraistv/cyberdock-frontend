@@ -159,6 +159,8 @@
 import { computed, defineProps } from 'vue';
 import logo from '@/assets/logo.png';
 import { formatVariation } from '@/utils/variation';
+import { saleMarketplace } from '@/utils/marketplaces';
+import { tiktokOrderStatusLabel } from '@/utils/marketplacePresentation';
 
 const props = defineProps({
   rows: { type: Array, default: () => [] },
@@ -205,6 +207,9 @@ function statusLabel(item) {
   const status = String(item.shipping_status_live || item.shipping_status || '').toLowerCase();
   if (['shipped', 'delivered', 'completed', 'expedited', 'in_transit'].includes(status)) return 'Despachado';
   if (['cancelled', 'canceled'].includes(status)) return 'Cancelado';
+  // No TikTok, `shipping_status_live` é o status do pedido na API (awaiting_shipment,
+  // on_hold...). Sem ele, `status` é o estado interno de expedição, que já é texto nosso.
+  if (item.shipping_status_live && saleMarketplace(item) === 'TikTok') return tiktokOrderStatusLabel(status);
   return status ? status.replaceAll('_', ' ') : 'A despachar';
 }
 

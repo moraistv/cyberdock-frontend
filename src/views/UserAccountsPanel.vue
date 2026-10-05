@@ -181,6 +181,7 @@ import ToastNotification from '../components/ToastNotification.vue';
 import { useUserAccounts } from '@/composables/useUserAccounts';
 import { useConfirm } from '@/composables/useConfirm';
 import { MK_LOGOS } from '@/utils/marketplaces';
+import { tiktokAccountStatusLabel } from '@/utils/marketplacePresentation';
 
 const props = defineProps({
   userId: { type: String, required: true },
@@ -235,12 +236,7 @@ const formatDate = (value) => {
  * Reconectar exige passar pelo OAuth do marketplace de novo, então a
  * confirmação diz isso em vez de um "tem certeza?" genérico.
  */
-const tiktokStatusText = (status) => {
-  if (status === 'active') return 'Ativa';
-  if (status === 'reconnect_needed') return 'Reconectar';
-  if (status === 'error') return 'Erro';
-  return status || 'Indefinida';
-};
+const tiktokStatusText = (status) => tiktokAccountStatusLabel(status);
 
 const CHANNEL_NOUN = {
   ml: 'conta do Mercado Livre',

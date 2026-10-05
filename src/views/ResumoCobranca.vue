@@ -86,6 +86,15 @@
                                 </p>
                                 <p v-if="currentInvoice.paymentDate" class="card-description">Pago em: {{ currentInvoice.paymentDate }}</p>
                                 <p v-else class="card-description">Aguardando pagamento.</p>
+                                <!-- Só aparece com cobrança emitida no Asaas e fatura em aberto. -->
+                                <div v-if="podePagarOnline(currentInvoice)" class="pay-online">
+                                    <a class="pay-link" :href="currentInvoice.asaasInvoiceUrl" target="_blank" rel="noopener noreferrer">
+                                        Pagar fatura<span class="sr-only"> (abre em nova aba)</span>
+                                    </a>
+                                    <span v-if="asaasStatusLabel(currentInvoice.asaasStatus)" class="pay-online__status">
+                                        Cobrança: {{ asaasStatusLabel(currentInvoice.asaasStatus) }}
+                                    </span>
+                                </div>
                             </article>
 
                             <article class="stat-card">
@@ -249,6 +258,17 @@
                                 <strong :class="['status-badge', getStatusClass(selectedInvoiceForModal.status)]">{{ getStatusLabel(selectedInvoiceForModal.status) }}</strong>
                             </div>
                             <div v-if="selectedInvoiceForModal.paymentDate"><span>Pago em</span><strong>{{ selectedInvoiceForModal.paymentDate }}</strong></div>
+                            <template v-if="podePagarOnline(selectedInvoiceForModal)">
+                                <div v-if="asaasStatusLabel(selectedInvoiceForModal.asaasStatus)">
+                                    <span>Cobrança</span><strong>{{ asaasStatusLabel(selectedInvoiceForModal.asaasStatus) }}</strong>
+                                </div>
+                                <div>
+                                    <span>Pagar online</span>
+                                    <a class="pay-link" :href="selectedInvoiceForModal.asaasInvoiceUrl" target="_blank" rel="noopener noreferrer">
+                                        Pagar fatura<span class="sr-only"> (abre em nova aba)</span>
+                                    </a>
+                                </div>
+                            </template>
                         </div>
 
                         <!-- Agrupado por categoria com subtotal, no lugar de um
@@ -292,6 +312,7 @@ import gsap from 'gsap';
 import UniversalModal from '@/components/UniversalModal.vue';
 import SidebarComponent from '@/components/SidebarComponent.vue';
 import TopbarComponent from '@/components/TopbarComponent.vue';
+import { asaasStatusLabel } from '@/utils/asaasStatus';
 
 const props = defineProps({
     userId: {
@@ -389,6 +410,18 @@ function groupedItems(invoice) {
 // Serviços pontuais da competência selecionada, exibidos em cards próprios.
 const manualItems = computed(() => (currentInvoice.value?.items || []).filter((i) => i.type === 'manual'));
 const manualTotal = computed(() => manualItems.value.reduce((sum, i) => sum + parseFloat(i.total_price || 0), 0));
+
+/**
+ * Cobrança do Asaas que o cliente ainda pode pagar: fatura em aberto e com link do
+ * provedor. `DELETED` fica de fora porque o link de uma cobrança removida no Asaas
+ * não leva a lugar nenhum; e só `https` passa porque o link vem de fora e vai para
+ * um `href`.
+ */
+const podePagarOnline = (invoice) =>
+    Boolean(invoice)
+    && invoice.status !== 'paid'
+    && /^https:\/\//i.test(invoice.asaasInvoiceUrl || '')
+    && String(invoice.asaasStatus || '').trim().toUpperCase() !== 'DELETED';
 
 const handlePeriodChange = () => {
     if (targetUserId.value) {
@@ -615,6 +648,13 @@ button, select { font-family: var(--font-sans); }
 .details-button svg { width: 0.85rem; height: 0.85rem; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .details-button:hover { color: #fff; border-color: var(--billing-blue-700); background: var(--billing-blue-700); }
 .details-button:focus-visible { outline: 3px solid rgba(2, 132, 199, 0.25); outline-offset: 2px; }
+
+/* Pagamento online: link da cobrança no Asaas + status traduzido. */
+.pay-online { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.65rem; margin-top: 0.7rem; }
+.pay-online__status { color: var(--billing-muted); font-size: 0.7rem; font-weight: 650; }
+.pay-link { display: inline-flex; align-items: center; align-self: flex-start; padding: 0.42rem 0.8rem; color: #fff; border-radius: 0.5rem; background: var(--billing-blue-700); font-size: 0.74rem; font-weight: 750; text-decoration: none; transition: background-color 0.2s; }
+.pay-link:hover { background: var(--billing-blue-800); }
+.pay-link:focus-visible { outline: 3px solid rgba(2, 132, 199, 0.25); outline-offset: 2px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .error-state { display: flex; align-items: center; justify-content: center; gap: 0.65rem; padding: 1.2rem; color: #b42318; border: 1px solid #f4c7c3; border-radius: 0.8rem; background: #fff5f4; font-size: 0.85rem; font-weight: 650; }

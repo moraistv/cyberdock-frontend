@@ -3,6 +3,51 @@
     <div class="main-content">
       <div class="dashboard-content" ref="contentArea">
 
+        <!-- ============ Teste da integração com o Asaas ============
+             Ponto fixo no topo, FORA do bloco de carregamento/erro e do cartão da
+             fatura. O teste serve justamente para quando a cobrança não funciona,
+             então não pode sumir junto com a fatura (competência sem fatura), nem
+             piscar a cada recarregamento da lista. A região viva fica sempre no
+             DOM: leitor de tela só anuncia mudança em região que já existia. -->
+        <section class="integration-check" aria-label="Integração com o Asaas">
+          <div class="integration-check__head">
+            <span class="charge-box__label">Integração Asaas</span>
+            <button
+              ref="botaoTestar"
+              type="button"
+              class="charge-btn charge-btn--solid"
+              :disabled="isIntegrationBusy"
+              title="Consulta o Asaas agora: ambiente, chave, webhook e conexão. Não cria nada"
+              @click="testarIntegracao"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              {{ isTestingIntegration ? 'Testando...' : 'Testar integração' }}
+            </button>
+            <button
+              v-if="temEventosPendentes"
+              type="button"
+              class="charge-btn charge-btn--ghost"
+              :disabled="isIntegrationBusy"
+              title="Tenta aplicar de novo os eventos que o Asaas enviou e o sistema ainda não processou"
+              @click="reprocessarPendentes"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              {{ isReprocessing ? 'Reprocessando...' : 'Reprocessar pendentes' }}
+            </button>
+          </div>
+
+          <div aria-live="polite" :aria-busy="isIntegrationBusy">
+            <dl v-if="resumoIntegracao.length" class="invoice-hero__facts integration-check__facts">
+              <div v-for="item in resumoIntegracao" :key="item.chave">
+                <dt>{{ item.rotulo }}</dt>
+                <dd :class="`is-${item.tom}`" :title="item.dica">{{ item.valor }}</dd>
+              </div>
+            </dl>
+            <p v-if="integracaoErro" class="charge-box__msg is-error">{{ integracaoErro }}</p>
+            <p v-if="reprocessMessage" class="charge-box__msg">{{ reprocessMessage }}</p>
+          </div>
+        </section>
+
         <div v-if="isLoading" class="skeleton-loader">
           <div class="sk-header"></div>
           <div class="sk-filters">
@@ -151,7 +196,7 @@
               <div class="charge-box__head">
                 <span class="charge-box__label">Cobrança</span>
                 <span v-if="temCobranca" class="charge-box__status">
-                  {{ currentInvoice.asaasStatus || 'emitida' }}
+                  {{ asaasStatusLabel(currentInvoice.asaasStatus) || 'emitida' }}
                 </span>
                 <span v-else class="charge-box__status is-off">não emitida</span>
               </div>
@@ -382,7 +427,7 @@
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>
                   Cobrança
                 </span>
-                <strong>{{ detailsInvoice.asaasStatus }}</strong>
+                <strong>{{ asaasStatusLabel(detailsInvoice.asaasStatus) }}</strong>
               </div>
             </div>
 
@@ -774,7 +819,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, defineProps } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, defineProps } from 'vue';
 import { useBilling } from '@/composables/useBilling';
 import { useConfirm } from '@/composables/useConfirm';
 import UniversalModal from '@/components/UniversalModal.vue';
@@ -785,6 +830,8 @@ import {
   apenasDigitos, mascaraDocumento, mascaraCep, mascaraTelefone, mascaraUf,
   erroDocumento, erroCep, erroTelefone, tipoDocumento,
 } from '@/utils/documentoFiscal';
+/* Status cru do Asaas em português ("PENDING" -> "Aguardando pagamento"). */
+import { asaasStatusLabel } from '@/utils/asaasStatus';
 
 const props = defineProps({
   userId: { type: String, default: null },
@@ -803,6 +850,8 @@ const {
   deleteManualItem,
   closeInvoicePeriod,
   reopenInvoicePeriod,
+  fetchAsaasStatus,
+  reprocessAsaasWebhooks,
   fetchBillingInfo,
   saveBillingInfo,
   ensureAsaasCustomer,
@@ -1113,16 +1162,42 @@ const passoAtual = computed(() => {
     };
   }
 
+  const statusCobranca = asaasStatusLabel(fatura.asaasStatus);
   return {
     icone: ICONES_PASSO.relogio,
     titulo: 'Passo 3 de 3: aguardando o pagamento.',
-    texto: `Cobrança emitida${fatura.asaasStatus ? ` (${fatura.asaasStatus})` : ''}. `
+    texto: `Cobrança emitida${statusCobranca ? ` (${statusCobranca})` : ''}. `
       + 'O provedor avisa quando o cliente pagar; "Sincronizar" confere na hora.',
   };
 });
 
 /** Código de erro do backend, quando existir. */
 const codigoDoErro = (e) => e?.data?.code || null;
+
+/**
+ * Texto de erro para o master, a partir do `code` que o backend devolve.
+ *
+ * Só entram aqui os códigos em que a mensagem crua do servidor não diz o que
+ * fazer (ou não é a mais útil para quem opera a tela). Os demais — entre eles
+ * `payment_mismatch`, cuja mensagem já é PT-BR e aponta a divergência entre a
+ * cobrança do Asaas e a fatura, e `invalid_billing_type` — mostram o que o
+ * servidor escreveu, com `padrao` como reserva quando não veio texto.
+ */
+function mensagemDeErroCobranca(e, padrao) {
+  switch (codigoDoErro(e)) {
+    case 'billing_busy':
+      return 'Outra operação desta cobrança ainda está em andamento. Aguarde alguns segundos e tente de novo.';
+    case 'provider_unauthorized':
+      return 'O Asaas recusou a chave de API. Confira ASAAS_API_KEY e ASAAS_ENV no servidor e use "Testar integração".';
+    case 'not_configured':
+      return 'Integração com o Asaas não configurada no servidor (ASAAS_API_KEY).';
+    case 'timeout':
+    case 'network_error':
+      return 'O Asaas não respondeu a tempo. Nada foi duplicado; tente novamente em instantes.';
+    default:
+      return e?.message || padrao;
+  }
+}
 
 /* ---------------- Dados de cobrança do cliente (modal) ----------------
  *
@@ -1141,6 +1216,9 @@ const billingFormError = ref('');
 const camposFaltando = ref([]);
 /** Quando o modal foi aberto por uma emissão recusada, salvar continua o fluxo. */
 const retomarEmissaoAoSalvar = ref(false);
+/** O cliente já existe no Asaas? Vem do GET que abre o formulário (`linkedToProvider`) e
+ *  serve de reserva caso a resposta do PUT não traga `user.asaas_customer_id`. */
+const clienteVinculadoAoAbrir = ref(false);
 
 const billingForm = ref({
   cpfCnpj: '', phone: '',
@@ -1179,10 +1257,12 @@ async function abrirDadosDeCobranca({ retomarEmissao = false, faltando = [] } = 
   billingFormError.value = '';
   retomarEmissaoAoSalvar.value = retomarEmissao;
   camposFaltando.value = faltando;
+  clienteVinculadoAoAbrir.value = false;
   isBillingInfoModalOpen.value = true;
 
   try {
-    const { user, faltando: doServidor } = await fetchBillingInfo(targetUserId.value);
+    const { user, faltando: doServidor, linkedToProvider } = await fetchBillingInfo(targetUserId.value);
+    clienteVinculadoAoAbrir.value = Boolean(linkedToProvider);
     billingForm.value = {
       cpfCnpj: user.cpfCnpjFormatted || '',
       phone: user.phone || '',
@@ -1214,17 +1294,32 @@ function closeBillingInfoModal() {
  * A sequência é gravar -> vincular no provedor -> emitir. O vínculo entra no
  * meio porque é ele que leva o documento e o endereço para lá; salvar no nosso
  * banco não atualiza o cadastro do provedor por conta própria.
+ *
+ * Fora da retomada vale o mesmo para o cliente que JÁ está vinculado: salvar só
+ * gravaria no banco local e o cadastro do Asaas ficaria desatualizado sem
+ * ninguém saber. Então o vínculo é refeito aqui (`atualizarCadastroNoAsaas`).
+ * Na retomada ele já acontece no fluxo abaixo, por isso não se chama duas vezes.
  */
 async function salvarDadosDeCobranca() {
   billingFormError.value = '';
   isSavingBillingInfo.value = true;
+  let dadosSalvos = false;
   try {
-    await saveBillingInfo(targetUserId.value, { ...billingForm.value });
+    const resposta = await saveBillingInfo(targetUserId.value, { ...billingForm.value });
+    dadosSalvos = true;
     const eraRetomada = retomarEmissaoAoSalvar.value;
+    const jaVinculado = Boolean(resposta?.user?.asaas_customer_id) || clienteVinculadoAoAbrir.value;
     closeBillingInfoModal();
 
     if (!eraRetomada) {
-      chargeMessage.value = 'Dados de cobrança salvos.';
+      if (!jaVinculado) {
+        limparAvisosDeCobranca();
+        chargeMessage.value = 'Dados de cobrança salvos.';
+        return;
+      }
+      // Os dados já estão gravados: o modal não precisa ficar preso em "Salvando...".
+      isSavingBillingInfo.value = false;
+      await atualizarCadastroNoAsaas();
       return;
     }
 
@@ -1233,6 +1328,14 @@ async function salvarDadosDeCobranca() {
     isSavingBillingInfo.value = false;
     await emitirCobranca();
   } catch (e) {
+    /* Falhou DEPOIS de salvar, já com o modal fechado (o vínculo da retomada): o erro de
+     * formulário não apareceria em lugar nenhum, então ele vai para o painel de cobrança. */
+    if (dadosSalvos) {
+      limparAvisosDeCobranca();
+      chargeError.value = 'Dados salvos aqui, mas não foi possível vincular o cliente ao Asaas: '
+        + mensagemDeErroCobranca(e, 'motivo não informado');
+      return;
+    }
     /* O backend responde 400 com `field`, e 409 com `code: document_already_used`
      * quando o documento está em outro cadastro — que quase sempre é cliente
      * duplicado, e a mensagem já diz de quem é. */
@@ -1240,6 +1343,32 @@ async function salvarDadosDeCobranca() {
     camposFaltando.value = e?.data?.field ? [e.data.field] : camposFaltando.value;
   } finally {
     isSavingBillingInfo.value = false;
+  }
+}
+
+/**
+ * Atualiza no Asaas o cadastro de um cliente já vinculado, depois de salvar aqui.
+ *
+ * `ensureAsaasCustomer` é idempotente e, com o cliente vinculado, atualiza o
+ * cadastro remoto. Se o Asaas recusar, os dados continuam salvos — a mensagem diz
+ * as duas coisas, para ninguém achar que o salvamento local falhou. Fica em
+ * `isChargeBusy` enquanto roda, para não haver emissão em paralelo com a troca
+ * do cadastro.
+ */
+async function atualizarCadastroNoAsaas() {
+  limparAvisosDeCobranca();
+  chargeMessage.value = 'Dados salvos. Atualizando o cadastro no Asaas...';
+  isChargeBusy.value = true;
+  try {
+    await ensureAsaasCustomer(targetUserId.value);
+    limparAvisosDeCobranca();
+    chargeMessage.value = 'Dados salvos e cadastro atualizado no Asaas.';
+  } catch (e) {
+    limparAvisosDeCobranca();
+    chargeError.value = 'Dados salvos aqui, mas o Asaas recusou a atualização: '
+      + mensagemDeErroCobranca(e, 'motivo não informado');
+  } finally {
+    isChargeBusy.value = false;
   }
 }
 
@@ -1326,7 +1455,7 @@ async function emitirCobranca({ dryRun = false, dueDate = null } = {}) {
           });
           return;
         }
-        chargeError.value = erroCliente.message;
+        chargeError.value = mensagemDeErroCobranca(erroCliente, 'Não foi possível vincular o cliente ao Asaas.');
         return;
       }
     }
@@ -1344,7 +1473,7 @@ async function emitirCobranca({ dryRun = false, dueDate = null } = {}) {
       return await emitirCobranca({ dryRun, dueDate: nova.trim() });
     }
 
-    chargeError.value = e.message || 'Não foi possível emitir a cobrança.';
+    chargeError.value = mensagemDeErroCobranca(e, 'Não foi possível emitir a cobrança.');
   } finally {
     isChargeBusy.value = false;
   }
@@ -1356,11 +1485,11 @@ async function sincronizarCobranca() {
   isChargeBusy.value = true;
   try {
     const r = await syncCharge(targetUserId.value, currentInvoice.value.period);
-    chargeMessage.value = `Provedor: ${r.status}`
+    chargeMessage.value = `Provedor: ${asaasStatusLabel(r.status) || 'sem status'}`
       + (r.statusLocal ? ` — fatura marcada como ${r.statusLocal === 'paid' ? 'paga' : 'em aberto'}.` : '.');
     await recarregarFatura();
   } catch (e) {
-    chargeError.value = e.message || 'Não foi possível sincronizar.';
+    chargeError.value = mensagemDeErroCobranca(e, 'Não foi possível sincronizar.');
   } finally {
     isChargeBusy.value = false;
   }
@@ -1385,7 +1514,7 @@ async function alterarVencimento() {
     chargeMessage.value = `Vencimento alterado para ${r.dueDate}.`;
     await recarregarFatura();
   } catch (e) {
-    chargeError.value = e.message || 'Não foi possível alterar o vencimento.';
+    chargeError.value = mensagemDeErroCobranca(e, 'Não foi possível alterar o vencimento.');
   } finally {
     isChargeBusy.value = false;
   }
@@ -1410,9 +1539,130 @@ async function cancelarCobranca() {
     chargeMessage.value = 'Cobrança cancelada.';
     await recarregarFatura();
   } catch (e) {
-    chargeError.value = e.message || 'Não foi possível cancelar a cobrança.';
+    chargeError.value = mensagemDeErroCobranca(e, 'Não foi possível cancelar a cobrança.');
   } finally {
     isChargeBusy.value = false;
+  }
+}
+
+/* ---------------- Teste da integração com o Asaas ----------------
+ *
+ * Diagnóstico sob demanda: ambiente, chave, webhook, conexão e fila de eventos
+ * pendentes. Não depende da fatura selecionada nem de o cliente ter cobrança,
+ * porque o motivo típico de abrir isto é "a cobrança não está funcionando".
+ * ----------------------------------------------------------------- */
+
+const isTestingIntegration = ref(false);
+const isReprocessing = ref(false);
+const isIntegrationBusy = computed(() => isTestingIntegration.value || isReprocessing.value);
+/** Última resposta do teste. `null` antes do primeiro clique e depois de uma falha de requisição. */
+const integracao = ref(null);
+/** Falha da REQUISIÇÃO. Integração mal configurada não cai aqui: vem dentro do resultado. */
+const integracaoErro = ref('');
+const reprocessMessage = ref('');
+const botaoTestar = ref(null);
+
+const temEventosPendentes = computed(() => Number(integracao.value?.pendingWebhookEvents) > 0);
+
+/**
+ * Linhas do resultado, já com texto e tom (`ok`, `warn`, `bad`).
+ *
+ * O tom é o que separa "está certo" de "olhe isto" sem depender só da cor: o
+ * texto de cada linha diz o estado por extenso.
+ */
+const resumoIntegracao = computed(() => {
+  const s = integracao.value;
+  if (!s) return [];
+
+  let ambiente = { valor: s.environment || 'não informado', tom: 'warn' };
+  if (s.environment === 'production') ambiente = { valor: 'Produção', tom: 'ok' };
+  if (s.environment === 'sandbox') {
+    ambiente = { valor: 'Sandbox (testes, cobranças NÃO são reais)', tom: 'warn' };
+  }
+
+  // A chave nunca chega inteira: o backend manda só os 4 últimos dígitos.
+  const chave = s.apiKeyPreview
+    ? { valor: s.apiKeyPreview, tom: 'ok' }
+    : { valor: 'não configurada', tom: 'bad' };
+
+  // Token inválido vem antes de "configurado": ele existe, mas o servidor o recusa.
+  let webhook = { valor: 'token ausente', tom: 'warn' };
+  if (s.webhookTokenInvalid) {
+    webhook = { valor: 'token inválido: use 32 a 255 caracteres', tom: 'bad' };
+  } else if (s.webhookTokenConfigured) {
+    webhook = { valor: 'token configurado', tom: 'ok' };
+  }
+
+  const conexao = s.reachable
+    ? { valor: typeof s.elapsedMs === 'number' ? `ok, ${Math.round(s.elapsedMs)} ms` : 'ok', tom: 'ok' }
+    : { valor: `falhou: ${s.motivo || s.code || 'motivo não informado'}`, tom: 'bad' };
+
+  const pendentes = Number.isFinite(s.pendingWebhookEvents)
+    ? { valor: String(s.pendingWebhookEvents), tom: s.pendingWebhookEvents > 0 ? 'warn' : 'ok' }
+    : { valor: 'indisponível', tom: 'warn' };
+
+  return [
+    { chave: 'ambiente', rotulo: 'Ambiente', dica: s.baseUrl, ...ambiente },
+    { chave: 'chave', rotulo: 'Chave', ...chave },
+    { chave: 'webhook', rotulo: 'Webhook', ...webhook },
+    { chave: 'conexao', rotulo: 'Conexão', ...conexao },
+    { chave: 'pendentes', rotulo: 'Eventos pendentes', ...pendentes },
+  ];
+});
+
+/** Consulta o backend e guarda o resultado, ou o erro da requisição. Nunca lança. */
+async function consultarIntegracao() {
+  isTestingIntegration.value = true;
+  try {
+    integracao.value = await fetchAsaasStatus();
+    integracaoErro.value = '';
+  } catch (e) {
+    // Resultado antigo ao lado de uma falha nova enganaria: some junto.
+    integracao.value = null;
+    integracaoErro.value = e.message || 'Não foi possível consultar a integração com o Asaas.';
+  } finally {
+    isTestingIntegration.value = false;
+  }
+}
+
+/**
+ * Quem navega por teclado perde o lugar quando o botão clicado é desabilitado
+ * durante a operação, ou some no fim dela (o de reprocessar, sem pendência): o
+ * foco cai para o <body>. Devolve ao botão de teste, que sempre existe, e não
+ * mexe em nada se o foco já estiver em outro elemento.
+ */
+async function devolverFocoAoTeste() {
+  await nextTick();
+  const foco = document.activeElement;
+  if (!foco || foco === document.body) botaoTestar.value?.focus();
+}
+
+async function testarIntegracao() {
+  reprocessMessage.value = '';
+  await consultarIntegracao();
+  await devolverFocoAoTeste();
+}
+
+/**
+ * Reprocessa os eventos de webhook pendentes e refaz o teste.
+ *
+ * O resumo ("processados X, falharam Y") é escrito DEPOIS do novo teste, porque
+ * o teste limpa o aviso anterior, e a contagem de pendentes exibida já é a nova.
+ */
+async function reprocessarPendentes() {
+  isReprocessing.value = true;
+  integracaoErro.value = '';
+  reprocessMessage.value = '';
+  try {
+    const r = await reprocessAsaasWebhooks();
+    await consultarIntegracao();
+    reprocessMessage.value = `Reprocessamento: processados ${Number(r?.processed) || 0}, `
+      + `falharam ${Number(r?.failed) || 0}.`;
+  } catch (e) {
+    integracaoErro.value = e.message || 'Não foi possível reprocessar os eventos pendentes.';
+  } finally {
+    isReprocessing.value = false;
+    await devolverFocoAoTeste();
   }
 }
 
@@ -1668,6 +1918,19 @@ watch(() => props.userId, (newId) => {
 .charge-btn--danger:hover:not(:disabled) { background: rgba(185, 28, 28, 0.35); }
 .charge-box__hint, .charge-box__msg { flex: 1 1 100%; margin: 0; font-size: 0.76rem; line-height: 1.45; color: rgba(255, 255, 255, 0.78); }
 .charge-box__msg.is-error { color: #fecaca; font-weight: 650; }
+
+/* Teste da integração: o mesmo cartão azul da fatura, só mais baixo. Reaproveita
+   .charge-btn, .charge-box__label/__msg e .invoice-hero__facts (grade de
+   rótulo/valor) em vez de criar outro vocabulário de botões e estados. Os três
+   tons são as versões claras de verde/âmbar/vermelho, legíveis sobre o azul. */
+.integration-check { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 0.75rem; background: var(--cd-gradient, linear-gradient(140deg, #0c3f68, #0369a1)); box-shadow: var(--cd-shadow, 0 10px 24px rgba(7, 89, 133, 0.22)); color: #fff; }
+.integration-check__head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+.integration-check__facts { grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); margin-top: 0.75rem; }
+.integration-check__facts dd { overflow-wrap: anywhere; }
+.integration-check .charge-box__msg { margin-top: 0.6rem; }
+.integration-check .is-ok { color: #bbf7d0; }
+.integration-check .is-warn { color: #fde68a; }
+.integration-check .is-bad { color: #fecaca; }
 
 /* Congelada x ainda mutável: informação que já chegava do backend e nenhuma
    tela mostrava, e é ela que responde "posso cobrar este valor?". */

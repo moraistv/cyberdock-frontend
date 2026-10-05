@@ -155,8 +155,22 @@ export function useBilling() {
    * só mostrar a mensagem crua.
    * =================================================================== */
 
-  /** Diagnóstico: chave presente, ambiente e alcance do provedor. Não cria nada. */
+  /**
+   * Diagnóstico: chave presente, ambiente e alcance do provedor. Não cria nada.
+   *
+   * Devolve `{ enabled, environment, baseUrl, apiKeyPreview, webhookTokenConfigured,
+   * webhookTokenInvalid, reachable, elapsedMs?, motivo?, code?, status?,
+   * pendingWebhookEvents }`. A chave nunca vem inteira: só os 4 últimos dígitos.
+   */
   const fetchAsaasStatus = async () => api.get('/billing/asaas/status');
+
+  /**
+   * Reprocessa os eventos de webhook do Asaas que ficaram pendentes (somente master).
+   *
+   * Devolve `{ ok, attempted, processed, failed, remaining, results }`, onde
+   * `results` traz um item por evento (`eventId`, `eventType`, `ok`, `error?`).
+   */
+  const reprocessAsaasWebhooks = async () => api.post('/billing/webhook/asaas/reprocess');
 
   /**
    * Dados de cobrança do cliente, com o que falta para poder cobrar.
@@ -214,6 +228,7 @@ export function useBilling() {
     closeInvoicePeriod,
     reopenInvoicePeriod,
     fetchAsaasStatus,
+    reprocessAsaasWebhooks,
     fetchBillingInfo,
     saveBillingInfo,
     ensureAsaasCustomer,

@@ -335,7 +335,7 @@
                 <div class="sale-cards-list" ref="salesTableBodyRef">
                     <div v-for="sale in groupedSales" :key="sale._groupKey" 
                          class="sale-card"
-                         :class="{ 'sale-card--cancelled': sale.sale_status === 'cancelled' }">
+                         :class="{ 'sale-card--cancelled': isCancelledSale(sale) }">
                         
                         <div class="sale-card__layout">
                             <!-- Chceckbox para lote (marca/desmarca todos os itens do pacote) -->
@@ -402,7 +402,7 @@
                                     <span class="sale-card__spec">
                                         <span class="sale-card__spec-label">Venda:</span>
                                         <span class="sale-card__spec-value">
-                                            {{ getSaleStatusLabel(sale.sale_status) }}
+                                            {{ getSaleStatusLabel(sale.sale_status, saleMarketplace(sale)) }}
                                         </span>
                                     </span>
                                     <span class="sale-card__divider">|</span>
@@ -570,6 +570,7 @@ import { useAuth } from '@/composables/useAuth';
 import { API_BASE_URL } from '@/config';
 import { formatVariation } from '@/utils/variation';
 import { MK_LOGOS, MARKETPLACE_OPTIONS, saleMarketplace, marketplaceLabel as mkLabel } from '@/utils/marketplaces';
+import { marketplaceStatusLabel } from '@/utils/marketplacePresentation';
 import { useNotification } from '@/composables/useNotification';
 import UniversalModal from './UniversalModal.vue';
 
@@ -1064,6 +1065,48 @@ function isSelectable(sale) {
     try { return getLabelInfo(sale).canPrint; } catch { return false; }
 }
 
+// Resultado normalizado pelo useMasterSales: os três backends usam nomes de ID
+// diferentes, mas a tela trabalha sempre com orderId/marketplace/outcome.
+function escapeSummaryHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function resultMatchesSale(result, sale) {
+    return String(result?.orderId) === String(sale?.id)
+        && String(result?.sku || '').trim().toUpperCase() === String(sale?.sku || '').trim().toUpperCase()
+        && (!result?.uid || String(result.uid) === String(sale?.uid));
+}
+
+function processingSummaryHtml(results) {
+    const sections = [
+        ['processedNow', 'Processadas agora', 'success'],
+        ['alreadyProcessed', 'Já estavam processadas', 'warning'],
+        ['failed', 'Falharam', 'failed'],
+    ];
+    let html = '';
+    for (const [key, title, css] of sections) {
+        const items = results?.[key] || [];
+        if (!items.length) continue;
+        html += `<div class="summary-section ${css}"><h4>${title}: ${items.length}</h4><ul>`;
+        for (const item of items) {
+            const channel = escapeSummaryHtml(item.marketplace || 'Marketplace');
+            const order = escapeSummaryHtml(item.orderId || 'sem ID');
+            const sku = escapeSummaryHtml(item.sku || 'sem SKU');
+            const reason = key === 'failed'
+                ? `: <strong>${escapeSummaryHtml(item.reason || 'Falha não informada.')}</strong>`
+                : '';
+            html += `<li>${channel} #${order} (SKU: ${sku})${reason}</li>`;
+        }
+        html += '</ul></div>';
+    }
+    return html;
+}
+
 // Processa (abate estoque) todos os itens pendentes+mapeados de um pacote.
 async function processGroup(group) {
     if (isProcessing.value) return;
@@ -1073,27 +1116,32 @@ async function processGroup(group) {
     try {
         const results = await processSalesApi(items);
         const failed = results.failed || [];
-        if (failed.length > 0) {
-            summaryModalTitle.value = 'Erro ao Processar Pacote';
-            let html = `<div class="summary-section failed"><h4>Falhas: ${failed.length}</h4><ul>`;
-            failed.forEach((f) => { html += `<li>Venda #${f.saleId} (SKU: ${f.sku}): <strong>${f.reason}</strong></li>`; });
-            html += `</ul></div>`;
-            if (results.success?.length) html += `<div class="summary-section success"><h4>Processadas: ${results.success.length}</h4></div>`;
-            summaryModalContent.value = html;
+        const completed = [...(results.processedNow || []), ...(results.alreadyProcessed || [])];
+
+        if (failed.length > 0 || (results.alreadyProcessed || []).length > 0) {
+            summaryModalTitle.value = failed.length > 0
+                ? 'Resultado do Processamento do Pacote'
+                : 'Pacote já processado';
+            summaryModalContent.value = processingSummaryHtml(results);
             isSummaryModalOpen.value = true;
         } else {
             showToast('Pacote processado com sucesso!', 'success');
         }
-        // Marca como processado (reativo) os itens que NÃO falharam.
-        const okItems = items.filter((it) => !failed.some((f) => String(f.saleId) === String(it.id) && String(f.sku) === String(it.sku)));
-        for (const it of okItems) {
-            const idx = sales.value.findIndex((s) => s.id === it.id && s.sku === it.sku && s.uid === it.uid);
-            if (idx !== -1) sales.value[idx] = { ...sales.value[idx], processed_at: new Date().toISOString() };
+
+        // Só o timestamp confirmado pelo servidor marca a linha. Replay entra em
+        // "já estava processada", não infla o número de baixas novas.
+        for (const result of completed) {
+            const it = items.find((sale) => resultMatchesSale(result, sale));
+            if (!it) continue;
+            const idx = sales.value.findIndex((sale) => resultMatchesSale(result, sale));
+            if (idx !== -1 && result.processedAt) {
+                sales.value[idx] = { ...sales.value[idx], processed_at: result.processedAt };
+            }
             selectedSaleIds.delete(getSaleKey(it));
         }
     } catch (err) {
         summaryModalTitle.value = 'Erro ao Processar Pacote';
-        summaryModalContent.value = `<p>Ocorreu um erro inesperado:</p><p class="error-text">${err.message}</p>`;
+        summaryModalContent.value = `<p>Ocorreu um erro inesperado:</p><p class="error-text">${escapeSummaryHtml(err.message)}</p>`;
         isSummaryModalOpen.value = true;
     } finally {
         isProcessing.value = false;
@@ -1456,7 +1504,22 @@ const getStatusLabel = (s) => {
     return ptMap[key] || (key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '));
 };
 
-function getSaleStatusLabel(statusValue) {
+function isCancelledSale(sale) {
+    const status = sale?.sale_status || sale?.raw_api_data?.status || '';
+    return ['cancelled', 'canceled'].includes(String(status).toLowerCase());
+}
+
+/**
+ * Rótulo do status da venda. O valor cru segue sendo o value do filtro e da
+ * API; só o texto muda. `marketplace` é o canal da venda. Sem ele (opção de
+ * filtro, que mistura canais), só o que é status do TikTok é traduzido.
+ */
+function getSaleStatusLabel(statusValue, marketplace) {
+    return marketplaceStatusLabel(marketplace, statusValue, legacySaleStatusLabel);
+}
+
+// Mercado Livre e Shopee: os rótulos que a tela já tinha.
+function legacySaleStatusLabel(statusValue) {
     if (!statusValue) return 'Pendente';
     const map = {
         paid: 'Pago', ready_to_ship: 'Pronto para Envio', shipped: 'Enviado',
@@ -1508,13 +1571,14 @@ function clearFilters() {
 }
 
 async function processAllSales() {
+    if (isProcessing.value) return;
     isProcessing.value = true;
     try {
         let salesToProcess = [];
-        
-        // If there are selected items, process only those. Otherwise, process all filtered processable.
+
+        // Se há seleção, processa só ela; sem seleção, usa o recorte processável.
         if (selectedSaleIds.size > 0) {
-            salesToProcess = processableSales.value.filter(sale => selectedSaleIds.has(getSaleKey(sale)));
+            salesToProcess = processableSales.value.filter((sale) => selectedSaleIds.has(getSaleKey(sale)));
         } else {
             salesToProcess = processableSales.value;
         }
@@ -1527,28 +1591,22 @@ async function processAllSales() {
         }
 
         const results = await processSalesApi(salesToProcess);
-        
-        // Clear selection after process attempt
-        deselectAll();
-        
-        summaryModalTitle.value = 'Resumo do Processamento';
-        let contentHtml = `<p>O processamento de ${salesToProcess.length} vendas foi concluído.</p>`;
-        if (results.success?.length > 0) {
-            contentHtml += `<div class="summary-section success"><h4>Processadas: ${results.success.length}</h4><ul>`;
-            results.success.forEach(s => { contentHtml += `<li>Venda #${s.saleId} (SKU: ${s.sku})</li>`; });
-            contentHtml += `</ul></div>`;
-        }
-        if (results.failed?.length > 0) {
-            contentHtml += `<div class="summary-section failed"><h4>Falharam: ${results.failed.length}</h4><ul>`;
-            results.failed.forEach(f => { contentHtml += `<li>Venda #${f.saleId} (SKU: ${f.sku}): <strong>${f.reason}</strong></li>`; });
-            contentHtml += `</ul></div>`;
-        }
-        summaryModalContent.value = contentHtml;
-        isSummaryModalOpen.value = true;
 
+        // Limpa só as seleções confirmadas; falhas continuam selecionadas para
+        // o operador corrigir e tentar de novo.
+        const completed = [...(results.processedNow || []), ...(results.alreadyProcessed || [])];
+        for (const result of completed) {
+            const sale = salesToProcess.find((item) => resultMatchesSale(result, item));
+            if (sale) selectedSaleIds.delete(getSaleKey(sale));
+        }
+
+        summaryModalTitle.value = 'Resumo do Processamento';
+        summaryModalContent.value = `<p>O processamento de ${salesToProcess.length} vendas foi concluído.</p>`
+            + processingSummaryHtml(results);
+        isSummaryModalOpen.value = true;
     } catch (err) {
         summaryModalTitle.value = 'Erro no Processamento';
-        summaryModalContent.value = `<p>Ocorreu um erro inesperado:</p><p class="error-text">${err.message}</p>`;
+        summaryModalContent.value = `<p>Ocorreu um erro inesperado:</p><p class="error-text">${escapeSummaryHtml(err.message)}</p>`;
         isSummaryModalOpen.value = true;
     } finally {
         triggerServerFetch(false);
