@@ -571,6 +571,7 @@ import { API_BASE_URL } from '@/config';
 import { formatVariation } from '@/utils/variation';
 import { MK_LOGOS, MARKETPLACE_OPTIONS, saleMarketplace, marketplaceLabel as mkLabel } from '@/utils/marketplaces';
 import { marketplaceStatusLabel } from '@/utils/marketplacePresentation';
+import { planProcessing, processedAtSuffixHtml } from '@/utils/processingFeedback';
 import { useNotification } from '@/composables/useNotification';
 import UniversalModal from './UniversalModal.vue';
 
@@ -1018,11 +1019,6 @@ const selectedSaleIds = reactive(new Set());
 // Helper to uniquely identify a sale across multiple accounts
 const getSaleKey = (s) => `${s.id}::${s.sku}::${s.uid}`;
 
-// Computed lists of sales that can be processed
-const processableSales = computed(() => {
-    return sales.value.filter(sale => !sale.processed_at && sale.is_sku_mapped);
-});
-
 // Agrupa itens do MESMO pacote/envio num único card. Quando o comprador leva
 // 2+ itens diferentes, eles vêm como várias linhas de venda com o mesmo
 // shipment (ou mesmo pedido) — aqui viram 1 card com todos os SKUs listados.
@@ -1085,7 +1081,7 @@ function resultMatchesSale(result, sale) {
 function processingSummaryHtml(results) {
     const sections = [
         ['processedNow', 'Processadas agora', 'success'],
-        ['alreadyProcessed', 'Já estavam processadas', 'warning'],
+        ['alreadyProcessed', 'Já estavam processadas (estoque não abatido de novo)', 'warning'],
         ['failed', 'Falharam', 'failed'],
     ];
     let html = '';
@@ -1097,10 +1093,14 @@ function processingSummaryHtml(results) {
             const channel = escapeSummaryHtml(item.marketplace || 'Marketplace');
             const order = escapeSummaryHtml(item.orderId || 'sem ID');
             const sku = escapeSummaryHtml(item.sku || 'sem SKU');
-            const reason = key === 'failed'
-                ? `: <strong>${escapeSummaryHtml(item.reason || 'Falha não informada.')}</strong>`
-                : '';
-            html += `<li>${channel} #${order} (SKU: ${sku})${reason}</li>`;
+            let detail = '';
+            if (key === 'failed') {
+                detail = `: <strong>${escapeSummaryHtml(item.reason || 'Falha não informada.')}</strong>`;
+            } else if (key === 'alreadyProcessed') {
+                // Quando a venda foi processada, para o operador não achar que foi agora.
+                detail = processedAtSuffixHtml(item.processedAt);
+            }
+            html += `<li>${channel} #${order} (SKU: ${sku})${detail}</li>`;
         }
         html += '</ul></div>';
     }
@@ -1122,7 +1122,12 @@ async function processGroup(group) {
             summaryModalTitle.value = failed.length > 0
                 ? 'Resultado do Processamento do Pacote'
                 : 'Pacote já processado';
-            summaryModalContent.value = processingSummaryHtml(results);
+            // Só "já processado": explica a tentativa antes da lista com data e hora.
+            const onlyAlreadyProcessed = failed.length === 0 && (results.processedNow || []).length === 0;
+            summaryModalContent.value = (onlyAlreadyProcessed
+                ? '<p>Você tentou processar um pacote cujas vendas <strong>já estavam processadas</strong>. Nada foi alterado.</p>'
+                : '')
+                + processingSummaryHtml(results);
             isSummaryModalOpen.value = true;
         } else {
             showToast('Pacote processado com sucesso!', 'success');
@@ -1574,18 +1579,20 @@ async function processAllSales() {
     if (isProcessing.value) return;
     isProcessing.value = true;
     try {
-        let salesToProcess = [];
-
-        // Se há seleção, processa só ela; sem seleção, usa o recorte processável.
-        if (selectedSaleIds.size > 0) {
-            salesToProcess = processableSales.value.filter((sale) => selectedSaleIds.has(getSaleKey(sale)));
-        } else {
-            salesToProcess = processableSales.value;
-        }
+        // Se há seleção, processa só ela; sem seleção, usa a lista atual. Só entra
+        // o que está pendente e com SKU no estoque: o resto vira mensagem clara
+        // (ex.: tentar processar uma venda que já foi processada, e quando).
+        const plan = planProcessing({
+            sales: sales.value,
+            selectedKeys: selectedSaleIds,
+            getKey: getSaleKey,
+            isSkuMapped: (sale) => Boolean(sale.is_sku_mapped),
+        });
+        const salesToProcess = plan.toProcess;
 
         if (salesToProcess.length === 0) {
-            summaryModalTitle.value = 'Nenhuma Venda para Processar';
-            summaryModalContent.value = '<p>Não foi encontrada nenhuma venda pendente com SKU correspondente no estoque para os filtros atuais.</p>';
+            summaryModalTitle.value = plan.nothingMessage.title;
+            summaryModalContent.value = plan.nothingMessage.html;
             isSummaryModalOpen.value = true;
             return;
         }
@@ -1601,7 +1608,8 @@ async function processAllSales() {
         }
 
         summaryModalTitle.value = 'Resumo do Processamento';
-        summaryModalContent.value = `<p>O processamento de ${salesToProcess.length} vendas foi concluído.</p>`
+        summaryModalContent.value = `<p>O processamento de ${salesToProcess.length} ${salesToProcess.length === 1 ? 'venda' : 'vendas'} foi concluído.</p>`
+            + plan.skippedHtml
             + processingSummaryHtml(results);
         isSummaryModalOpen.value = true;
     } catch (err) {

@@ -551,6 +551,7 @@ import { defineProps, ref, onMounted, onUnmounted, computed, watch, nextTick, to
 import { formatVariation } from '@/utils/variation';
 import { saleMarketplace, marketplaceLabel, marketplaceLogo } from '@/utils/marketplaces';
 import { marketplaceStatusLabel, tiktokShippingModeLabel } from '@/utils/marketplacePresentation';
+import { planProcessing, processedAtSuffixHtml } from '@/utils/processingFeedback';
 import gsap from 'gsap';
 import { useSalesForUser } from '@/composables/useSalesForUser';
 import { useUserStorage } from '@/composables/useUserStorage';
@@ -600,11 +601,12 @@ const isBulkStatusModalOpen = ref(false);
 // Seleção de vendas para processamento manual
 const selectedSaleKeys = ref(new Set());
 const saleKey = (s) => `${s.id}-${s.sku}`;
-const isSaleSelectable = (sale) => {
+// O SKU da venda existe no estoque (Armazenamento) do cliente.
+const isSkuManaged = (sale) => {
     const saleSku = normalizeSku(sale.sku);
-    const gerenciarSkuSim = saleSku && stockSkuSet.value.has(saleSku);
-    return !sale.processed_at && gerenciarSkuSim;
+    return Boolean(saleSku && stockSkuSet.value.has(saleSku));
 };
+const isSaleSelectable = (sale) => !sale.processed_at && isSkuManaged(sale);
 const isSaleSelected = (sale) => selectedSaleKeys.value.has(saleKey(sale));
 const selectedCount = computed(() => selectedSaleKeys.value.size);
 const toggleSelectSale = (sale, checked) => {
@@ -1684,16 +1686,19 @@ async function processAllSales() {
     isProcessing.value = true;
     try {
         await loadStorageData();
-        const base = paginatedUserSales.value;
-        const salesToProcess = base.filter(sale => {
-            const saleSku = normalizeSku(sale.sku);
-            const gerenciarSkuSim = saleSku && stockSkuSet.value.has(saleSku);
-            return !sale.processed_at && gerenciarSkuSim;
+        // Sem seleção: a página atual. Só entra o que está pendente e com SKU no
+        // estoque; o resto vira mensagem clara em vez de "nada encontrado".
+        const plan = planProcessing({
+            sales: paginatedUserSales.value,
+            selectedKeys: null,
+            getKey: saleKey,
+            isSkuMapped: isSkuManaged,
         });
+        const salesToProcess = plan.toProcess;
 
         if (salesToProcess.length === 0) {
-            summaryModalTitle.value = 'Nenhuma Venda para Processar';
-            summaryModalContent.value = '<p>Não foi encontrada nenhuma venda pendente com SKU correspondente no estoque nos filtros atuais.</p>';
+            summaryModalTitle.value = plan.nothingMessage.title;
+            summaryModalContent.value = plan.nothingMessage.html;
             isSummaryModalOpen.value = true;
             return;
         }
@@ -1707,8 +1712,8 @@ async function processAllSales() {
             contentHtml += '</ul></div>';
         }
         if (results.alreadyProcessed?.length > 0) {
-            contentHtml += `<div class="summary-section"><h4>${results.alreadyProcessed.length} Já estavam processadas</h4><ul>`;
-            results.alreadyProcessed.forEach((s) => { contentHtml += `<li>${s.marketplace} #${s.saleId} (SKU: ${s.sku})</li>`; });
+            contentHtml += `<div class="summary-section"><h4>${results.alreadyProcessed.length} Já estavam processadas (estoque não abatido de novo)</h4><ul>`;
+            results.alreadyProcessed.forEach((s) => { contentHtml += `<li>${s.marketplace} #${s.saleId} (SKU: ${s.sku})${processedAtSuffixHtml(s.processedAt)}</li>`; });
             contentHtml += '</ul></div>';
         }
         if (results.failed?.length > 0) {
@@ -1735,28 +1740,34 @@ async function processSelectedSales() {
     isProcessing.value = true;
     try {
         await loadStorageData();
-        const selectedSet = new Set(selectedSaleKeys.value);
-        const candidates = sales.value.filter((s) => selectedSet.has(saleKey(s)));
-        const salesToProcess = candidates.filter(isSaleSelectable);
+        // Só entra o que está pendente e com SKU no estoque. As marcadas que já
+        // foram processadas viram aviso com a data e a hora em que foram baixadas.
+        const plan = planProcessing({
+            sales: sales.value,
+            selectedKeys: selectedSaleKeys.value,
+            getKey: saleKey,
+            isSkuMapped: isSkuManaged,
+        });
+        const salesToProcess = plan.toProcess;
 
         if (salesToProcess.length === 0) {
-            summaryModalTitle.value = 'Nenhuma Seleção Válida';
-            summaryModalContent.value = '<p>As vendas selecionadas não são elegíveis para processamento (já processadas ou SKU não gerenciado).</p>';
+            summaryModalTitle.value = plan.nothingMessage.title;
+            summaryModalContent.value = plan.nothingMessage.html;
             isSummaryModalOpen.value = true;
             return;
         }
 
         const results = await processSalesApi(salesToProcess);
         summaryModalTitle.value = 'Resumo do Processamento (Selecionadas)';
-        let contentHtml = '<p>O processamento das vendas selecionadas foi concluído.</p>';
+        let contentHtml = '<p>O processamento das vendas selecionadas foi concluído.</p>' + plan.skippedHtml;
         if (results.processedNow?.length > 0) {
             contentHtml += `<div class="summary-section success"><h4>${results.processedNow.length} processada(s) agora</h4><ul>`;
             results.processedNow.forEach((s) => { contentHtml += `<li>${s.marketplace} #${s.saleId} (SKU: ${s.sku})</li>`; });
             contentHtml += '</ul></div>';
         }
         if (results.alreadyProcessed?.length > 0) {
-            contentHtml += `<div class="summary-section"><h4>${results.alreadyProcessed.length} já estava(m) processada(s)</h4><ul>`;
-            results.alreadyProcessed.forEach((s) => { contentHtml += `<li>${s.marketplace} #${s.saleId} (SKU: ${s.sku})</li>`; });
+            contentHtml += `<div class="summary-section"><h4>${results.alreadyProcessed.length} já estava(m) processada(s) (estoque não abatido de novo)</h4><ul>`;
+            results.alreadyProcessed.forEach((s) => { contentHtml += `<li>${s.marketplace} #${s.saleId} (SKU: ${s.sku})${processedAtSuffixHtml(s.processedAt)}</li>`; });
             contentHtml += '</ul></div>';
         }
         if (results.failed?.length > 0) {
