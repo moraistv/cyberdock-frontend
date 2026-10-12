@@ -108,7 +108,7 @@
             <th class="th-actions">Ações</th>
           </tr>
         </thead>
-        <tbody ref="tbodyEl">
+        <tbody>
           <template v-for="item in filteredSkus" :key="`item-${item.id}-${item.type}`">
             <!-- SKU PAI -->
             <tr v-if="item.type === 'kit'" class="kit-parent-row">
@@ -299,8 +299,7 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, watch, nextTick } from 'vue'
-import { gsap } from 'gsap'
+import { defineComponent, ref, computed } from 'vue'
 
 export default defineComponent({
   name: 'SkuTable',
@@ -317,7 +316,6 @@ export default defineComponent({
     const pkgFilter = ref('')
     const stockFilter = ref('all') // 'all', 'with', 'without'
     const skuTypeFilter = ref('all') // 'all', 'parent', 'child'
-    const tbodyEl = ref(null)
     
     // Estado para controlar a expansão dos kits
     const expandedKits = ref([])
@@ -520,19 +518,6 @@ export default defineComponent({
          return total + (childVolume * (child.quantity_per_kit || 1));
        }, 0);
     };
-    
-    watch(filteredSkus, () => {
-      if (props.isLoading || !tbodyEl.value) return;
-      nextTick(() => {
-        gsap.from(tbodyEl.value.children, {
-          opacity: 0,
-          y: 10,
-          duration: 0.4,
-          ease: 'power2.out',
-          stagger: 0.05
-        });
-      });
-    }, { immediate: true });
 
         return { 
       query, 
@@ -540,7 +525,6 @@ export default defineComponent({
       stockFilter,
       skuTypeFilter,
       filteredSkus, 
-      tbodyEl, 
       expandedKits,
       toggleKitExpansion,
       getPackageTypeClass, 

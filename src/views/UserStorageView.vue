@@ -184,13 +184,23 @@ export default defineComponent({
       fetchStockMovements, calcularVolumePorSku,
       addPackageType, updatePackageType, removePackageType,
       deleteMovement, connectSkuToKits, disconnectSkuFromKit, getSkuKitConnections,
+      loadStorageData,
     } = useUserStorage(reactiveUserId, () => {
       initialLoadComplete.value = true
     })
 
     const { sales } = useSalesForUser(reactiveUserId)
 
-    const { activeKits, loadActiveKits } = useKitManagement(reactiveUserId)
+    /*
+     * `useUserStorage` já baixou o catálogo completo. Reusar essa mesma lista
+     * evita uma segunda chamada a /storage/user/:uid/skus — especialmente cara
+     * para clientes com muitos SKUs — e impede uma atualização tardia de kits
+     * de reconstruir a tabela logo depois do primeiro paint.
+     */
+    const { activeKits, loadActiveKits } = useKitManagement(
+      reactiveUserId,
+      { sourceSkus: skus }
+    )
 
     const toast = (message, type = 'info', duration = 3200) => {
       window.dispatchEvent(new CustomEvent('show-toast', {
@@ -508,19 +518,33 @@ export default defineComponent({
       isKitManagementModalOpen.value = false
     }
     
-    const handleKitCreated = () => {
+    /*
+     * O modal usa uma instância própria de useKitManagement para gravar no
+     * servidor. Como esta tela deriva os kits de `skus`, recarrega o catálogo
+     * uma vez depois da mutação para a tabela e o modal de vínculos refletirem
+     * imediatamente o kit criado, editado ou excluído.
+     */
+    const finishKitMutation = async (message) => {
       closeKitManagementModal()
-      toast('Kit criado com sucesso.', 'success')
+      try {
+        await loadStorageData()
+        if (error.value) throw new Error(error.value)
+        toast(message, 'success')
+      } catch (err) {
+        toast(`A alteração foi salva, mas não foi possível atualizar a lista: ${err.message}`, 'warning', 4200)
+      }
+    }
+
+    const handleKitCreated = async () => {
+      await finishKitMutation('Kit criado com sucesso.')
     }
     
-    const handleKitUpdated = () => {
-      closeKitManagementModal()
-      toast('Kit atualizado com sucesso.', 'success')
+    const handleKitUpdated = async () => {
+      await finishKitMutation('Kit atualizado com sucesso.')
     }
     
-    const handleKitDeleted = () => {
-      closeKitManagementModal()
-      toast('Kit excluído com sucesso.', 'success')
+    const handleKitDeleted = async () => {
+      await finishKitMutation('Kit excluído com sucesso.')
     }
 
     watchEffect(() => {
