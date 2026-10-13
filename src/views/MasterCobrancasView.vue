@@ -1,8 +1,9 @@
-<!-- Tela geral de cobranças (master).
-     Todos os clientes de uma competência num lugar só: fechar, conferir a
-     descrição e emitir no Asaas, um cliente por vez ou em lote. As regras de
-     segurança (lock, idempotência, fechar antes de cobrar) continuam no backend;
-     esta tela só encadeia as mesmas rotas que a tela de cada cliente usa. -->
+<!-- Central de cobranças (master).
+     Todos os clientes de uma competência num lugar só. Cada cliente abre, ali
+     mesmo, o painel completo de cobrança (fatura, avulsos, fechamento, baixa,
+     Asaas, histórico e dados de cobrança): não é preciso ir à tela individual.
+     Uma rolagem só, a da página: nada aqui tem rolagem própria. As regras de
+     segurança (lock, idempotência, fechar antes de cobrar) continuam no backend. -->
 <template>
   <div class="billing-wrapper">
     <SidebarComponent />
@@ -16,34 +17,20 @@
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
               Área do administrador
             </span>
-            <h1 class="title">Cobranças</h1>
-            <p class="subtitle">Todos os clientes da competência: feche, confira e emita as cobranças no Asaas, um a um ou em lote.</p>
+            <h1 class="title">Central de cobranças</h1>
+            <p class="subtitle">Feche, confira e emita as cobranças de todos os clientes. Clique num cliente para ver e resolver tudo dele aqui mesmo.</p>
           </div>
 
           <div class="header-actions">
             <div class="period-picker" role="group" aria-label="Competência">
-              <button
-                type="button"
-                class="period-picker__step"
-                :disabled="ocupado"
-                aria-label="Competência anterior"
-                title="Competência anterior"
-                @click="mudarCompetencia(-1)"
-              >
+              <button type="button" class="period-picker__step" :disabled="ocupado" aria-label="Competência anterior" title="Competência anterior" @click="mudarCompetencia(-1)">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
               </button>
               <label class="sr-only" for="cobrancas-competencia">Competência</label>
               <select id="cobrancas-competencia" v-model="competencia" class="period-picker__select" :disabled="ocupado">
                 <option v-for="opcao in opcoesDeCompetencia" :key="opcao" :value="opcao">{{ periodLabel(opcao) }}</option>
               </select>
-              <button
-                type="button"
-                class="period-picker__step"
-                :disabled="ocupado || competencia >= competenciaCorrente"
-                aria-label="Próxima competência"
-                title="Próxima competência"
-                @click="mudarCompetencia(1)"
-              >
+              <button type="button" class="period-picker__step" :disabled="ocupado || competencia >= competenciaCorrente" aria-label="Próxima competência" title="Próxima competência" @click="mudarCompetencia(1)">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
               </button>
             </div>
@@ -61,77 +48,103 @@
             </button>
             <button
               type="button"
-              class="btn btn-secondary btn-icon"
-              :disabled="ocupado"
-              title="Atualizar a lista"
-              aria-label="Atualizar a lista"
-              @click="carregar()"
+              class="btn btn-secondary btn-with-icon"
+              :disabled="!linhasOrdenadas.length"
+              title="Baixa a lista atual (com filtros e busca) em planilha"
+              @click="exportarCsv"
             >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Exportar
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary btn-with-icon"
+              :aria-expanded="integracaoAberta"
+              title="Testa a conexão com o Asaas (ambiente, chave, webhook) e mostra eventos pendentes"
+              @click="alternarIntegracao"
+            >
+              <span class="integracao-dot" :class="`is-${estadoIntegracao}`" aria-hidden="true"></span>
+              Asaas
+            </button>
+            <button type="button" class="btn btn-secondary btn-icon" :disabled="ocupado" title="Atualizar a lista" aria-label="Atualizar a lista" @click="carregar()">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" :class="{ 'is-spinning': carregando }"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"></path><polyline points="21 3 21 8 16 8"></polyline></svg>
             </button>
           </div>
         </header>
 
-        <!-- ================= INDICADORES ================= -->
-        <div class="stats-strip">
-          <div class="stat-tile">
-            <span class="stat-tile__icon" aria-hidden="true">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16l-3 -2l-2 2l-2 -2l-2 2l-2 -2l-3 2"></path><path d="M9 7h6"></path><path d="M9 11h6"></path><path d="M13 15h2"></path></svg>
-            </span>
-            <div class="stat-tile__body">
-              <strong>{{ formatCurrency(indicadores.total.valor) }}</strong>
-              <span>Total da competência · {{ indicadores.total.quantidade }} fatura(s)</span>
-            </div>
+        <!-- ================= INTEGRAÇÃO ASAAS =================
+             Conferir antes de emitir em lote: chave, ambiente e webhook. O teste
+             só roda quando pedido, para não consultar o Asaas a cada visita. -->
+        <section v-if="integracaoAberta" class="integracao" aria-label="Integração com o Asaas">
+          <div class="integracao__topo">
+            <strong>Integração Asaas</strong>
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="testandoIntegracao || reprocessando" @click="testarIntegracao">
+              {{ testandoIntegracao ? 'Testando...' : 'Testar de novo' }}
+            </button>
+            <button
+              v-if="integracao?.pendingWebhookEvents > 0"
+              type="button"
+              class="btn btn-secondary btn-sm"
+              :disabled="testandoIntegracao || reprocessando"
+              title="Tenta aplicar de novo os eventos que o Asaas enviou e o sistema ainda não processou"
+              @click="reprocessarPendentes"
+            >
+              {{ reprocessando ? 'Reprocessando...' : `Reprocessar ${integracao.pendingWebhookEvents} pendente(s)` }}
+            </button>
+            <button type="button" class="integracao__fechar" aria-label="Fechar a integração" @click="integracaoAberta = false">×</button>
           </div>
-          <div class="stat-tile is-warning">
-            <span class="stat-tile__icon" aria-hidden="true">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
-            </span>
-            <div class="stat-tile__body">
-              <strong>{{ indicadores.aFechar.quantidade }}</strong>
-              <span>A fechar · {{ formatCurrency(indicadores.aFechar.valor) }} até agora</span>
-            </div>
+          <div aria-live="polite" :aria-busy="testandoIntegracao || reprocessando">
+            <p v-if="testandoIntegracao && !integracao" class="integracao__estado">Consultando o Asaas...</p>
+            <dl v-if="resumoIntegracao.length" class="integracao__fatos">
+              <div v-for="item in resumoIntegracao" :key="item.chave">
+                <dt>{{ item.rotulo }}</dt>
+                <dd :class="`is-${item.tom}`" :title="item.dica">{{ item.valor }}</dd>
+              </div>
+            </dl>
+            <p v-if="integracaoErro" class="integracao__estado is-error">{{ integracaoErro }}</p>
+            <p v-if="reprocessoMensagem" class="integracao__estado">{{ reprocessoMensagem }}</p>
           </div>
-          <div class="stat-tile is-info">
-            <span class="stat-tile__icon" aria-hidden="true">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-            </span>
-            <div class="stat-tile__body">
-              <strong>{{ indicadores.aEmitir.quantidade }}</strong>
-              <span>A emitir · {{ formatCurrency(indicadores.aEmitir.valor) }}</span>
-            </div>
-          </div>
-          <div class="stat-tile is-sent">
-            <span class="stat-tile__icon" aria-hidden="true">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-            </span>
-            <div class="stat-tile__body">
-              <strong>{{ indicadores.emitidas.quantidade }}</strong>
-              <span>Aguardando pagamento · {{ formatCurrency(indicadores.emitidas.valor) }}</span>
-            </div>
-          </div>
-          <div class="stat-tile is-success">
-            <span class="stat-tile__icon" aria-hidden="true">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-            </span>
-            <div class="stat-tile__body">
-              <strong>{{ indicadores.pagas.quantidade }}</strong>
-              <span>Pagas · {{ formatCurrency(indicadores.pagas.valor) }}</span>
-            </div>
-          </div>
-        </div>
+        </section>
 
-        <!-- Competência aberta mostra o último valor gravado: a lista não
-             recalcula sozinha, porque recalcular todo mundo a cada abertura
-             varreria as vendas de todos os clientes. -->
-        <p v-if="indicadores.aFechar.quantidade" class="page-hint">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-          <span>
-            Competências abertas mostram o último valor calculado. "Recalcular abertas" atualiza agora;
-            fechar sempre recalcula antes de congelar.
-            <template v-if="competencia === competenciaCorrente"> Este mês ainda está em andamento.</template>
-          </span>
-        </p>
+        <!-- ================= FECHAMENTO DO MÊS ================= -->
+        <section class="fechamento" aria-label="Resumo do fechamento">
+          <div class="fechamento__topo">
+            <div class="fechamento__titulo">
+              <span class="fechamento__rotulo">Fechamento de {{ periodLabel(competencia) }}</span>
+              <strong class="fechamento__total">{{ formatarMoeda(indicadores.total.valor) }}</strong>
+              <span class="fechamento__sub">
+                {{ indicadores.total.quantidade }} {{ indicadores.total.quantidade === 1 ? 'fatura com valor' : 'faturas com valor' }}
+                · {{ percentualRecebido }}% recebido
+              </span>
+            </div>
+            <p v-if="indicadores.aFechar.quantidade" class="fechamento__dica">
+              Competências abertas mostram o último valor calculado. "Recalcular abertas" atualiza agora, e fechar sempre recalcula antes de congelar.
+              <template v-if="competencia === competenciaCorrente"> Este mês ainda está em andamento.</template>
+            </p>
+          </div>
+
+          <div class="fechamento__barra" role="img" :aria-label="descricaoDaBarra">
+            <span v-for="segmento in segmentos" :key="segmento.key" :class="`is-${segmento.key}`" :style="{ width: `${segmento.percentual}%` }"></span>
+          </div>
+
+          <div class="fechamento__kpis">
+            <button
+              v-for="kpi in KPIS"
+              :key="kpi.key"
+              type="button"
+              class="kpi"
+              :class="[`is-${kpi.key}`, { 'is-active': filtro === kpi.filtro }]"
+              :aria-pressed="filtro === kpi.filtro"
+              :title="`Mostrar só: ${kpi.label}`"
+              @click="alternarFiltro(kpi.filtro)"
+            >
+              <span class="kpi__marca" aria-hidden="true"></span>
+              <span class="kpi__rotulo">{{ kpi.label }}</span>
+              <strong class="kpi__numero">{{ indicadores[kpi.key].quantidade }}</strong>
+              <span class="kpi__valor">{{ formatarMoeda(indicadores[kpi.key].valor) }}</span>
+            </button>
+          </div>
+        </section>
 
         <!-- ================= FERRAMENTAS ================= -->
         <div class="table-controls">
@@ -144,297 +157,227 @@
             </button>
           </div>
 
-          <div class="status-filter-wrapper">
-            <span class="filter-label">Situação</span>
-            <div class="chip-row">
-              <button
-                v-for="opcao in FILTROS"
-                :key="opcao.key"
-                type="button"
-                class="chip"
-                :class="{ 'is-active': filtro === opcao.key }"
-                :aria-pressed="filtro === opcao.key"
-                :title="opcao.dica"
-                @click="filtro = opcao.key"
-              >
-                {{ opcao.label }}
-                <span class="chip__count">{{ contagemPorFiltro[opcao.key] }}</span>
-              </button>
-            </div>
+          <div class="chip-row" role="group" aria-label="Filtrar por situação">
+            <button
+              v-for="opcao in FILTROS"
+              :key="opcao.key"
+              type="button"
+              class="chip"
+              :class="{ 'is-active': filtro === opcao.key }"
+              :aria-pressed="filtro === opcao.key"
+              :title="opcao.dica"
+              @click="filtro = opcao.key"
+            >
+              {{ opcao.label }}
+              <span class="chip__count">{{ contagemPorFiltro[opcao.key] }}</span>
+            </button>
           </div>
 
-          <label class="toggle-inactive">
-            <input v-model="mostrarInativos" type="checkbox" />
-            Mostrar inativos<template v-if="!mostrarInativos && inativosOcultos"> ({{ inativosOcultos }})</template>
-          </label>
-
-          <span class="results-count">
-            {{ linhasFiltradas.length }} {{ linhasFiltradas.length === 1 ? 'cliente' : 'clientes' }}
-          </span>
+          <div class="controls-end">
+            <label class="sort">
+              <span>Ordenar</span>
+              <select v-model="ordem">
+                <option v-for="opcao in ORDENACOES" :key="opcao.key" :value="opcao.key">{{ opcao.label }}</option>
+              </select>
+            </label>
+            <label class="toggle-inactive">
+              <input v-model="mostrarInativos" type="checkbox" />
+              Inativos<template v-if="!mostrarInativos && inativosOcultos"> ({{ inativosOcultos }})</template>
+            </label>
+          </div>
         </div>
 
-        <!-- ================= AÇÕES EM LOTE ================= -->
+        <!-- ================= LISTA ================= -->
+        <div class="lista" :aria-busy="carregando">
+          <div v-if="linhasOrdenadas.length" class="lista__cabecalho">
+            <span class="col-check">
+              <input
+                type="checkbox"
+                :checked="todasMarcadas"
+                :indeterminate="algumasMarcadas"
+                :disabled="ocupado || selecionaveisVisiveis.length === 0"
+                aria-label="Selecionar todos os clientes da lista que podem ser cobrados"
+                @change="alternarTodas($event.target.checked)"
+              />
+            </span>
+            <span aria-hidden="true">Cliente</span>
+            <span aria-hidden="true">Situação</span>
+            <span aria-hidden="true">Vencimento</span>
+            <span aria-hidden="true">Asaas</span>
+            <span class="col-num" aria-hidden="true">Valor</span>
+            <span class="col-acoes" aria-hidden="true">Ações</span>
+            <span aria-hidden="true"></span>
+          </div>
+
+          <ul v-if="carregando && !visao" class="lista__itens">
+            <li v-for="n in 7" :key="`sk-${n}`" class="linha is-skeleton">
+              <div class="linha__resumo">
+                <span class="sk sk-check"></span>
+                <div class="sk-lines"><span class="sk" style="width: 190px"></span><span class="sk sk--sm" style="width: 130px"></span></div>
+                <span class="sk sk-pill" style="width: 80px"></span>
+                <span class="sk" style="width: 74px"></span>
+                <span class="sk" style="width: 100px"></span>
+                <span class="sk" style="width: 84px"></span>
+                <span class="sk sk-btn" style="width: 120px"></span>
+              </div>
+            </li>
+          </ul>
+
+          <div v-else-if="erroCarga && !visao" class="feedback-state">
+            <span class="feedback-icon is-error" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </span>
+            <h3>Não foi possível carregar as cobranças</h3>
+            <p>{{ erroCarga }}</p>
+            <button type="button" class="btn btn-secondary btn-sm" @click="carregar()">Tentar de novo</button>
+          </div>
+
+          <div v-else-if="linhasOrdenadas.length === 0" class="feedback-state">
+            <span class="feedback-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <h3>Nenhum cliente nesta visão</h3>
+            <p>Ajuste a busca, troque o filtro ou escolha outra competência.</p>
+            <button v-if="busca || filtro !== 'todas'" type="button" class="btn btn-secondary btn-sm" @click="busca = ''; filtro = 'todas'">
+              Limpar filtros
+            </button>
+          </div>
+
+          <ul v-else class="lista__itens">
+            <li
+              v-for="linha in linhasOrdenadas"
+              :id="idDaLinha(linha.uid)"
+              :key="linha.uid"
+              class="linha"
+              :class="{
+                'is-expandida': expandido === linha.uid,
+                'is-selecionada': selecionados.has(linha.uid),
+                'is-inativa': !linha.active,
+              }"
+            >
+              <div class="linha__resumo" @click="alternarPainel(linha)">
+                <span class="linha__check" @click.stop>
+                  <input
+                    v-if="linha.selecionavel"
+                    type="checkbox"
+                    :checked="selecionados.has(linha.uid)"
+                    :disabled="ocupado"
+                    :aria-label="`Selecionar ${linha.nome}`"
+                    @change="alternarSelecao(linha.uid, $event.target.checked)"
+                  />
+                </span>
+
+                <div class="linha__cliente">
+                  <span class="linha__nome">{{ linha.nome }}</span>
+                  <span v-if="linha.detalhe" class="linha__detalhe">{{ linha.detalhe }}</span>
+                  <span v-if="!linha.active || (linha.faltaDocumento && linha.selecionavel) || linha.divergente" class="linha__tags">
+                    <span v-if="!linha.active" class="tag is-muted">Inativo</span>
+                    <span v-if="linha.faltaDocumento && linha.selecionavel" class="tag is-warning" title="Sem CPF/CNPJ não há como criar o cliente no Asaas. Abra o cliente e preencha em Dados de cobrança">Sem CPF/CNPJ</span>
+                    <span v-if="linha.divergente" class="tag is-danger" title="Os itens não somam o total congelado. Abra o cliente e reabra a competência para recalcular">Itens ≠ total</span>
+                  </span>
+                </div>
+
+                <div class="linha__meta">
+                  <span class="linha__situacao">
+                    <span class="status-pill" :class="classeDaSituacao(linha)" :title="SITUACOES[linha.situacao].dica">
+                      <span class="status-dot" aria-hidden="true"></span>
+                      {{ rotuloDaSituacao(linha) }}
+                    </span>
+                  </span>
+                  <span class="linha__venc">
+                    <span class="meta-rotulo">Vence</span>
+                    {{ linha.invoice?.dueDate ? formatarData(linha.invoice.dueDate) : '—' }}
+                  </span>
+                  <span class="linha__asaas" :class="{ 'is-overdue': linha.invoice?.asaasStatus === 'OVERDUE' }">
+                    <span class="meta-rotulo">Asaas</span>
+                    {{ textoDoAsaas(linha) }}
+                  </span>
+                </div>
+
+                <span class="linha__valor">
+                  <template v-if="linha.invoice">
+                    <strong>{{ formatarMoeda(linha.total) }}</strong>
+                    <small v-if="linha.situacao === 'aberta'">até agora</small>
+                  </template>
+                  <span v-else class="cell-muted">—</span>
+                </span>
+
+                <div class="linha__acoes" @click.stop>
+                  <template v-if="linha.situacao === 'sem_fatura' || linha.situacao === 'aberta'">
+                    <button type="button" class="btn btn-primary btn-xs" :disabled="ocupado || ocupados.has(linha.uid)" title="Fecha a competência (recalcula e congela) e emite a cobrança" @click="abrirProcesso('emitir', [linha])">
+                      Fechar e cobrar
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-xs" :disabled="ocupado || ocupados.has(linha.uid)" title="Só congela o valor, sem criar cobrança" @click="fecharUma(linha)">
+                      {{ ocupados.has(linha.uid) ? 'Fechando...' : 'Fechar' }}
+                    </button>
+                  </template>
+                  <button v-else-if="linha.situacao === 'a_emitir'" type="button" class="btn btn-primary btn-xs" :disabled="ocupado" title="Emite a cobrança no Asaas com a descrição dos serviços" @click="abrirProcesso('emitir', [linha])">
+                    Emitir cobrança
+                  </button>
+                  <template v-else-if="linha.situacao === 'emitida' || linha.situacao === 'paga'">
+                    <a v-if="linha.invoice?.asaasInvoiceUrl" class="btn btn-secondary btn-xs" :href="linha.invoice.asaasInvoiceUrl" target="_blank" rel="noopener noreferrer" title="Abre a fatura no Asaas, do jeito que o cliente vê">
+                      Abrir fatura
+                    </a>
+                    <button v-if="linha.invoice?.asaasPaymentId && linha.situacao === 'emitida'" type="button" class="btn btn-secondary btn-xs" :disabled="ocupado || ocupados.has(linha.uid)" title="Relê o status no Asaas" @click="sincronizar(linha)">
+                      {{ ocupados.has(linha.uid) ? 'Sincronizando...' : 'Sincronizar' }}
+                    </button>
+                  </template>
+                </div>
+
+                <button
+                  type="button"
+                  class="linha__expandir"
+                  :aria-expanded="expandido === linha.uid"
+                  :aria-controls="`${idDaLinha(linha.uid)}-painel`"
+                  :aria-label="expandido === linha.uid ? `Fechar o painel de ${linha.nome}` : `Abrir tudo de ${linha.nome}`"
+                  :title="expandido === linha.uid ? 'Fechar' : 'Ver fatura, histórico e dados do cliente'"
+                  @click.stop="alternarPainel(linha)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+              </div>
+
+              <div v-if="expandido === linha.uid" :id="`${idDaLinha(linha.uid)}-painel`">
+                <CobrancaClientePainel
+                  :key="linha.uid"
+                  :cliente="linha"
+                  :competencia="competencia"
+                  :hoje="hoje"
+                  :versao="versaoDoPainel"
+                  :aba-inicial="abaDoPainel"
+                  @alterado="carregar({ silencioso: true })"
+                  @emitir="emitirDoPainel"
+                />
+              </div>
+            </li>
+          </ul>
+
+          <div v-if="visao && linhasOrdenadas.length" class="lista__rodape">
+            <span>
+              <strong>{{ linhasOrdenadas.length }}</strong> {{ linhasOrdenadas.length === 1 ? 'cliente' : 'clientes' }} nesta visão
+              · <strong>{{ formatarMoeda(totalFiltrado) }}</strong>
+            </span>
+            <span>{{ periodLabel(competencia) }} · vencimento padrão {{ formatarData(visao.standardDueDate) }}</span>
+          </div>
+        </div>
+
+        <!-- ================= AÇÕES EM LOTE =================
+             Fica presa ao pé da tela enquanto a lista passa por baixo, sem
+             disputar o topo com o cabeçalho da lista. -->
         <div v-if="selecionadas.length" class="bulk-bar" role="region" aria-label="Ações em lote">
           <span class="bulk-bar__info">
             <strong>{{ selecionadas.length }}</strong> {{ selecionadas.length === 1 ? 'cliente selecionado' : 'clientes selecionados' }}
-            · {{ formatCurrency(totalSelecionado) }} no valor atual
+            · {{ formatarMoeda(totalSelecionado) }} no valor atual
           </span>
           <div class="bulk-bar__actions">
-            <button type="button" class="btn btn-secondary btn-sm" :disabled="ocupado" @click="limparSelecao">Limpar seleção</button>
-            <button
-              type="button"
-              class="btn btn-secondary btn-sm"
-              :disabled="ocupado || selecionadasAbertas.length === 0"
-              title="Só congela o valor. Nenhuma cobrança é criada"
-              @click="abrirProcesso('fechar', selecionadasAbertas)"
-            >
+            <button type="button" class="btn btn-ghost-light btn-sm" :disabled="ocupado" @click="limparSelecao">Limpar</button>
+            <button type="button" class="btn btn-ghost-light btn-sm" :disabled="ocupado || selecionadasAbertas.length === 0" title="Só congela o valor. Nenhuma cobrança é criada" @click="abrirProcesso('fechar', selecionadasAbertas)">
               Só fechar ({{ selecionadasAbertas.length }})
             </button>
-            <button
-              type="button"
-              class="btn btn-primary btn-sm btn-with-icon"
-              :disabled="ocupado"
-              title="Fecha o que estiver aberto e emite a cobrança de cada cliente no Asaas"
-              @click="abrirProcesso('emitir', selecionadas)"
-            >
+            <button type="button" class="btn btn-light btn-sm btn-with-icon" :disabled="ocupado" title="Fecha o que estiver aberto e emite a cobrança de cada cliente no Asaas" @click="abrirProcesso('emitir', selecionadas)">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
               Gerar cobranças ({{ selecionadas.length }})
             </button>
-          </div>
-        </div>
-
-        <!-- ================= TABELA ================= -->
-        <div class="table-container">
-          <div class="table-wrapper">
-            <table v-if="carregando && !visao" class="billing-table" aria-busy="true">
-              <thead>
-                <tr>
-                  <th class="col-check"></th>
-                  <th>Cliente</th>
-                  <th>Situação</th>
-                  <th class="col-num">Valor</th>
-                  <th>Vencimento</th>
-                  <th>Asaas</th>
-                  <th class="col-actions">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="n in 8" :key="`sk-${n}`" class="is-skeleton">
-                  <td class="col-check"><div class="sk sk-check"></div></td>
-                  <td>
-                    <div class="sk-lines">
-                      <div class="sk sk-text" style="width: 180px"></div>
-                      <div class="sk sk-text sk-text--sm" style="width: 130px"></div>
-                    </div>
-                  </td>
-                  <td><div class="sk sk-pill" style="width: 76px"></div></td>
-                  <td class="col-num"><div class="sk sk-text" style="width: 80px"></div></td>
-                  <td><div class="sk sk-text" style="width: 72px"></div></td>
-                  <td><div class="sk sk-text" style="width: 110px"></div></td>
-                  <td class="col-actions"><div class="sk sk-btn" style="width: 150px"></div></td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div v-else-if="erroCarga && !visao" class="feedback-state">
-              <span class="feedback-icon is-error" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-              </span>
-              <h3>Não foi possível carregar as cobranças</h3>
-              <p>{{ erroCarga }}</p>
-              <button type="button" class="btn btn-secondary btn-sm" @click="carregar()">Tentar de novo</button>
-            </div>
-
-            <div v-else-if="linhasFiltradas.length === 0" class="feedback-state">
-              <span class="feedback-icon" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              </span>
-              <h3>Nenhum cliente nesta visão</h3>
-              <p>Ajuste a busca, troque o filtro ou escolha outra competência.</p>
-              <button
-                v-if="busca || filtro !== 'todas'"
-                type="button"
-                class="btn btn-secondary btn-sm"
-                @click="busca = ''; filtro = 'todas'"
-              >
-                Limpar filtros
-              </button>
-            </div>
-
-            <table v-else class="billing-table">
-              <thead>
-                <tr>
-                  <th class="col-check">
-                    <input
-                      type="checkbox"
-                      :checked="todasMarcadas"
-                      :indeterminate="algumasMarcadas"
-                      :disabled="ocupado || selecionaveisVisiveis.length === 0"
-                      aria-label="Selecionar todos os clientes da lista que podem ser cobrados"
-                      @change="alternarTodas($event.target.checked)"
-                    />
-                  </th>
-                  <th>Cliente</th>
-                  <th>Situação</th>
-                  <th class="col-num">Valor</th>
-                  <th>Vencimento</th>
-                  <th>Asaas</th>
-                  <th class="col-actions">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="linha in linhasFiltradas"
-                  :key="linha.uid"
-                  :class="{ 'is-selected': selecionados.has(linha.uid), 'row-inactive': !linha.active }"
-                >
-                  <td class="col-check">
-                    <input
-                      v-if="linha.selecionavel"
-                      type="checkbox"
-                      :checked="selecionados.has(linha.uid)"
-                      :disabled="ocupado"
-                      :aria-label="`Selecionar ${linha.nome}`"
-                      @change="alternarSelecao(linha.uid, $event.target.checked)"
-                    />
-                  </td>
-
-                  <td>
-                    <div class="client-cell">
-                      <span class="client-cell__name">{{ linha.nome }}</span>
-                      <span v-if="linha.detalhe" class="client-cell__meta">{{ linha.detalhe }}</span>
-                      <span v-if="!linha.active || linha.faltaDocumento || linha.divergente" class="client-cell__tags">
-                        <span v-if="!linha.active" class="tag is-muted">Inativo</span>
-                        <span
-                          v-if="linha.faltaDocumento && linha.selecionavel"
-                          class="tag is-warning"
-                          title="Sem CPF/CNPJ não há como criar o cliente no Asaas. Complete o cadastro na tela do cliente"
-                        >Sem CPF/CNPJ</span>
-                        <span
-                          v-if="linha.divergente"
-                          class="tag is-danger"
-                          title="Os itens não somam o total congelado. Reabra e feche a competência na tela do cliente para recalcular"
-                        >Itens ≠ total</span>
-                      </span>
-                    </div>
-                  </td>
-
-                  <td>
-                    <span class="status-pill" :class="classeDaSituacao(linha)" :title="SITUACOES[linha.situacao].dica">
-                      <span class="status-dot" aria-hidden="true"></span>
-                      {{ SITUACOES[linha.situacao].label }}
-                    </span>
-                  </td>
-
-                  <td class="col-num">
-                    <template v-if="linha.invoice">
-                      <span class="money">{{ formatCurrency(linha.total) }}</span>
-                      <small v-if="linha.situacao === 'aberta'" class="cell-hint">até agora</small>
-                    </template>
-                    <span v-else class="cell-muted">—</span>
-                  </td>
-
-                  <td class="cell-date">
-                    {{ linha.invoice?.dueDate ? formatarData(linha.invoice.dueDate) : '—' }}
-                  </td>
-
-                  <td>
-                    <template v-if="linha.invoice?.asaasPaymentId">
-                      <span class="asaas-status" :class="{ 'is-overdue': linha.invoice.asaasStatus === 'OVERDUE' }">
-                        {{ asaasStatusLabel(linha.invoice.asaasStatus) || 'Emitida' }}
-                      </span>
-                    </template>
-                    <span v-else class="cell-muted">{{ linha.situacao === 'paga' ? 'Baixa manual' : 'Não emitida' }}</span>
-                  </td>
-
-                  <td class="actions-cell">
-                    <div class="row-actions">
-                      <template v-if="linha.situacao === 'sem_fatura' || linha.situacao === 'aberta'">
-                        <button
-                          type="button"
-                          class="btn btn-primary btn-xs"
-                          :disabled="ocupado || ocupados.has(linha.uid)"
-                          title="Fecha a competência (o valor é recalculado e congelado) e emite a cobrança"
-                          @click="abrirProcesso('emitir', [linha])"
-                        >
-                          Fechar e cobrar
-                        </button>
-                        <button
-                          type="button"
-                          class="btn btn-secondary btn-xs"
-                          :disabled="ocupado || ocupados.has(linha.uid)"
-                          title="Só congela o valor, sem criar cobrança"
-                          @click="fecharUma(linha)"
-                        >
-                          {{ ocupados.has(linha.uid) ? 'Fechando...' : 'Fechar' }}
-                        </button>
-                      </template>
-
-                      <template v-else-if="linha.situacao === 'a_emitir'">
-                        <button
-                          type="button"
-                          class="btn btn-primary btn-xs"
-                          :disabled="ocupado"
-                          title="Emite a cobrança no Asaas com a descrição dos serviços"
-                          @click="abrirProcesso('emitir', [linha])"
-                        >
-                          Emitir cobrança
-                        </button>
-                        <button
-                          type="button"
-                          class="btn btn-secondary btn-xs"
-                          :disabled="ocupado"
-                          title="Mostra o texto que vai na cobrança: cada serviço com quantidade e valor"
-                          @click="abrirDescricao(linha)"
-                        >
-                          Descrição
-                        </button>
-                      </template>
-
-                      <template v-else-if="linha.situacao === 'emitida' || linha.situacao === 'paga'">
-                        <a
-                          v-if="linha.invoice?.asaasInvoiceUrl"
-                          class="btn btn-secondary btn-xs"
-                          :href="linha.invoice.asaasInvoiceUrl"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Abre a fatura no Asaas, do jeito que o cliente vê"
-                        >
-                          Abrir fatura
-                        </a>
-                        <button
-                          v-if="linha.invoice?.asaasPaymentId"
-                          type="button"
-                          class="btn btn-secondary btn-xs"
-                          :disabled="ocupado || ocupados.has(linha.uid)"
-                          title="Relê o status no Asaas. Use se o pagamento entrou e a lista não atualizou"
-                          @click="sincronizar(linha)"
-                        >
-                          {{ ocupados.has(linha.uid) ? 'Sincronizando...' : 'Sincronizar' }}
-                        </button>
-                      </template>
-
-                      <router-link
-                        :to="rotaDoCliente(linha.uid)"
-                        class="btn-icon-link"
-                        :title="`Abrir a cobrança de ${linha.nome}`"
-                        :aria-label="`Abrir a cobrança de ${linha.nome}`"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                      </router-link>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div v-if="visao && linhasFiltradas.length" class="table-footer">
-            <span class="table-footer__info">
-              <strong>{{ linhasFiltradas.length }}</strong> {{ linhasFiltradas.length === 1 ? 'cliente' : 'clientes' }} nesta visão
-              · <strong>{{ formatCurrency(totalFiltrado) }}</strong>
-            </span>
-            <span class="table-footer__info">{{ periodLabel(competencia) }} · vencimento padrão {{ formatarData(visao.standardDueDate) }}</span>
           </div>
         </div>
       </div>
@@ -463,12 +406,12 @@
             </template>
             <template v-else>
               Para cada cliente: fecha a competência se ainda estiver aberta e cria a cobrança no Asaas com a
-              descrição dos serviços. Um cliente por vez, sem cobrar duas vezes quem já tiver cobrança.
+              descrição dos serviços. Quem já tiver cobrança não é cobrado de novo.
             </template>
           </p>
 
           <ul class="process__facts">
-            <li><strong>{{ resumoRevisao.total }}</strong> {{ resumoRevisao.total === 1 ? 'cliente' : 'clientes' }} · {{ formatCurrency(resumoRevisao.valorAtual) }} no valor atual</li>
+            <li><strong>{{ resumoRevisao.total }}</strong> {{ resumoRevisao.total === 1 ? 'cliente' : 'clientes' }} · {{ formatarMoeda(resumoRevisao.valorAtual) }} no valor atual</li>
             <li v-if="resumoRevisao.aFechar">
               <strong>{{ resumoRevisao.aFechar }}</strong> com a competência aberta: o valor pode mudar ao fechar.
               <template v-if="resumoRevisao.semValor"> ({{ resumoRevisao.semValor }} ainda sem valor calculado: use "Recalcular abertas" antes para conferir.)</template>
@@ -477,7 +420,7 @@
               <strong>{{ resumoRevisao.semDocumento }}</strong> sem CPF/CNPJ: a competência é fechada, mas a cobrança fica para depois do cadastro.
             </li>
             <li v-if="processo.modo === 'emitir' && resumoRevisao.divergentes" class="is-danger">
-              <strong>{{ resumoRevisao.divergentes }}</strong> com itens que não somam o total: o backend recusa a emissão até a competência ser recalculada.
+              <strong>{{ resumoRevisao.divergentes }}</strong> com itens que não somam o total: a emissão é recusada até a competência ser recalculada.
             </li>
           </ul>
 
@@ -493,7 +436,8 @@
             />
             <small id="cobrancas-vencimento-dica" :class="{ 'is-error': !vencimentoValido }">
               <template v-if="!vencimentoValido">Escolha uma data a partir de hoje ({{ formatarData(hoje) }}): o Asaas recusa vencimento no passado.</template>
-              <template v-else>Padrão da competência: {{ formatarData(visao?.standardDueDate) }}. A fatura passa a mostrar a data emitida.</template>
+              <template v-else-if="processo.vencimentoPadrao">Padrão da competência: {{ formatarData(processo.vencimentoPadrao) }}. A fatura passa a mostrar a data emitida.</template>
+              <template v-else>A fatura passa a mostrar a data emitida.</template>
             </small>
           </div>
 
@@ -503,7 +447,7 @@
           </p>
 
           <!-- Prévia só para um cliente com valor já congelado: com vários, seriam
-               N requisições para um texto que cada linha mostra em "Descrição". -->
+               N requisições para um texto que cada painel mostra em "Ver descrição". -->
           <div v-if="processo.previaCarregando || processo.previa || processo.previaErro" class="desc-preview">
             <span class="desc-preview__label">Descrição que vai para o Asaas</span>
             <p v-if="processo.previaCarregando" class="desc-preview__state">Montando a descrição...</p>
@@ -524,7 +468,7 @@
                 <span class="process__item-name">{{ item.nome }}</span>
                 <span class="process__item-note">{{ notaDaRevisao(item.linha) }}</span>
               </div>
-              <span class="process__item-value">{{ item.linha.invoice ? formatCurrency(item.linha.total) : '—' }}</span>
+              <span class="process__item-value">{{ item.linha.invoice ? formatarMoeda(item.linha.total) : '—' }}</span>
             </li>
           </ul>
         </template>
@@ -560,19 +504,11 @@
                 <span class="process__item-name">{{ item.nome }}</span>
                 <span class="process__item-note">{{ item.mensagem || ETAPAS[item.etapa] }}</span>
               </div>
-              <span class="process__item-value">{{ item.total !== null && item.total !== undefined ? formatCurrency(item.total) : '' }}</span>
-              <a
-                v-if="item.invoiceUrl"
-                class="process__item-link"
-                :href="item.invoiceUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-              >Abrir</a>
-              <router-link
-                v-else-if="item.pendencia === 'dados' && !processando"
-                class="process__item-link"
-                :to="rotaDoCliente(item.uid)"
-              >Completar cadastro</router-link>
+              <span class="process__item-value">{{ item.total !== null && item.total !== undefined ? formatarMoeda(item.total) : '' }}</span>
+              <a v-if="item.invoiceUrl" class="process__item-link" :href="item.invoiceUrl" target="_blank" rel="noopener noreferrer">Abrir</a>
+              <button v-else-if="item.pendencia === 'dados' && !processando" type="button" class="process__item-link" @click="abrirCadastroDoCliente(item.uid)">
+                Completar cadastro
+              </button>
             </li>
           </ul>
         </template>
@@ -581,9 +517,7 @@
       <template #footer>
         <template v-if="processo?.fase === 'revisao'">
           <button type="button" class="btn btn-secondary" @click="fecharProcesso">Cancelar</button>
-          <button type="button" class="btn btn-primary" :disabled="!podeIniciar" @click="executarProcesso">
-            {{ textoDeInicio }}
-          </button>
+          <button type="button" class="btn btn-primary" :disabled="!podeIniciar" @click="executarProcesso">{{ textoDeInicio }}</button>
         </template>
         <template v-else-if="processando">
           <button type="button" class="btn btn-secondary" :disabled="processo.cancelado" @click="processo.cancelado = true">
@@ -591,57 +525,30 @@
           </button>
         </template>
         <template v-else-if="processo">
-          <button v-if="repetiveis.length" type="button" class="btn btn-secondary" @click="repetirFalhas">
-            Tentar de novo ({{ repetiveis.length }})
-          </button>
+          <button v-if="repetiveis.length" type="button" class="btn btn-secondary" @click="repetirFalhas">Tentar de novo ({{ repetiveis.length }})</button>
           <button type="button" class="btn btn-primary" @click="fecharProcesso">Concluir</button>
         </template>
-      </template>
-    </UniversalModal>
-
-    <!-- ================= PRÉVIA DA DESCRIÇÃO ================= -->
-    <UniversalModal
-      :is-open="Boolean(previa) && telaAtiva"
-      :title="previa ? `Descrição da cobrança · ${previa.nome}` : 'Descrição da cobrança'"
-      size="md"
-      @close="previa = null"
-    >
-      <div v-if="previa" class="desc-preview desc-preview--modal">
-        <p v-if="previa.carregando" class="desc-preview__state">Montando a descrição...</p>
-        <p v-else-if="previa.erro" class="desc-preview__state is-error">{{ previa.erro }}</p>
-        <template v-else-if="previa.dados">
-          <pre class="desc-preview__text">{{ previa.dados.description }}</pre>
-          <small class="desc-preview__meta" :class="{ 'is-error': !previa.dados.matches }">
-            {{ previa.dados.length }}/{{ previa.dados.limit }} caracteres · {{ previa.dados.itemCount }} serviço(s)
-            <template v-if="previa.dados.groupedItems"> · {{ previa.dados.groupedItems }} agrupados para caber no limite do Asaas</template>
-          </small>
-          <p v-if="!previa.dados.matches" class="desc-preview__state is-error">
-            Os itens somam {{ formatCurrency(previa.dados.itemsTotal) }} e o total congelado é {{ formatCurrency(previa.dados.total) }}.
-            A emissão é recusada até a competência ser reaberta e fechada de novo na tela do cliente.
-          </p>
-          <p v-else-if="!previa.dados.closed" class="desc-preview__state">
-            Competência aberta: os valores ainda podem mudar até o fechamento.
-          </p>
-        </template>
-      </div>
-      <template #footer>
-        <button type="button" class="btn btn-primary" @click="previa = null">Fechar</button>
       </template>
     </UniversalModal>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onActivated, onDeactivated } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onActivated, onDeactivated } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import SidebarComponent from '@/components/SidebarComponent.vue';
 import TopbarComponent from '@/components/TopbarComponent.vue';
 import UniversalModal from '@/components/UniversalModal.vue';
+import CobrancaClientePainel from '@/components/CobrancaClientePainel.vue';
 import { useBilling } from '@/composables/useBilling';
 import { useConfirm } from '@/composables/useConfirm';
 import { useNotification } from '@/composables/useNotification';
 import { asaasStatusLabel } from '@/utils/asaasStatus';
 import { criarLoteDeCobranca, codigoDoErro } from '@/utils/loteDeCobranca';
+import {
+  PERIODO_VALIDO, periodLabel, deslocarCompetencia, competenciaDeHoje, dataDeHoje,
+  formatarMoeda, paraCentavos, formatarData, somarDias, dataValida, mensagemDeErro,
+} from '@/utils/cobrancaUi';
 
 const route = useRoute();
 const router = useRouter();
@@ -655,42 +562,95 @@ const {
   ensureAsaasCustomer,
   issueCharge,
   syncCharge,
+  fetchAsaasStatus,
+  reprocessAsaasWebhooks,
 } = useBilling();
 
 const NOME_DA_ROTA = 'MasterCobrancasView';
 
+/* ============================ Integração Asaas ============================ */
+
+const integracaoAberta = ref(false);
+const integracao = ref(null);
+const integracaoErro = ref('');
+const testandoIntegracao = ref(false);
+const reprocessando = ref(false);
+const reprocessoMensagem = ref('');
+
+/* Bolinha do botão: verde quando o último teste alcançou o Asaas, vermelha
+ * quando falhou, cinza enquanto ninguém testou. */
+const estadoIntegracao = computed(() => {
+  if (integracaoErro.value || (integracao.value && !integracao.value.reachable)) return 'bad';
+  if (integracao.value?.reachable) return integracao.value.environment === 'sandbox' ? 'warn' : 'ok';
+  return 'idle';
+});
+
+/** O que o teste respondeu, em linguagem de quem opera (mesmo critério da tela do cliente). */
+const resumoIntegracao = computed(() => {
+  const s = integracao.value;
+  if (!s) return [];
+  let ambiente = { valor: s.environment || 'desconhecido', tom: 'warn' };
+  if (s.environment === 'production') ambiente = { valor: 'Produção', tom: 'ok' };
+  if (s.environment === 'sandbox') ambiente = { valor: 'Sandbox (testes, cobranças NÃO são reais)', tom: 'warn' };
+  // A chave nunca chega inteira: o backend manda só os 4 últimos dígitos.
+  const chave = s.apiKeyPreview ? { valor: s.apiKeyPreview, tom: 'ok' } : { valor: 'não configurada', tom: 'bad' };
+  let webhook = { valor: 'token ausente', tom: 'warn' };
+  if (s.webhookTokenInvalid) webhook = { valor: 'token inválido: use 32 a 255 caracteres', tom: 'bad' };
+  else if (s.webhookTokenConfigured) webhook = { valor: 'token configurado', tom: 'ok' };
+  const conexao = s.reachable
+    ? { valor: typeof s.elapsedMs === 'number' ? `ok, ${Math.round(s.elapsedMs)} ms` : 'ok', tom: 'ok' }
+    : { valor: `falhou: ${s.motivo || s.code || 'motivo não informado'}`, tom: 'bad' };
+  const pendentes = Number.isFinite(s.pendingWebhookEvents)
+    ? { valor: String(s.pendingWebhookEvents), tom: s.pendingWebhookEvents > 0 ? 'warn' : 'ok' }
+    : { valor: 'indisponível', tom: 'warn' };
+  return [
+    { chave: 'ambiente', rotulo: 'Ambiente', dica: s.baseUrl, ...ambiente },
+    { chave: 'chave', rotulo: 'Chave', ...chave },
+    { chave: 'webhook', rotulo: 'Webhook', ...webhook },
+    { chave: 'conexao', rotulo: 'Conexão', ...conexao },
+    { chave: 'pendentes', rotulo: 'Eventos pendentes', ...pendentes },
+  ];
+});
+
+async function testarIntegracao() {
+  testandoIntegracao.value = true;
+  reprocessoMensagem.value = '';
+  try {
+    integracao.value = await fetchAsaasStatus();
+    integracaoErro.value = '';
+  } catch (e) {
+    // Resultado antigo ao lado de uma falha nova enganaria: some junto.
+    integracao.value = null;
+    integracaoErro.value = mensagemDeErro(e, 'Não foi possível consultar a integração com o Asaas.');
+  } finally {
+    testandoIntegracao.value = false;
+  }
+}
+
+function alternarIntegracao() {
+  integracaoAberta.value = !integracaoAberta.value;
+  if (integracaoAberta.value && !testandoIntegracao.value) testarIntegracao();
+}
+
+/** Reaplica os eventos de webhook pendentes (pagamentos que podem não ter dado baixa). */
+async function reprocessarPendentes() {
+  reprocessando.value = true;
+  integracaoErro.value = '';
+  try {
+    const r = await reprocessAsaasWebhooks();
+    await testarIntegracao();
+    reprocessoMensagem.value = `Reprocessados ${r?.processed ?? 0} de ${r?.attempted ?? 0}`
+      + (r?.failed ? `; ${r.failed} falharam` : '')
+      + (r?.remaining ? `; restam ${r.remaining}` : '') + '.';
+    await depoisDaAcao(null);
+  } catch (e) {
+    integracaoErro.value = mensagemDeErro(e, 'Não foi possível reprocessar os eventos pendentes.');
+  } finally {
+    reprocessando.value = false;
+  }
+}
+
 /* ============================ Competência ============================ */
-
-const PERIODO_VALIDO = /^\d{4}-(0[1-9]|1[0-2])$/;
-const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-
-/** "2026-08" -> "Agosto de 2026". */
-function periodLabel(period) {
-  const [ano, mes] = String(period || '').split('-').map(Number);
-  if (!ano || !mes || mes < 1 || mes > 12) return period || '';
-  const nome = MESES[mes - 1];
-  return `${nome.charAt(0).toUpperCase()}${nome.slice(1)} de ${ano}`;
-}
-
-/** Competência AAAA-MM deslocada `delta` meses. */
-function deslocarCompetencia(period, delta) {
-  const [ano, mes] = period.split('-').map(Number);
-  const data = new Date(Date.UTC(ano, mes - 1 + delta, 1));
-  return `${data.getUTCFullYear()}-${String(data.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
-/* Datas civis de Brasília, as mesmas que o backend usa para recusar
- * vencimento no passado. O fuso do navegador não entra na conta. */
-function partesDeHojeNoBrasil() {
-  const partes = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(new Date());
-  const valor = (tipo) => partes.find((p) => p.type === tipo)?.value;
-  return { ano: valor('year'), mes: valor('month'), dia: valor('day') };
-}
-const competenciaDeHoje = () => { const { ano, mes } = partesDeHojeNoBrasil(); return `${ano}-${mes}`; };
-const dataDeHoje = () => { const { ano, mes, dia } = partesDeHojeNoBrasil(); return `${ano}-${mes}-${dia}`; };
 
 const competenciaCorrente = ref(competenciaDeHoje());
 
@@ -715,23 +675,6 @@ function mudarCompetencia(delta) {
   competencia.value = nova;
 }
 
-/* ============================ Formatação ============================ */
-
-const formatCurrency = (valor) => (Number(valor) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const paraCentavos = (valor) => Math.round((Number(valor) || 0) * 100);
-
-/** "2026-09-10" -> "10/09/2026", sem passar pelo fuso do navegador. */
-function formatarData(iso) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : '—';
-}
-
-function somarDias(iso, dias) {
-  const data = new Date(`${iso}T00:00:00Z`);
-  data.setUTCDate(data.getUTCDate() + dias);
-  return data.toISOString().slice(0, 10);
-}
-
 const normalizarBusca = (texto) => String(texto || '')
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
@@ -741,6 +684,9 @@ const visao = ref(null);
 const carregando = ref(false);
 const erroCarga = ref('');
 let geracaoDaCarga = 0;
+
+/* uid do cliente com o painel aberto (um por vez). */
+const expandido = ref(null);
 
 /**
  * Carrega a visão da competência selecionada.
@@ -774,6 +720,8 @@ async function carregar({ silencioso = false } = {}) {
   }
 }
 
+const hoje = computed(() => visao.value?.today || dataDeHoje());
+
 /* ============================ Linhas ============================ */
 
 const SITUACOES = {
@@ -798,9 +746,14 @@ function situacaoDe(cliente) {
   return 'a_emitir';
 }
 
-function classeDaSituacao(linha) {
-  if (linha.situacao === 'emitida' && linha.invoice?.asaasStatus === 'OVERDUE') return 'is-overdue';
-  return SITUACOES[linha.situacao].classe;
+const vencida = (linha) => linha.situacao === 'emitida' && linha.invoice?.asaasStatus === 'OVERDUE';
+const classeDaSituacao = (linha) => (vencida(linha) ? 'is-overdue' : SITUACOES[linha.situacao].classe);
+const rotuloDaSituacao = (linha) => (vencida(linha) ? 'Vencida' : SITUACOES[linha.situacao].label);
+
+function textoDoAsaas(linha) {
+  if (linha.invoice?.asaasPaymentId) return asaasStatusLabel(linha.invoice.asaasStatus) || 'Emitida';
+  if (linha.situacao === 'paga') return 'Baixa manual';
+  return linha.linked ? 'Não emitida' : 'Cliente não vinculado';
 }
 
 const linhas = computed(() => (visao.value?.clients || [])
@@ -862,7 +815,42 @@ const filtro = ref('todas');
 const contagemPorFiltro = computed(() => Object.fromEntries(FILTROS.map(({ key }) => [
   key, linhasBuscadas.value.filter((linha) => passaNoFiltro(linha, key)).length,
 ])));
-const linhasFiltradas = computed(() => linhasBuscadas.value.filter((linha) => passaNoFiltro(linha, filtro.value)));
+/* O cliente aberto fica na lista mesmo que deixe de passar no filtro: emitir
+ * a cobrança de quem está em "A emitir" não pode fazer o painel sumir no meio
+ * do trabalho. Trocar o filtro de propósito fecha o painel (watch abaixo). */
+const linhasFiltradas = computed(() => linhasBuscadas.value
+  .filter((linha) => passaNoFiltro(linha, filtro.value) || linha.uid === expandido.value));
+
+/* Clicar no indicador filtra; clicar de novo volta para todas. */
+function alternarFiltro(chave) {
+  filtro.value = filtro.value === chave ? 'todas' : chave;
+}
+
+const ORDENACOES = [
+  { key: 'nome', label: 'Nome' },
+  { key: 'situacao', label: 'O que falta fazer' },
+  { key: 'valor', label: 'Maior valor' },
+  { key: 'vencimento', label: 'Vencimento' },
+];
+/* "O que falta fazer" põe primeiro quem ainda tem passo: abrir, emitir, receber. */
+const PESO_DA_SITUACAO = { aberta: 0, sem_fatura: 1, a_emitir: 2, emitida: 3, paga: 4, zerada: 5 };
+const ordem = ref('nome');
+
+const linhasOrdenadas = computed(() => {
+  const lista = [...linhasFiltradas.value];
+  const porNome = (a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { numeric: true, sensitivity: 'base' });
+  switch (ordem.value) {
+    case 'valor':
+      return lista.sort((a, b) => (paraCentavos(b.total) - paraCentavos(a.total)) || porNome(a, b));
+    case 'situacao':
+      return lista.sort((a, b) => (PESO_DA_SITUACAO[a.situacao] - PESO_DA_SITUACAO[b.situacao]) || porNome(a, b));
+    case 'vencimento':
+      return lista.sort((a, b) => String(a.invoice?.dueDate || '9999').localeCompare(String(b.invoice?.dueDate || '9999'))
+        || porNome(a, b));
+    default:
+      return lista; // `linhas` já vem por nome
+  }
+});
 
 /** Soma em centavos: somar float de reais acumula erro de arredondamento. */
 const somar = (lista) => lista.reduce((soma, linha) => soma + paraCentavos(linha.total), 0) / 100;
@@ -878,11 +866,89 @@ const indicadores = computed(() => {
     pagas: resumir(escopo.filter((linha) => linha.situacao === 'paga')),
   };
 });
-const totalFiltrado = computed(() => somar(linhasFiltradas.value));
-const abertasVisiveis = computed(() => linhasFiltradas.value
+
+const KPIS = [
+  { key: 'aFechar', filtro: 'a_fechar', label: 'A fechar' },
+  { key: 'aEmitir', filtro: 'a_emitir', label: 'A emitir' },
+  { key: 'emitidas', filtro: 'emitidas', label: 'Aguardando pagamento' },
+  { key: 'pagas', filtro: 'pagas', label: 'Pagas' },
+];
+
+/* Barra do fechamento por VALOR, na ordem do caminho: recebido, aguardando,
+ * pronto para emitir, ainda aberto. */
+const segmentos = computed(() => {
+  const partes = [
+    { key: 'pagas', valor: indicadores.value.pagas.valor },
+    { key: 'emitidas', valor: indicadores.value.emitidas.valor },
+    { key: 'aEmitir', valor: indicadores.value.aEmitir.valor },
+    { key: 'aFechar', valor: indicadores.value.aFechar.valor },
+  ];
+  const total = partes.reduce((soma, parte) => soma + Math.max(0, parte.valor), 0);
+  return partes.map((parte) => ({ ...parte, percentual: total > 0 ? (Math.max(0, parte.valor) / total) * 100 : 0 }));
+});
+const percentualRecebido = computed(() => Math.round(segmentos.value[0].percentual));
+const descricaoDaBarra = computed(() => {
+  const nomes = { pagas: 'pago', emitidas: 'aguardando pagamento', aEmitir: 'a emitir', aFechar: 'a fechar' };
+  return `Fechamento: ${segmentos.value.map((s) => `${Math.round(s.percentual)}% ${nomes[s.key]}`).join(', ')}`;
+});
+
+const totalFiltrado = computed(() => somar(linhasOrdenadas.value));
+const abertasVisiveis = computed(() => linhasOrdenadas.value
   .filter((linha) => linha.situacao === 'sem_fatura' || linha.situacao === 'aberta'));
 
-const rotaDoCliente = (uid) => ({ name: 'ManageUserDetail', params: { uid, tab: 'cobranca' } });
+/* ============================ Painel do cliente ============================ */
+
+const abaDoPainel = ref('fatura');
+/* Incrementado quando a PÁGINA mexe no cliente aberto (lote, ação da linha):
+ * o painel recarrega a fatura dele. */
+const versaoDoPainel = ref(0);
+
+/* Trocar o filtro de propósito fecha o painel de quem não passa nele. */
+watch(filtro, (chave) => {
+  const aberta = linhas.value.find((linha) => linha.uid === expandido.value);
+  if (aberta && !passaNoFiltro(aberta, chave)) expandido.value = null;
+});
+
+const idDaLinha = (uid) => `cliente-${String(uid).replace(/[^A-Za-z0-9_-]/g, '_')}`;
+
+async function mostrarLinha(uid) {
+  await nextTick();
+  const elemento = document.getElementById(idDaLinha(uid));
+  if (!elemento) return;
+  const { top } = elemento.getBoundingClientRect();
+  // Só rola quando a linha não está na parte de cima da tela.
+  if (top < 90 || top > window.innerHeight * 0.45) {
+    elemento.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function alternarPainel(linha) {
+  if (expandido.value === linha.uid) {
+    expandido.value = null;
+    return;
+  }
+  abaDoPainel.value = 'fatura';
+  expandido.value = linha.uid;
+  mostrarLinha(linha.uid);
+}
+
+/** Abre o cliente na aba de dados de cobrança (vindo do "Completar cadastro" do lote). */
+function abrirCadastroDoCliente(uid) {
+  fecharProcesso();
+  if (!linhasOrdenadas.value.some((linha) => linha.uid === uid)) {
+    busca.value = '';
+    filtro.value = 'todas';
+    mostrarInativos.value = true;
+  }
+  abaDoPainel.value = 'cadastro';
+  expandido.value = uid;
+  mostrarLinha(uid);
+}
+
+/** O painel pede a emissão; ela passa pelo mesmo modal do lote. */
+function emitirDoPainel({ linha, periodo, vencimento, vencimentoPadrao }) {
+  abrirProcesso('emitir', [linha], { periodo, vencimento, vencimentoPadrao });
+}
 
 /* ============================ Seleção ============================ */
 
@@ -894,7 +960,7 @@ const selecionadas = computed(() => linhasNoEscopo.value
   .filter((linha) => linha.selecionavel && selecionados.value.has(linha.uid)));
 const selecionadasAbertas = computed(() => selecionadas.value.filter((linha) => !linha.invoice?.closedAt));
 const totalSelecionado = computed(() => somar(selecionadas.value));
-const selecionaveisVisiveis = computed(() => linhasFiltradas.value.filter((linha) => linha.selecionavel));
+const selecionaveisVisiveis = computed(() => linhasOrdenadas.value.filter((linha) => linha.selecionavel));
 const todasMarcadas = computed(() => selecionaveisVisiveis.value.length > 0
   && selecionaveisVisiveis.value.every((linha) => selecionados.value.has(linha.uid)));
 const algumasMarcadas = computed(() => !todasMarcadas.value
@@ -922,29 +988,6 @@ function podarSelecao() {
   selecionados.value = new Set([...selecionados.value].filter((uid) => validos.has(uid)));
 }
 
-/* ============================ Erros ============================ */
-
-/** Texto para o master, a partir do `code` do backend quando a mensagem crua não diz o que fazer. */
-function mensagemDeErro(e, padrao = 'Não foi possível concluir a operação.') {
-  switch (codigoDoErro(e)) {
-    case 'billing_busy':
-      return 'Outra operação de cobrança deste cliente está em andamento. Tente de novo em instantes.';
-    case 'provider_unauthorized':
-      return 'O Asaas recusou a chave de API. Confira ASAAS_API_KEY e ASAAS_ENV no servidor.';
-    case 'not_configured':
-      return 'Integração com o Asaas não configurada no servidor (ASAAS_API_KEY).';
-    case 'provider_rate_limited':
-      return 'O Asaas limitou as requisições. Aguarde um minuto e tente de novo.';
-    case 'timeout':
-    case 'network_error':
-      return 'O Asaas não respondeu a tempo. Nada foi duplicado; tente de novo.';
-    default:
-      // Sem status HTTP: a requisição nem chegou ao servidor.
-      if (e && !e.status && e.name === 'TypeError') return 'Sem resposta do servidor. Confira a conexão e tente de novo.';
-      return e?.message || padrao;
-  }
-}
-
 /* ============================ Ações de uma linha ============================ */
 
 const ocupados = ref(new Set());
@@ -954,13 +997,19 @@ function marcarOcupado(uid, sim) {
   ocupados.value = proximo;
 }
 
+/** Recarrega a lista e, se o cliente está aberto, o painel dele. */
+async function depoisDaAcao(uid) {
+  await carregar({ silencioso: true });
+  if (!uid || expandido.value === uid) versaoDoPainel.value += 1;
+}
+
 /** Fecha sem emitir. A confirmação diz o que muda: o valor deixa de mudar. */
 async function fecharUma(linha) {
   const periodo = competencia.value;
   const confirmado = await confirm({
     title: `Fechar ${periodLabel(periodo)}`,
     message: `${linha.nome}: o valor é recalculado uma última vez e passa a ser definitivo.`,
-    detail: 'Vendas e avulsos que chegarem depois entram na competência seguinte. Para reabrir, use a tela do cliente.',
+    detail: 'Vendas e avulsos que chegarem depois entram na competência seguinte. Dá para reabrir pelo painel do cliente.',
     confirmText: 'Fechar competência',
     tone: 'primary',
   });
@@ -969,13 +1018,13 @@ async function fecharUma(linha) {
   marcarOcupado(linha.uid, true);
   try {
     const resposta = await closeInvoicePeriod(linha.uid, periodo);
-    notify.success(`${linha.nome}: competência fechada em ${formatCurrency(resposta?.invoice?.total_amount)}.`);
+    notify.success(`${linha.nome}: competência fechada em ${formatarMoeda(resposta?.invoice?.total_amount)}.`);
   } catch (e) {
     if (codigoDoErro(e) === 'already_closed') notify.info(`${linha.nome}: a competência já estava fechada.`);
     else notify.error(mensagemDeErro(e, 'Não foi possível fechar a competência.'));
   } finally {
     marcarOcupado(linha.uid, false);
-    await carregar({ silencioso: true });
+    await depoisDaAcao(linha.uid);
   }
 }
 
@@ -989,29 +1038,7 @@ async function sincronizar(linha) {
     notify.error(mensagemDeErro(e, 'Não foi possível sincronizar com o Asaas.'));
   } finally {
     marcarOcupado(linha.uid, false);
-    await carregar({ silencioso: true });
-  }
-}
-
-/* ---------------- Prévia da descrição ---------------- */
-
-const previa = ref(null);
-let geracaoDaPrevia = 0;
-
-async function abrirDescricao(linha) {
-  const geracao = ++geracaoDaPrevia;
-  previa.value = { geracao, nome: linha.nome, carregando: true, erro: '', dados: null };
-  try {
-    const dados = await fetchChargePreview(linha.uid, competencia.value);
-    if (previa.value?.geracao === geracao) previa.value.dados = dados;
-  } catch (e) {
-    if (previa.value?.geracao === geracao) {
-      previa.value.erro = e?.status === 404
-        ? 'Este cliente ainda não tem fatura nesta competência.'
-        : mensagemDeErro(e, 'Não foi possível montar a descrição.');
-    }
-  } finally {
-    if (previa.value?.geracao === geracao) previa.value.carregando = false;
+    await depoisDaAcao(linha.uid);
   }
 }
 
@@ -1044,11 +1071,44 @@ async function recalcularAbertas() {
     notify.error(mensagemDeErro(e, 'Não foi possível recalcular as competências abertas.'));
   } finally {
     recalculo.value = null;
-    await carregar({ silencioso: true });
+    await depoisDaAcao(null);
   }
 }
 
-/* ============================ Fechar / emitir em lote ============================
+/* ---------------- Exportar ---------------- */
+
+/** Planilha da lista atual. `;` e BOM para o Excel em português abrir certo. */
+function exportarCsv() {
+  /* Texto que começa com = + - @ vira fórmula no Excel: o apóstrofo neutraliza. */
+  const celula = (valor) => {
+    let texto = String(valor ?? '');
+    if (/^[=+\-@]/.test(texto)) texto = `'${texto}`;
+    return `"${texto.replace(/"/g, '""')}"`;
+  };
+  const valorBr = (valor) => (valor === null || valor === undefined ? '' : (Number(valor) || 0).toFixed(2).replace('.', ','));
+  const cabecalho = ['Cliente', 'E-mail', 'Apelido ML', 'Situação', 'Valor (R$)', 'Vencimento', 'Asaas', 'Link da fatura'];
+  const linhasDoArquivo = linhasOrdenadas.value.map((linha) => [
+    linha.nome,
+    linha.email || '',
+    linha.mlNickname || '',
+    rotuloDaSituacao(linha),
+    valorBr(linha.total),
+    linha.invoice?.dueDate ? formatarData(linha.invoice.dueDate) : '',
+    linha.invoice?.asaasPaymentId ? textoDoAsaas(linha) : '',
+    linha.invoice?.asaasInvoiceUrl || '',
+  ]);
+  const conteudo = [cabecalho, ...linhasDoArquivo].map((colunas) => colunas.map(celula).join(';')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([`\ufeff${conteudo}`], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `cobrancas-${competencia.value}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/* ============================ Fechar / emitir (modal) ============================
  *
  * O passo a passo de cada cliente (fechar -> vincular no Asaas -> emitir, com
  * repetição do que for passageiro) está em utils/loteDeCobranca.js, sem Vue,
@@ -1061,7 +1121,7 @@ const CONCORRENCIA = 2;
 
 const lote = criarLoteDeCobranca({
   api: { closeInvoicePeriod, ensureAsaasCustomer, issueCharge },
-  formatarValor: formatCurrency,
+  formatarValor: formatarMoeda,
   formatarData,
   mensagemDeErro,
 });
@@ -1082,8 +1142,6 @@ const telaAtiva = ref(true);
 const processando = computed(() => processo.value?.fase === 'executando');
 const ocupado = computed(() => carregando.value || Boolean(recalculo.value) || processando.value);
 
-const hoje = computed(() => visao.value?.today || dataDeHoje());
-
 /* Vencimento padrão da competência; se já passou, cinco dias a partir de hoje
  * (o mesmo prazo que a tela do cliente sugere). */
 const vencimentoSugerido = computed(() => {
@@ -1091,16 +1149,25 @@ const vencimentoSugerido = computed(() => {
   return padrao && padrao >= hoje.value ? padrao : somarDias(hoje.value, 5);
 });
 
-function abrirProcesso(modo, alvo) {
+/**
+ * Abre o modal de fechar/emitir para um ou vários clientes.
+ * `opcoes.periodo` existe porque o painel do cliente pode estar em outra
+ * competência (navegando pelo histórico).
+ */
+function abrirProcesso(modo, alvo, opcoes = {}) {
   const lista = (alvo || []).filter((linha) => linha.selecionavel);
   if (!lista.length || ocupado.value) return;
+  const periodo = opcoes.periodo || competencia.value;
+  const vencimentoPadrao = opcoes.vencimentoPadrao
+    ?? (periodo === competencia.value ? visao.value?.standardDueDate : '');
 
   processo.value = {
     modo,
-    periodo: competencia.value,
+    periodo,
     fase: 'revisao',
     cancelado: false,
-    vencimento: vencimentoSugerido.value,
+    vencimentoPadrao: vencimentoPadrao || '',
+    vencimento: opcoes.vencimento || vencimentoSugerido.value,
     previa: null,
     previaErro: '',
     previaCarregando: false,
@@ -1155,9 +1222,7 @@ const resumoRevisao = computed(() => {
 
 const vencimentoValido = computed(() => {
   const valor = processo.value?.vencimento || '';
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
-  const data = new Date(`${valor}T00:00:00Z`);
-  return !Number.isNaN(data.getTime()) && data.toISOString().slice(0, 10) === valor && valor >= hoje.value;
+  return dataValida(valor) && valor >= hoje.value;
 });
 
 const podeIniciar = computed(() => Boolean(processo.value?.itens.length)
@@ -1218,7 +1283,7 @@ async function executarProcesso() {
   // fechado o modal, e aí o resumo sairia zerado.
   const { ok, erros, pulados } = contagemDoProcesso.value;
   limparSelecao();
-  await carregar({ silencioso: true });
+  await depoisDaAcao(null);
 
   const feito = p.modo === 'fechar' ? 'fechada(s)' : 'concluída(s)';
   if (erros) notify.warning(`${ok} ${feito}, ${erros} com erro. O motivo de cada uma está na lista.`);
@@ -1237,7 +1302,8 @@ async function repetirFalhas() {
   }
   const atuais = new Map(linhas.value.map((linha) => [linha.uid, linha]));
   repetiveis.value.forEach((item) => {
-    item.linha = atuais.get(item.uid) || item.linha;
+    // Linha nova só para a competência da página; no histórico, fica a do painel.
+    if (p.periodo === competencia.value) item.linha = atuais.get(item.uid) || item.linha;
     lote.concluir(item, 'aguardando', '', { pendencia: null });
   });
   await executarProcesso();
@@ -1258,6 +1324,7 @@ function sincronizarRota() {
 
 watch(competencia, () => {
   limparSelecao();
+  expandido.value = null;
   sincronizarRota();
   carregar();
 });
@@ -1274,87 +1341,61 @@ onMounted(() => {
   carregar();
 });
 
-/* keep-alive: a primeira ativação é a própria montagem. Nas seguintes (voltando
- * da tela de um cliente, por exemplo) os dados podem ter mudado. */
+/* keep-alive: a primeira ativação é a própria montagem. Nas seguintes os dados
+ * podem ter mudado em outra tela. */
 let ativadaUmaVez = false;
 onActivated(() => {
   telaAtiva.value = true;
   if (!ativadaUmaVez) { ativadaUmaVez = true; return; }
   const daRota = competenciaDaRota();
   if (daRota !== competencia.value) competencia.value = daRota;
-  else carregar({ silencioso: Boolean(visao.value) });
+  else depoisDaAcao(null);
 });
 
 /* Modal teleportado para o body continuaria na tela depois de sair daqui. O lote
  * em andamento segue rodando e o modal volta a aparecer quando a tela voltar. */
 onDeactivated(() => {
   telaAtiva.value = false;
-  previa.value = null;
   if (!processando.value) processo.value = null;
 });
 </script>
 
 <style scoped>
-/* Mesmo vocabulário visual da tela de usuários (cabeçalho, faixa de
-   indicadores, barra de ferramentas e tabela), para o master não trocar de
-   linguagem ao passar de uma tela para a outra. */
+/* Uma rolagem só, a da página. Nenhum contêiner aqui tem altura máxima com
+   overflow: o cabeçalho da lista gruda logo abaixo da barra do topo (56px) e a
+   barra de lote gruda no pé da tela. */
 
 /* ===================== BASE / LAYOUT ===================== */
 .billing-wrapper {
-  display: flex;
-  min-height: 100vh;
-  font-family: var(--font-sans);
-  background-color: #f8fafc;
-  color: #0f172a;
+  display: flex; min-height: 100vh;
+  font-family: var(--font-sans); background-color: #f4f7fb; color: #0f172a;
 }
 .main-content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .content-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  width: 100%;
-  max-width: 1640px;
-  margin: 0 auto;
-  padding: 1.25rem 1.5rem 2.5rem;
-  box-sizing: border-box;
+  flex: 1; display: flex; flex-direction: column; min-width: 0;
+  width: 100%; max-width: 1640px; margin: 0 auto;
+  padding: 1.25rem 1.5rem 2.5rem; box-sizing: border-box;
 }
-button, input, select, table { font-family: var(--font-sans); }
-
+button, input, select { font-family: var(--font-sans); }
 .sr-only {
   position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 
 /* ===================== CABEÇALHO ===================== */
-.page-header {
-  display: flex; justify-content: space-between; align-items: flex-end;
-  gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;
-}
+.page-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .page-header__text { min-width: 0; }
 .page-eyebrow {
-  display: inline-flex; align-items: center; gap: 0.35rem;
-  padding: 0.2rem 0.55rem; margin-bottom: 0.45rem;
-  border: 1px solid #bfdbfe; border-radius: 999px;
-  background: #eff6ff; color: #1d4ed8;
+  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.55rem; margin-bottom: 0.45rem;
+  border: 1px solid #bfdbfe; border-radius: 999px; background: #eff6ff; color: #1d4ed8;
   font-size: 0.68rem; font-weight: 750; letter-spacing: 0.02em; text-transform: uppercase;
 }
-.title {
-  margin: 0; font-size: clamp(1.45rem, 2vw, 1.8rem); font-weight: 800;
-  letter-spacing: -0.035em; color: #0f172a;
-}
-.subtitle { margin: 0.2rem 0 0; font-size: 0.86rem; color: #64748b; }
-.header-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.title { margin: 0; font-size: clamp(1.45rem, 2vw, 1.8rem); font-weight: 800; letter-spacing: -0.035em; color: #0f172a; }
+.subtitle { margin: 0.2rem 0 0; max-width: 46rem; font-size: 0.86rem; color: #64748b; }
+.header-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 
-.period-picker {
-  display: inline-flex; align-items: center; min-height: 38px;
-  border: 1px solid #dbe3ef; border-radius: 9px; background: #fff; overflow: hidden;
-}
-.period-picker__step {
-  display: grid; place-items: center; width: 34px; height: 38px;
-  border: none; background: transparent; color: #475569; cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
+.period-picker { display: inline-flex; align-items: center; min-height: 38px; border: 1px solid #dbe3ef; border-radius: 9px; background: #fff; overflow: hidden; }
+.period-picker__step { display: grid; place-items: center; width: 34px; height: 38px; border: none; background: transparent; color: #475569; cursor: pointer; transition: background 0.15s, color 0.15s; }
 .period-picker__step:hover:not(:disabled) { background: #eff6ff; color: #1d4ed8; }
 .period-picker__step:disabled { opacity: 0.4; cursor: not-allowed; }
 .period-picker__select {
@@ -1362,170 +1403,186 @@ button, input, select, table { font-family: var(--font-sans); }
   border: none; border-left: 1px solid #eef2f7; border-right: 1px solid #eef2f7;
   background: #fff; color: #0f172a; font-size: 0.85rem; font-weight: 700; cursor: pointer;
 }
-.period-picker__select:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; }
-.period-picker__step:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; }
+.period-picker__select:focus-visible, .period-picker__step:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; }
 
-/* ===================== INDICADORES ===================== */
-.stats-strip {
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.7rem; margin-bottom: 0.8rem;
+/* ===================== INTEGRAÇÃO ===================== */
+.integracao-dot { width: 9px; height: 9px; border-radius: 999px; background: #cbd5e1; }
+.integracao-dot.is-ok { background: #10b981; }
+.integracao-dot.is-warn { background: #f59e0b; }
+.integracao-dot.is-bad { background: #ef4444; }
+.integracao {
+  display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 0.9rem; padding: 0.8rem 1rem;
+  border: 1px solid #dbe3ef; border-radius: 12px; background: #fff;
 }
-.stat-tile {
-  display: flex; align-items: center; gap: 0.7rem; min-width: 0;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid #dbe3ef; border-radius: 10px; background: #fff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+.integracao__topo { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.integracao__topo strong { margin-right: auto; color: #0f172a; font-size: 0.88rem; font-weight: 800; }
+.integracao__fechar {
+  display: grid; place-items: center; width: 28px; height: 28px; border: none; border-radius: 7px;
+  background: transparent; color: #64748b; font-size: 1.1rem; cursor: pointer;
 }
-.stat-tile__icon {
-  display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto;
-  border-radius: 9px; background: #eff6ff; color: #2563eb;
-}
-.stat-tile.is-warning .stat-tile__icon { background: #fff7ed; color: #c2410c; }
-.stat-tile.is-info .stat-tile__icon { background: #eff6ff; color: #1d4ed8; }
-.stat-tile.is-sent .stat-tile__icon { background: #eef2ff; color: #4338ca; }
-.stat-tile.is-success .stat-tile__icon { background: #ecfdf5; color: #059669; }
-.stat-tile__body { min-width: 0; display: flex; flex-direction: column; }
-.stat-tile__body strong {
-  color: #0f172a; font-size: 1.15rem; font-weight: 800;
-  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15;
-}
-.stat-tile__body span {
-  margin-top: 0.08rem; overflow: hidden; color: #64748b;
-  font-size: 0.7rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap;
-}
+.integracao__fechar:hover { background: #f1f5f9; color: #0f172a; }
+.integracao__fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.6rem; margin: 0; }
+.integracao__fatos dt { color: #64748b; font-size: 0.66rem; font-weight: 750; letter-spacing: 0.05em; text-transform: uppercase; }
+.integracao__fatos dd { margin: 0.15rem 0 0; font-size: 0.82rem; font-weight: 700; overflow-wrap: anywhere; }
+.integracao__fatos dd.is-ok { color: #047857; }
+.integracao__fatos dd.is-warn { color: #b45309; }
+.integracao__fatos dd.is-bad { color: #b91c1c; }
+.integracao__estado { margin: 0; color: #475569; font-size: 0.8rem; }
+.integracao__estado.is-error { color: #b91c1c; font-weight: 650; }
 
-.page-hint {
-  display: flex; align-items: flex-start; gap: 0.45rem;
-  margin: 0 0 0.8rem; padding: 0.55rem 0.75rem;
-  border: 1px solid #fde68a; border-radius: 9px; background: #fffbeb;
-  color: #92400e; font-size: 0.78rem; line-height: 1.45;
+/* ===================== FECHAMENTO ===================== */
+.fechamento {
+  display: flex; flex-direction: column; gap: 0.8rem; margin-bottom: 0.9rem; padding: 1rem 1.1rem;
+  border: 1px solid #dbe3ef; border-radius: 14px; background: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
-.page-hint svg { flex: 0 0 auto; margin-top: 0.12rem; }
+.fechamento__topo { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.fechamento__titulo { display: flex; flex-direction: column; gap: 0.1rem; }
+.fechamento__rotulo { color: #64748b; font-size: 0.7rem; font-weight: 750; letter-spacing: 0.05em; text-transform: uppercase; }
+.fechamento__total { color: #0f172a; font-size: 1.75rem; font-weight: 850; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.fechamento__sub { color: #64748b; font-size: 0.78rem; font-weight: 600; }
+.fechamento__dica {
+  max-width: 34rem; margin: 0; padding: 0.5rem 0.7rem; border: 1px solid #fde68a; border-radius: 9px;
+  background: #fffbeb; color: #92400e; font-size: 0.75rem; line-height: 1.45;
+}
+.fechamento__barra { display: flex; height: 10px; overflow: hidden; border-radius: 999px; background: #eef2f7; }
+.fechamento__barra span { height: 100%; transition: width 0.35s ease; }
+.fechamento__barra .is-pagas { background: #10b981; }
+.fechamento__barra .is-emitidas { background: #6366f1; }
+.fechamento__barra .is-aEmitir { background: #3b82f6; }
+.fechamento__barra .is-aFechar { background: #f59e0b; }
+
+.fechamento__kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.6rem; }
+.kpi {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "marca rotulo numero" "marca valor numero";
+  align-items: center; column-gap: 0.55rem; row-gap: 0.05rem; padding: 0.6rem 0.75rem;
+  border: 1px solid #e2e8f0; border-radius: 11px; background: #f8fafc; text-align: left; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.kpi:hover { border-color: #93c5fd; background: #fff; transform: translateY(-1px); }
+.kpi:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25); }
+.kpi.is-active { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 1px #2563eb inset; }
+.kpi__marca { grid-area: marca; width: 10px; height: 34px; border-radius: 999px; background: #cbd5e1; }
+.kpi.is-pagas .kpi__marca { background: #10b981; }
+.kpi.is-emitidas .kpi__marca { background: #6366f1; }
+.kpi.is-aEmitir .kpi__marca { background: #3b82f6; }
+.kpi.is-aFechar .kpi__marca { background: #f59e0b; }
+.kpi__rotulo { grid-area: rotulo; overflow: hidden; color: #475569; font-size: 0.74rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.kpi__valor { grid-area: valor; color: #64748b; font-size: 0.74rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kpi__numero { grid-area: numero; color: #0f172a; font-size: 1.35rem; font-weight: 850; font-variant-numeric: tabular-nums; }
 
 /* ===================== FERRAMENTAS ===================== */
 .table-controls {
-  display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap;
-  padding: 0.6rem 0.7rem; margin-bottom: 0.7rem;
-  border: 1px solid #dbe3ef; border-radius: 12px; background: #fff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; margin-bottom: 0.7rem; padding: 0.6rem 0.7rem;
+  border: 1px solid #dbe3ef; border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
-.search-wrapper { position: relative; flex: 1 1 260px; min-width: 220px; max-width: 380px; }
-.search-icon {
-  position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%);
-  width: 1rem; height: 1rem; color: #94a3b8; pointer-events: none;
-}
+.search-wrapper { position: relative; flex: 1 1 240px; min-width: 200px; max-width: 360px; }
+.search-icon { position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); width: 1rem; height: 1rem; color: #94a3b8; pointer-events: none; }
 .search-input {
-  width: 100%; min-height: 38px; box-sizing: border-box;
-  padding: 0.5rem 2rem 0.5rem 2.1rem;
-  font-size: 0.85rem; color: #0f172a;
-  border: 1px solid #dbe3ef; border-radius: 8px; background: #fff;
+  width: 100%; min-height: 38px; box-sizing: border-box; padding: 0.5rem 2rem 0.5rem 2.1rem;
+  border: 1px solid #dbe3ef; border-radius: 8px; background: #fff; color: #0f172a; font-size: 0.85rem;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .search-input::placeholder { color: #94a3b8; }
 .search-input:focus { outline: none; border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
 .search-clear {
-  position: absolute; right: 0.45rem; top: 50%; transform: translateY(-50%);
-  display: grid; place-items: center; width: 20px; height: 20px;
-  border: none; border-radius: 999px; background: #eef2f7; color: #64748b; cursor: pointer;
+  position: absolute; right: 0.45rem; top: 50%; transform: translateY(-50%); display: grid; place-items: center;
+  width: 20px; height: 20px; border: none; border-radius: 999px; background: #eef2f7; color: #64748b; cursor: pointer;
 }
 .search-clear:hover { background: #dbeafe; color: #1d4ed8; }
 
-.status-filter-wrapper { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
-.filter-label {
-  color: #64748b; font-size: 0.68rem; font-weight: 750;
-  letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap;
-}
 .chip-row { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
 .chip {
-  display: inline-flex; align-items: center; gap: 0.35rem;
-  min-height: 32px; padding: 0.32rem 0.62rem;
-  border: 1px solid #dbe3ef; border-radius: 8px; background: #fff;
-  color: #475569; font-size: 0.78rem; font-weight: 650; white-space: nowrap; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 0.35rem; min-height: 32px; padding: 0.32rem 0.62rem;
+  border: 1px solid #dbe3ef; border-radius: 8px; background: #fff; color: #475569;
+  font-size: 0.78rem; font-weight: 650; white-space: nowrap; cursor: pointer;
   transition: border-color 140ms, background 140ms, color 140ms;
 }
 .chip:hover { border-color: #93c5fd; background: #f8fbff; color: #1d4ed8; }
 .chip.is-active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
 .chip__count {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 20px; padding: 0 0.25rem; border-radius: 999px;
-  background: #f1f5f9; color: #64748b;
-  font-size: 0.68rem; font-weight: 750; font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; padding: 0 0.25rem;
+  border-radius: 999px; background: #f1f5f9; color: #64748b; font-size: 0.68rem; font-weight: 750; font-variant-numeric: tabular-nums;
 }
 .chip.is-active .chip__count { background: #2563eb; color: #fff; }
 
-.toggle-inactive {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  color: #475569; font-size: 0.78rem; font-weight: 650; white-space: nowrap; cursor: pointer;
+.controls-end { display: flex; align-items: center; gap: 0.8rem; margin-left: auto; flex-wrap: wrap; }
+.sort { display: inline-flex; align-items: center; gap: 0.4rem; color: #64748b; font-size: 0.72rem; font-weight: 750; letter-spacing: 0.03em; text-transform: uppercase; }
+.sort select {
+  min-height: 34px; padding: 0 0.5rem; border: 1px solid #dbe3ef; border-radius: 8px; background: #fff;
+  color: #0f172a; font-size: 0.8rem; font-weight: 650; letter-spacing: 0; text-transform: none; cursor: pointer;
 }
+.sort select:focus-visible { outline: none; border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+.toggle-inactive { display: inline-flex; align-items: center; gap: 0.4rem; color: #475569; font-size: 0.78rem; font-weight: 650; white-space: nowrap; cursor: pointer; }
 .toggle-inactive input { width: 15px; height: 15px; accent-color: #2563eb; cursor: pointer; }
 
-.results-count {
-  margin-left: auto; color: #64748b; font-size: 0.74rem; font-weight: 650; white-space: nowrap;
+/* ===================== LISTA ===================== */
+/* A lista é um contêiner: o layout de cartão entra pela largura DELA, que muda
+   com o menu lateral aberto ou recolhido, e não pela largura da janela. */
+.lista {
+  container-type: inline-size; container-name: lista;
+  border: 1px solid #dbe3ef; border-radius: 14px; background: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
-/* ===================== LOTE ===================== */
-.bulk-bar {
-  position: sticky; top: 0.5rem; z-index: 5;
-  display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;
-  margin-bottom: 0.7rem; padding: 0.55rem 0.75rem;
-  border: 1px solid #93c5fd; border-radius: 12px; background: #eff6ff;
-  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.12);
+.lista__cabecalho, .linha__resumo {
+  display: grid;
+  grid-template-columns: 24px minmax(10rem, 2fr) minmax(6.5rem, 0.8fr) minmax(5.5rem, 0.6fr) minmax(6rem, 0.9fr) minmax(6.5rem, 0.7fr) auto 32px;
+  align-items: center; gap: 0.65rem;
 }
-.bulk-bar__info { color: #1e3a8a; font-size: 0.82rem; }
-.bulk-bar__info strong { font-variant-numeric: tabular-nums; }
-.bulk-bar__actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+.lista__cabecalho {
+  position: sticky; top: 56px; z-index: 6;
+  padding: 0.55rem 1rem; border-bottom: 1px solid #dbe3ef; border-radius: 14px 14px 0 0; background: #f8fafc;
+  color: #64748b; font-size: 0.66rem; font-weight: 750; letter-spacing: 0.05em; text-transform: uppercase;
+}
+.lista__cabecalho input, .linha__check input { width: 16px; height: 16px; accent-color: #2563eb; cursor: pointer; }
+.lista__cabecalho input:disabled, .linha__check input:disabled { cursor: not-allowed; }
+.col-num { text-align: right; }
+.col-acoes { text-align: right; }
 
-/* ===================== TABELA ===================== */
-.table-container {
-  background-color: #fff; border: 1px solid #dbe3ef; border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05); overflow: hidden;
-}
-.table-wrapper { width: 100%; max-width: 100%; max-height: min(70vh, 820px); overflow: auto; }
-.billing-table { width: 100%; min-width: 1040px; border-collapse: separate; border-spacing: 0; }
-.billing-table th, .billing-table td {
-  padding: 0.65rem 0.9rem; text-align: left; border-bottom: 1px solid #eef2f7; vertical-align: middle;
-}
-.billing-table th {
-  position: sticky; top: 0; z-index: 2;
-  background-color: #f8fafc; color: #64748b;
-  font-weight: 750; font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase;
-  border-bottom: 1px solid #dbe3ef; white-space: nowrap;
-}
-.billing-table td { font-size: 0.85rem; color: #0f172a; }
-.billing-table tbody tr:nth-child(even) { background-color: #fcfdff; }
-.billing-table tbody tr:hover { background-color: #f8fbff; }
-.billing-table tbody tr.is-selected { background-color: #eff6ff; }
-.billing-table tbody tr:last-child td { border-bottom: none; }
+.lista__itens { margin: 0; padding: 0; list-style: none; }
+.linha { border-bottom: 1px solid #eef2f7; scroll-margin-top: 104px; transition: background 0.15s, box-shadow 0.15s; }
+.linha:last-child { border-bottom: none; }
+.linha__resumo { padding: 0.65rem 1rem; cursor: pointer; }
+.linha:hover .linha__resumo { background: #f8fbff; }
+.linha.is-selecionada .linha__resumo { background: #eff6ff; }
+.linha.is-expandida { position: relative; z-index: 1; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1), 0 0 0 1px #93c5fd; }
+.linha.is-expandida .linha__resumo { background: #eff6ff; }
+.linha.is-inativa .linha__nome { color: #64748b; }
 
-.col-check { width: 2.25rem; padding-right: 0 !important; }
-.col-check input { width: 16px; height: 16px; accent-color: #2563eb; cursor: pointer; }
-.col-check input:disabled { cursor: not-allowed; }
-.col-num { text-align: right !important; white-space: nowrap; }
-.col-actions { width: 1%; text-align: right !important; }
+.linha__check { display: flex; align-items: center; justify-content: center; min-height: 24px; cursor: default; }
+.linha__cliente { display: flex; flex-direction: column; min-width: 0; }
+.linha__nome { overflow: hidden; color: #0f172a; font-size: 0.88rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.linha__detalhe { overflow: hidden; color: #94a3b8; font-size: 0.73rem; text-overflow: ellipsis; white-space: nowrap; }
+.linha__tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
 
-.client-cell { display: flex; flex-direction: column; min-width: 0; max-width: 26rem; }
-.client-cell__name {
-  overflow: hidden; color: #0f172a; font-size: 0.86rem; font-weight: 700;
-  text-overflow: ellipsis; white-space: nowrap;
-}
-.client-cell__meta {
-  overflow: hidden; color: #94a3b8; font-size: 0.73rem; text-overflow: ellipsis; white-space: nowrap;
-}
-.client-cell__tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
-.row-inactive .client-cell__name { color: #475569; }
+/* No desktop os três itens de `meta` viram colunas da grade. */
+.linha__meta { display: contents; }
+.meta-rotulo { display: none; }
+.linha__venc { color: #475569; font-size: 0.8rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.linha__asaas { overflow: hidden; color: #4338ca; font-size: 0.8rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.linha__asaas.is-overdue { color: #b91c1c; }
+.linha__valor { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+.linha__valor strong { color: #0f172a; font-size: 0.9rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.linha__valor small { color: #c2410c; font-size: 0.66rem; font-weight: 700; }
+.cell-muted { color: #94a3b8; font-size: 0.8rem; }
 
-.tag {
-  display: inline-flex; align-items: center; padding: 0.08rem 0.4rem; border-radius: 5px;
-  font-size: 0.66rem; font-weight: 750; letter-spacing: 0.01em; white-space: nowrap;
+.linha__acoes { display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem; flex-wrap: wrap; cursor: default; }
+.linha__expandir {
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 1px solid #dbe3ef; border-radius: 9px; background: #fff; color: #475569; cursor: pointer;
+  transition: transform 0.2s, background 0.15s, color 0.15s, border-color 0.15s;
 }
+.linha__expandir:hover { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.linha__expandir:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25); }
+.linha.is-expandida .linha__expandir { transform: rotate(180deg); border-color: #2563eb; background: #2563eb; color: #fff; }
+
+.tag { display: inline-flex; align-items: center; padding: 0.08rem 0.4rem; border-radius: 5px; font-size: 0.66rem; font-weight: 750; white-space: nowrap; }
 .tag.is-muted { background: #f1f5f9; color: #64748b; }
 .tag.is-warning { background: #fff7ed; color: #c2410c; }
 .tag.is-danger { background: #fef2f2; color: #b91c1c; }
 
 .status-pill {
-  display: inline-flex; align-items: center; gap: 0.35rem;
-  padding: 0.22rem 0.55rem; border-radius: 999px; white-space: nowrap;
-  font-size: 0.7rem; font-weight: 750; letter-spacing: 0.02em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.22rem 0.55rem; border-radius: 999px; white-space: nowrap;
+  font-size: 0.68rem; font-weight: 750; letter-spacing: 0.02em; text-transform: uppercase;
 }
 .status-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
 .status-pill.is-muted { background: #f1f5f9; color: #64748b; }
@@ -1535,38 +1592,34 @@ button, input, select, table { font-family: var(--font-sans); }
 .status-pill.is-overdue { background: #fef2f2; color: #b91c1c; }
 .status-pill.is-paid { background: #ecfdf5; color: #047857; }
 
-.money { font-weight: 750; font-variant-numeric: tabular-nums; }
-.cell-hint { display: block; color: #c2410c; font-size: 0.68rem; font-weight: 650; }
-.cell-muted { color: #94a3b8; font-size: 0.8rem; }
-.cell-date { color: #475569; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.asaas-status { color: #4338ca; font-size: 0.8rem; font-weight: 650; }
-.asaas-status.is-overdue { color: #b91c1c; }
-
-.actions-cell { white-space: nowrap; }
-.row-actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.35rem; }
-.btn-icon-link {
-  display: inline-grid; place-items: center; width: 30px; height: 30px;
-  border: 1px solid #dbe3ef; border-radius: 8px; background: #fff; color: #64748b;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
+.lista__rodape {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap;
+  padding: 0.7rem 1rem; border-top: 1px solid #eef2f7; border-radius: 0 0 14px 14px; background: #fff;
+  color: #64748b; font-size: 0.76rem;
 }
-.btn-icon-link:hover { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
-.btn-icon-link:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2); }
+.lista__rodape strong { color: #0f172a; font-weight: 750; font-variant-numeric: tabular-nums; }
+
+/* ===================== LOTE ===================== */
+.bulk-bar {
+  position: sticky; bottom: 1rem; z-index: 8;
+  display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; flex-wrap: wrap;
+  margin-top: 0.8rem; padding: 0.65rem 0.8rem; border-radius: 14px;
+  background: #0f172a; color: #e2e8f0; box-shadow: 0 16px 40px rgba(15, 23, 42, 0.3);
+}
+.bulk-bar__info { font-size: 0.82rem; }
+.bulk-bar__info strong { color: #fff; font-variant-numeric: tabular-nums; }
+.bulk-bar__actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
 
 /* ===================== ESTADOS ===================== */
-.feedback-state {
-  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
-  padding: 3rem 1rem; text-align: center; color: #64748b;
-}
+.feedback-state { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; padding: 3rem 1rem; text-align: center; color: #64748b; }
 .feedback-state h3 { margin: 0; color: #0f172a; font-size: 0.98rem; font-weight: 750; }
 .feedback-state p { margin: 0; font-size: 0.82rem; }
 .feedback-state .btn { margin-top: 0.6rem; }
-.feedback-icon {
-  display: grid; place-items: center; width: 46px; height: 46px; margin-bottom: 0.3rem;
-  border-radius: 999px; background: #eff6ff; color: #2563eb;
-}
+.feedback-icon { display: grid; place-items: center; width: 46px; height: 46px; margin-bottom: 0.3rem; border-radius: 999px; background: #eff6ff; color: #2563eb; }
 .feedback-icon.is-error { background: #fef2f2; color: #dc2626; }
 
-.is-skeleton:hover { background: transparent !important; }
+.linha.is-skeleton .linha__resumo { cursor: default; }
+.linha.is-skeleton:hover .linha__resumo { background: transparent; }
 .sk-lines { display: flex; flex-direction: column; gap: 6px; }
 .sk { position: relative; overflow: hidden; display: inline-block; height: 12px; border-radius: 6px; background: #eef1f5; }
 .sk::after {
@@ -1574,46 +1627,43 @@ button, input, select, table { font-family: var(--font-sans); }
   background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.6) 50%, rgba(255, 255, 255, 0) 100%);
   animation: sk-shimmer 1.2s infinite;
 }
-.sk-text--sm { height: 9px; }
+.sk--sm { height: 9px; }
 .sk-check { width: 16px; height: 16px; border-radius: 4px; }
 .sk-pill { height: 24px; border-radius: 999px; }
 .sk-btn { height: 30px; border-radius: 8px; }
 @keyframes sk-shimmer { 100% { transform: translateX(100%); } }
 
-.table-footer {
-  display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap;
-  padding: 0.7rem 1rem; border-top: 1px solid #eef2f7; background: #fff;
-}
-.table-footer__info { color: #64748b; font-size: 0.76rem; }
-.table-footer__info strong { color: #0f172a; font-weight: 750; font-variant-numeric: tabular-nums; }
-
 /* ===================== BOTÕES ===================== */
 .btn {
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 0.82rem; font-weight: 700; padding: 0.45rem 0.8rem; min-height: 38px;
-  border-radius: 9px; border: 1px solid transparent; cursor: pointer; text-decoration: none; white-space: nowrap;
+  min-height: 38px; padding: 0.45rem 0.8rem; border: 1px solid transparent; border-radius: 9px;
+  font-size: 0.82rem; font-weight: 700; white-space: nowrap; text-decoration: none; cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s, opacity 0.15s;
 }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25); }
 .btn-with-icon { gap: 0.4rem; }
-.btn-primary { background-color: #2563eb; color: #fff; border-color: #2563eb; box-shadow: 0 6px 16px rgba(37, 99, 235, 0.18); }
+.btn-primary { background-color: #2563eb; border-color: #2563eb; color: #fff; }
 .btn-primary:hover:not(:disabled) { background-color: #1d4ed8; border-color: #1d4ed8; }
-.btn-secondary { background-color: #fff; color: #475569; border-color: #dbe3ef; }
+.btn-secondary { background-color: #fff; border-color: #dbe3ef; color: #475569; }
 .btn-secondary:hover:not(:disabled) { border-color: #93c5fd; background-color: #eff6ff; color: #1d4ed8; }
+.btn-light { background: #fff; border-color: #fff; color: #0f172a; }
+.btn-light:hover:not(:disabled) { background: #e0e7ff; border-color: #e0e7ff; }
+.btn-ghost-light { background: transparent; border-color: rgba(226, 232, 240, 0.35); color: #e2e8f0; }
+.btn-ghost-light:hover:not(:disabled) { background: rgba(226, 232, 240, 0.12); }
 .btn-sm { min-height: 32px; padding: 0.3rem 0.65rem; font-size: 0.78rem; }
-.btn-xs { min-height: 30px; padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 8px; box-shadow: none; }
+.btn-xs { min-height: 30px; padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 8px; }
 .btn-icon { width: 38px; padding: 0; }
 .is-spinning { animation: girar 0.9s linear infinite; }
 @keyframes girar { to { transform: rotate(360deg); } }
 
-/* ===================== MODAL DO LOTE ===================== */
+/* ===================== MODAL DO LOTE =====================
+   Sem altura máxima nas listas: quem rola é o corpo do modal, e só ele. */
 .process { display: flex; flex-direction: column; gap: 0.85rem; }
 .process__lead { margin: 0; color: #334155; font-size: 0.86rem; line-height: 1.5; }
 .process__facts {
-  display: flex; flex-direction: column; gap: 0.3rem; margin: 0; padding: 0.7rem 0.85rem;
-  list-style: none; border: 1px solid #eef2f7; border-radius: 10px; background: #f8fafc;
-  color: #334155; font-size: 0.8rem; line-height: 1.45;
+  display: flex; flex-direction: column; gap: 0.3rem; margin: 0; padding: 0.7rem 0.85rem; list-style: none;
+  border: 1px solid #eef2f7; border-radius: 10px; background: #f8fafc; color: #334155; font-size: 0.8rem; line-height: 1.45;
 }
 .process__facts strong { font-variant-numeric: tabular-nums; }
 .process__facts .is-warning { color: #9a3412; }
@@ -1632,19 +1682,15 @@ button, input, select, table { font-family: var(--font-sans); }
 
 .process__notice {
   display: flex; align-items: flex-start; gap: 0.45rem; margin: 0; padding: 0.55rem 0.7rem;
-  border: 1px solid #bfdbfe; border-radius: 9px; background: #eff6ff;
-  color: #1e40af; font-size: 0.78rem; line-height: 1.45;
+  border: 1px solid #bfdbfe; border-radius: 9px; background: #eff6ff; color: #1e40af; font-size: 0.78rem; line-height: 1.45;
 }
 .process__notice svg { flex: 0 0 auto; margin-top: 0.1rem; }
 
 .desc-preview { display: flex; flex-direction: column; gap: 0.35rem; }
-.desc-preview__label {
-  color: #64748b; font-size: 0.68rem; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase;
-}
+.desc-preview__label { color: #64748b; font-size: 0.68rem; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; }
 .desc-preview__text {
-  margin: 0; padding: 0.7rem 0.8rem; max-height: 16rem; overflow: auto;
-  border: 1px solid #dbe3ef; border-radius: 9px; background: #f8fafc;
-  color: #0f172a; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin: 0; padding: 0.7rem 0.8rem; border: 1px solid #dbe3ef; border-radius: 9px; background: #0f172a;
+  color: #e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.78rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .desc-preview__meta { color: #64748b; font-size: 0.72rem; }
@@ -1656,19 +1702,10 @@ button, input, select, table { font-family: var(--font-sans); }
 .progress__bar { display: block; height: 100%; border-radius: inherit; background: #2563eb; transition: width 0.25s ease; }
 .process__counter { margin: 0; color: #475569; font-size: 0.8rem; font-variant-numeric: tabular-nums; }
 
-.process__list {
-  display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none;
-  max-height: 18rem; overflow: auto; border: 1px solid #eef2f7; border-radius: 10px;
-}
-.process__item {
-  display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid #f1f5f9; font-size: 0.8rem;
-}
+.process__list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border: 1px solid #eef2f7; border-radius: 10px; }
+.process__item { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; }
 .process__item:last-child { border-bottom: none; }
-.process__item-icon {
-  display: grid; place-items: center; width: 22px; height: 22px; flex: 0 0 auto;
-  border-radius: 999px; background: #f1f5f9; color: #94a3b8;
-}
+.process__item-icon { display: grid; place-items: center; width: 22px; height: 22px; flex: 0 0 auto; border-radius: 999px; background: #f1f5f9; color: #94a3b8; }
 .process__item.is-ok .process__item-icon { background: #ecfdf5; color: #059669; }
 .process__item.is-erro .process__item-icon { background: #fef2f2; color: #dc2626; }
 .process__item.is-pulado .process__item-icon,
@@ -1681,20 +1718,38 @@ button, input, select, table { font-family: var(--font-sans); }
 .process__item-note { color: #64748b; font-size: 0.74rem; line-height: 1.35; }
 .process__item.is-erro .process__item-note { color: #b91c1c; }
 .process__item-value { color: #0f172a; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.process__item-link { color: #1d4ed8; font-size: 0.75rem; font-weight: 700; white-space: nowrap; text-decoration: none; }
+.process__item-link {
+  padding: 0; border: none; background: none; color: #1d4ed8; font-size: 0.75rem; font-weight: 700;
+  white-space: nowrap; text-decoration: none; cursor: pointer;
+}
 .process__item-link:hover { text-decoration: underline; }
+.spinner { width: 12px; height: 12px; border-radius: 999px; border: 2px solid #bfdbfe; border-top-color: #2563eb; animation: girar 0.8s linear infinite; }
 
-.spinner {
-  width: 12px; height: 12px; border-radius: 999px;
-  border: 2px solid #bfdbfe; border-top-color: #2563eb; animation: girar 0.8s linear infinite;
+/* ===================== RESPONSIVO =====================
+   Lista estreita (menos de ~940px úteis): a linha vira cartão de três faixas.
+   Nada de rolagem horizontal em largura nenhuma. */
+@media (max-width: 1180px) {
+  .fechamento__kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-
-/* ===================== RESPONSIVO ===================== */
-@media (max-width: 1380px) {
-  .stats-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (max-width: 860px) {
-  .stats-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container lista (max-width: 940px) {
+  .lista__cabecalho { grid-template-columns: 28px minmax(0, 1fr); }
+  .lista__cabecalho span:not(.col-check) { display: none; }
+  .lista__cabecalho span:nth-child(2) { display: inline; }
+  .linha__resumo {
+    grid-template-columns: 28px minmax(0, 1fr) auto 34px;
+    grid-template-areas:
+      "check cliente valor expandir"
+      "check meta meta expandir"
+      "check acoes acoes acoes";
+    row-gap: 0.45rem;
+  }
+  .linha__check { grid-area: check; align-self: start; padding-top: 0.15rem; }
+  .linha__cliente { grid-area: cliente; }
+  .linha__meta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.9rem; }
+  .linha__valor { grid-area: valor; }
+  .linha__acoes { grid-area: acoes; justify-content: flex-start; }
+  .linha__expandir { grid-area: expandir; align-self: start; }
+  .meta-rotulo { display: inline; margin-right: 0.25rem; color: #94a3b8; font-size: 0.66rem; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase; }
 }
 @media (max-width: 760px) {
   .content-area { padding: 1rem; }
@@ -1702,17 +1757,15 @@ button, input, select, table { font-family: var(--font-sans); }
   .header-actions { width: 100%; }
   .period-picker { flex: 1 1 100%; }
   .period-picker__select { flex: 1; min-width: 0; }
-  .stats-strip { grid-template-columns: 1fr; }
   .table-controls { align-items: stretch; flex-direction: column; }
   .search-wrapper { max-width: none; }
-  .status-filter-wrapper { align-items: flex-start; flex-direction: column; gap: 0.35rem; }
-  .results-count { margin-left: 0; }
-  .bulk-bar { position: static; }
-  .table-wrapper { max-height: none; }
-  .billing-table th { position: static; }
+  .controls-end { margin-left: 0; }
+  .fechamento__kpis { grid-template-columns: 1fr; }
+  .lista__cabecalho { position: static; }
+  .bulk-bar { bottom: 0.5rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .is-spinning, .spinner, .sk::after { animation: none; }
-  .progress__bar { transition: none; }
+  .progress__bar, .fechamento__barra span, .linha__expandir, .kpi { transition: none; }
 }
 </style>
