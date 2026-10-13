@@ -100,6 +100,10 @@ export function mensagemDeErro(e, padrao = 'Não foi possível concluir a opera�
     case 'timeout':
     case 'network_error':
       return 'O Asaas não respondeu a tempo. Nada foi duplicado; tente de novo.';
+    case 'items_total_mismatch':
+      // O texto cru do backend fala em "competência congelada"; aqui vai o que fazer.
+      return `Os serviços da fatura somam ${formatarMoeda(e?.data?.itemsTotal)}, mas o total é ${formatarMoeda(e?.data?.invoiceTotal)}. `
+        + 'Abra o cliente, reabra a fatura para recalcular e gere a cobrança de novo.';
     default:
       // Sem status HTTP: a requisição nem chegou ao servidor.
       if (e && !e.status && e.name === 'TypeError') return 'Sem resposta do servidor. Confira a conexão e tente de novo.';

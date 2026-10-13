@@ -1,15 +1,19 @@
 // src/utils/loteDeCobranca.js
 //
-// Passo a passo de fechar/emitir a cobrança de um cliente, e o lote que repete
-// isso para vários. Usado pela tela geral de cobranças.
+// Passo a passo de gerar a cobrança de um cliente, e o lote que repete isso
+// para vários. Usado pela central de cobranças.
+//
+// Para quem opera, é uma ação só: "Gerar cobrança". Por baixo o backend exige
+// três passos, e é aqui que eles são encadeados: calcular e travar o valor do
+// mês (fechar a competência) -> cadastrar o cliente no Asaas -> criar a
+// cobrança.
 //
 // Não há rota de lote no backend de propósito: ela seguraria a requisição por
 // minutos (timeout do proxy) e prenderia conexões do pool. Aqui cada cliente
-// passa pelas MESMAS rotas da tela dele — fechar -> vincular no Asaas -> emitir
-// — e cada passo é curto e protegido pelo lock e pela idempotência do backend.
-// Repetir qualquer passo é seguro: fechar de novo responde `already_closed`,
-// vincular é idempotente e emitir de novo ADOTA a cobrança que o Asaas já
-// tiver, em vez de criar outra.
+// passa pelas MESMAS rotas da tela dele e cada passo é curto e protegido pelo
+// lock e pela idempotência do backend. Repetir qualquer passo é seguro: fechar
+// de novo responde `already_closed`, cadastrar é idempotente e emitir de novo
+// ADOTA a cobrança que o Asaas já tiver, em vez de criar outra.
 //
 // Sem Vue e sem chamadas diretas de rede: as rotas entram por injeção, o que
 // permite testar o fluxo inteiro com dublês.
@@ -26,7 +30,7 @@ export const codigoDoErro = (erro) => erro?.data?.code || null;
 
 const esperarPadrao = (ms) => new Promise((resolver) => setTimeout(resolver, ms));
 
-export const PENDENCIA_DE_DADOS = 'Sem CPF/CNPJ: complete o cadastro do cliente para emitir.';
+export const PENDENCIA_DE_DADOS = 'Sem CPF/CNPJ: complete o cadastro do cliente para gerar a cobrança.';
 
 /**
  * @param {object} deps
@@ -36,7 +40,7 @@ export const PENDENCIA_DE_DADOS = 'Sem CPF/CNPJ: complete o cadastro do cliente 
  * @param {(erro:any, padrao:string)=>string} deps.mensagemDeErro
  * @param {(ms:number)=>Promise}   [deps.esperar]
  */
-export function criarLoteDeCobranca({ api, formatarValor, formatarData, mensagemDeErro, esperar = esperarPadrao }) {
+export function criarLoteDeCobranca({ api, formatarData, mensagemDeErro, esperar = esperarPadrao }) {
   function concluir(item, etapa, mensagem, extra = {}) {
     Object.assign(item, { etapa, mensagem }, extra);
   }
@@ -60,18 +64,18 @@ export function criarLoteDeCobranca({ api, formatarValor, formatarData, mensagem
     }
   }
 
-  /** Fecha a competência; `already_closed` conta como sucesso. */
+  /** Trava o valor do mês; `already_closed` conta como sucesso. */
   async function fecharCompetencia(uid, periodo) {
     try {
       const resposta = await comRetentativa(() => api.closeInvoicePeriod(uid, periodo));
-      return { fechouAgora: true, total: resposta?.invoice?.total_amount ?? null };
+      return { total: resposta?.invoice?.total_amount ?? null };
     } catch (erro) {
-      if (codigoDoErro(erro) === 'already_closed') return { fechouAgora: false, total: null };
+      if (codigoDoErro(erro) === 'already_closed') return { total: null };
       throw erro;
     }
   }
 
-  /** Emite, resolvendo os dois desvios que têm saída automática. */
+  /** Cria a cobrança, resolvendo os dois desvios que têm saída automática. */
   async function emitirCobranca(uid, periodo, vencimento) {
     const emitir = () => comRetentativa(() => api.issueCharge(uid, periodo, { dueDate: vencimento }));
     try {
@@ -92,38 +96,37 @@ export function criarLoteDeCobranca({ api, formatarValor, formatarData, mensagem
   }
 
   /**
-   * Processa um cliente e grava o resultado no próprio `item`:
+   * Gera a cobrança de um cliente e grava o resultado no próprio `item`:
    * `etapa` (ok | pulado | erro), `mensagem`, `total`, `invoiceUrl` e
    * `pendencia` ('dados' quando falta CPF/CNPJ). Nunca lança.
    *
    * `item.linha` é a linha da visão geral: { uid, linked, hasDocument, total,
    * invoice: { closedAt } | null }.
    *
-   * @param {{ modo: 'fechar'|'emitir', periodo: string, vencimento?: string }} opcoes
+   * @param {{ periodo: string, vencimento: string }} opcoes
    */
-  async function processarItem(item, { modo, periodo, vencimento }) {
+  async function processarItem(item, { periodo, vencimento }) {
     const { linha } = item;
     try {
+      /* Sem cadastro para cobrar, nada é feito. Travar o valor antes deixaria o
+       * mês fechado sem cobrança, e quem opera nem sabe que existe "fechar". */
+      if (!linha.linked && !linha.hasDocument) {
+        return concluir(item, 'pulado', PENDENCIA_DE_DADOS, { pendencia: 'dados' });
+      }
+
       let total = linha.total ?? null;
-      let fechouAgora = false;
       if (!linha.invoice?.closedAt) {
         item.etapa = 'fechando';
         const fechamento = await fecharCompetencia(linha.uid, periodo);
-        fechouAgora = fechamento.fechouAgora;
         if (fechamento.total !== null) total = fechamento.total;
       }
       item.total = total;
 
-      if (modo === 'fechar') {
-        if (fechouAgora) return concluir(item, 'ok', `Competência fechada em ${formatarValor(total)}.`);
-        return concluir(item, 'pulado', 'Já estava fechada.');
-      }
       if (total !== null && !(Number(total) > 0)) {
         return concluir(item, 'pulado', 'Fatura zerada: nada a cobrar.');
       }
 
       if (!linha.linked) {
-        if (!linha.hasDocument) return concluir(item, 'pulado', PENDENCIA_DE_DADOS, { pendencia: 'dados' });
         item.etapa = 'vinculando';
         await comRetentativa(() => api.ensureAsaasCustomer(linha.uid));
       }
@@ -131,15 +134,15 @@ export function criarLoteDeCobranca({ api, formatarValor, formatarData, mensagem
       item.etapa = 'emitindo';
       const resposta = await emitirCobranca(linha.uid, periodo, vencimento);
       return concluir(item, 'ok', resposta?.adopted
-        ? 'Já existia no Asaas: a cobrança foi vinculada, sem criar outra.'
-        : `Cobrança emitida, vence em ${formatarData(resposta?.dueDate)}.`, {
+        ? 'Este mês já tinha cobrança no Asaas, então nenhuma outra foi criada.'
+        : `Cobrança criada, vence em ${formatarData(resposta?.dueDate)}.`, {
         total: resposta?.value ?? item.total,
         invoiceUrl: resposta?.invoiceUrl || null,
       });
     } catch (erro) {
       switch (codigoDoErro(erro)) {
         case 'already_charged':
-          return concluir(item, 'ok', 'Já estava emitida.', { invoiceUrl: erro.data?.invoiceUrl || null });
+          return concluir(item, 'ok', 'Já tinha cobrança.', { invoiceUrl: erro.data?.invoiceUrl || null });
         case 'zero_amount':
           return concluir(item, 'pulado', 'Fatura zerada: nada a cobrar.');
         case 'missing_billing_info':

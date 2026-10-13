@@ -35,10 +35,7 @@
       </div>
     </header>
 
-    <p v-if="aviso" class="aviso" :class="`is-${aviso.tipo}`" role="status">
-      <span>{{ aviso.texto }}</span>
-      <button type="button" class="aviso__fechar" aria-label="Dispensar aviso" @click="aviso = null">×</button>
-    </p>
+    <p v-if="aviso" class="aviso" :class="`is-${aviso.tipo}`" role="status">{{ aviso.texto }}</p>
 
     <!-- ============================ FATURA ============================ -->
     <div
@@ -61,7 +58,7 @@
             <span class="painel__rotulo">Total da fatura</span>
             <strong>{{ formatarMoeda(fatura.totalAmount) }}</strong>
             <span class="pill" :class="situacao.classe">{{ situacao.label }}</span>
-            <small v-if="!fatura.isClosed" class="resumo__dica">Recalculado agora. Muda até o fechamento.</small>
+            <small v-if="valorEmAndamento" class="resumo__dica">Valor de agora. Pode mudar até gerar a cobrança.</small>
           </div>
           <dl class="resumo__fatos">
             <div>
@@ -69,9 +66,9 @@
               <dd>{{ formatarData(isoDeData(fatura.due_date)) }}</dd>
             </div>
             <div>
-              <dt>Fechamento</dt>
-              <dd>{{ fatura.isClosed ? (fatura.closedAtLabel || 'Fechada') : 'Aberta' }}</dd>
-              <small v-if="fatura.closedBy">{{ fatura.closedBy }}</small>
+              <dt>Valor do mês</dt>
+              <dd>{{ fatura.isClosed ? 'Definitivo' : 'Pode mudar' }}</dd>
+              <small v-if="fatura.isClosed && fatura.closedAtLabel">desde {{ fatura.closedAtLabel }}</small>
             </div>
             <div>
               <dt>Pagamento</dt>
@@ -79,60 +76,69 @@
               <small v-if="fatura.paidBy">baixa por {{ fatura.paidBy }}</small>
             </div>
             <div>
-              <dt>Asaas</dt>
+              <dt>Cobrança no Asaas</dt>
               <dd :class="{ 'is-overdue': fatura.asaasStatus === 'OVERDUE' }">
-                {{ fatura.asaasPaymentId ? (asaasStatusLabel(fatura.asaasStatus) || 'Emitida') : 'Não emitida' }}
+                {{ fatura.asaasPaymentId ? (asaasStatusLabel(fatura.asaasStatus) || 'Cobrança criada') : 'Ainda não criada' }}
               </dd>
               <small v-if="fatura.asaasPaymentId">{{ fatura.asaasPaymentId }}</small>
             </div>
           </dl>
         </div>
 
-        <p v-if="divergente" class="aviso is-erro aviso--fixo">
-          Os itens somam {{ formatarMoeda(somaDosItens) }} e o total congelado é {{ formatarMoeda(fatura.totalAmount) }}.
-          Reabra e feche a competência para recalcular antes de emitir.
-        </p>
+        <div v-if="divergente" class="aviso is-erro aviso--acao">
+          <span>
+            Os serviços somam {{ formatarMoeda(somaDosItens) }}, mas o total da fatura é {{ formatarMoeda(fatura.totalAmount) }}.
+            Reabra a fatura para recalcular antes de gerar a cobrança.
+          </span>
+          <button type="button" class="btn btn-secondary btn-sm btn-with-icon" :disabled="Boolean(ocupado)" @click="reabrir">
+            <IconeSvg nome="destravar" :tamanho="14" />
+            {{ ocupado === 'reabrir' ? 'Reabrindo...' : 'Reabrir para recalcular' }}
+          </button>
+        </div>
 
-        <!-- Ações: só aparece o que faz sentido no estado atual da fatura. -->
+        <!-- Ações: só aparece o que faz sentido no estado atual da fatura. Todo
+             botão tem ícone E nome. -->
         <div class="acoes">
-          <template v-if="!fatura.isClosed">
-            <button type="button" class="btn btn-primary" :disabled="Boolean(ocupado)" @click="pedirEmissao">
-              Fechar e emitir
-            </button>
-            <button type="button" class="btn btn-secondary" :disabled="Boolean(ocupado)" @click="fecharCompetencia">
-              {{ ocupado === 'fechar' ? 'Fechando...' : 'Fechar competência' }}
-            </button>
-            <button type="button" class="btn btn-secondary" :disabled="Boolean(ocupado)" @click="abrirAvulso">
-              Lançar avulso
-            </button>
-          </template>
+          <button v-if="podeGerar" type="button" class="btn btn-primary btn-with-icon" :disabled="Boolean(ocupado)" @click="pedirEmissao">
+            <IconeSvg nome="enviar" />
+            Gerar cobrança
+          </button>
 
-          <template v-else-if="!fatura.asaasPaymentId && !paga">
-            <button
-              v-if="fatura.totalAmount > 0"
-              type="button"
-              class="btn btn-primary"
-              :disabled="Boolean(ocupado)"
-              @click="pedirEmissao"
-            >
-              Emitir cobrança
-            </button>
-          </template>
+          <button
+            v-if="!fatura.isClosed && !fatura.asaasPaymentId && !paga"
+            type="button"
+            class="btn btn-secondary btn-with-icon"
+            :disabled="Boolean(ocupado)"
+            @click="abrirAvulso"
+          >
+            <IconeSvg nome="mais" />
+            Lançar avulso
+          </button>
 
           <template v-if="fatura.asaasPaymentId">
             <a
               v-if="fatura.asaasInvoiceUrl"
-              class="btn btn-secondary"
+              class="btn btn-secondary btn-with-icon"
               :href="fatura.asaasInvoiceUrl"
               target="_blank"
               rel="noopener noreferrer"
+              title="Abre a fatura no Asaas, do jeito que o cliente vê"
             >
-              Abrir fatura no Asaas
+              <IconeSvg nome="link" />
+              Abrir fatura
             </a>
-            <button type="button" class="btn btn-secondary" :disabled="Boolean(ocupado)" @click="sincronizar">
-              {{ ocupado === 'sincronizar' ? 'Sincronizando...' : 'Sincronizar' }}
+            <button
+              type="button"
+              class="btn btn-secondary btn-with-icon"
+              :disabled="Boolean(ocupado)"
+              title="Confere no Asaas se o cliente já pagou"
+              @click="sincronizar"
+            >
+              <IconeSvg nome="atualizar" />
+              {{ ocupado === 'sincronizar' ? 'Conferindo...' : 'Conferir pagamento' }}
             </button>
-            <button v-if="!paga" type="button" class="btn btn-secondary" :disabled="Boolean(ocupado)" @click="abrirVencimento">
+            <button v-if="!paga" type="button" class="btn btn-secondary btn-with-icon" :disabled="Boolean(ocupado)" @click="abrirVencimento">
+              <IconeSvg nome="calendario" />
               Alterar vencimento
             </button>
           </template>
@@ -140,50 +146,59 @@
           <button
             v-if="!paga"
             type="button"
-            class="btn btn-secondary"
+            class="btn btn-secondary btn-with-icon"
             :disabled="Boolean(ocupado)"
             title="Para pagamento recebido por fora do Asaas"
             @click="abrirBaixa"
           >
+            <IconeSvg nome="check" />
             Marcar como paga
           </button>
-          <button v-else type="button" class="btn btn-secondary" :disabled="Boolean(ocupado)" @click="desfazerBaixa">
+          <button v-else type="button" class="btn btn-secondary btn-with-icon" :disabled="Boolean(ocupado)" @click="desfazerBaixa">
+            <IconeSvg nome="desfazer" />
             {{ ocupado === 'baixa' ? 'Salvando...' : 'Desfazer baixa' }}
           </button>
 
           <button
             type="button"
-            class="btn btn-ghost"
+            class="btn btn-ghost btn-with-icon"
             :disabled="carregandoDescricao"
             :aria-expanded="Boolean(descricao)"
             title="O texto que vai na cobrança do Asaas: cada serviço com quantidade e valor"
             @click="alternarDescricao"
           >
+            <IconeSvg nome="documento" />
             {{ carregandoDescricao ? 'Montando...' : (descricao ? 'Ocultar descrição' : 'Ver descrição') }}
           </button>
 
           <span class="acoes__espaco"></span>
 
           <button
-            v-if="fatura.isClosed && !paga"
+            v-if="fatura.isClosed && !paga && !divergente"
             type="button"
-            class="btn btn-ghost"
+            class="btn btn-ghost btn-with-icon"
             :disabled="Boolean(ocupado)"
-            title="Volta o total a ser recalculado"
+            title="Destrava o valor do mês para lançar avulso ou recalcular. Depois é só gerar a cobrança de novo"
             @click="reabrir"
           >
-            {{ ocupado === 'reabrir' ? 'Reabrindo...' : 'Reabrir competência' }}
+            <IconeSvg nome="destravar" />
+            {{ ocupado === 'reabrir' ? 'Reabrindo...' : 'Reabrir para alterar' }}
           </button>
           <button
             v-if="fatura.asaasPaymentId && !paga"
             type="button"
-            class="btn btn-danger-ghost"
+            class="btn btn-danger-ghost btn-with-icon"
             :disabled="Boolean(ocupado)"
             @click="cancelarCobranca"
           >
+            <IconeSvg nome="cancelar" />
             {{ ocupado === 'cancelar' ? 'Cancelando...' : 'Cancelar cobrança' }}
           </button>
         </div>
+
+        <p v-if="semValor" class="nota">
+          Nada a cobrar neste mês por enquanto.<template v-if="!fatura.isClosed"> Se faltar algum serviço, use "Lançar avulso".</template>
+        </p>
 
         <!-- Formulários curtos, no lugar onde a decisão é tomada. -->
         <form v-if="vencimentoForm.aberto" class="mini-form" @submit.prevent="salvarVencimento">
@@ -235,15 +250,15 @@
                 <span class="item__unit">{{ formatarMoeda(item.unit_price) }}</span>
                 <span class="item__total">{{ formatarMoeda(item.total_price) }}</span>
                 <button
-                  v-if="item.type === 'manual' && !fatura.isClosed"
+                  v-if="item.type === 'manual' && !fatura.isClosed && !fatura.asaasPaymentId"
                   type="button"
                   class="item__remover"
                   :disabled="Boolean(ocupado)"
-                  :aria-label="`Remover ${item.description}`"
-                  title="Remover este lançamento"
+                  :title="`Remover ${item.description} desta fatura`"
                   @click="removerAvulso(item)"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                  <IconeSvg nome="lixo" :tamanho="14" />
+                  Remover
                 </button>
               </li>
             </ul>
@@ -281,7 +296,8 @@
           <p v-if="avulsoForm.erro" class="avulso__erro">{{ avulsoForm.erro }}</p>
           <div class="avulso__acoes">
             <button type="button" class="btn btn-secondary btn-sm" @click="avulsoForm.aberto = false">Cancelar</button>
-            <button type="submit" class="btn btn-primary btn-sm" :disabled="Boolean(ocupado)">
+            <button type="submit" class="btn btn-primary btn-sm btn-with-icon" :disabled="Boolean(ocupado)">
+              <IconeSvg nome="mais" :tamanho="14" />
               {{ ocupado === 'avulso' ? 'Lançando...' : 'Lançar na fatura' }}
             </button>
           </div>
@@ -333,7 +349,6 @@
       <form v-else class="cadastro" @submit.prevent="salvarCadastro">
         <p class="cadastro__intro">
           O Asaas exige o <strong>CPF ou CNPJ</strong> do pagador. <strong>CEP e número</strong> só são exigidos para boleto.
-          <span class="pill" :class="vinculado ? 'is-paid' : 'is-muted'">{{ vinculado ? 'Vinculado ao Asaas' : 'Ainda não vinculado ao Asaas' }}</span>
         </p>
         <p v-if="cadastro.erro" class="aviso is-erro aviso--fixo">{{ cadastro.erro }}</p>
 
@@ -412,18 +427,9 @@
         </div>
 
         <div class="cadastro__acoes">
-          <button
-            v-if="!vinculado && temDocumento"
-            type="button"
-            class="btn btn-secondary"
-            :disabled="Boolean(ocupado) || cadastro.salvando"
-            title="Cria (ou encontra) o cliente no Asaas com os dados salvos"
-            @click="vincularAoAsaas"
-          >
-            {{ ocupado === 'vincular' ? 'Vinculando...' : 'Vincular ao Asaas' }}
-          </button>
-          <button type="submit" class="btn btn-primary" :disabled="cadastro.salvando || !podeSalvarCadastro">
-            {{ cadastro.salvando ? 'Salvando...' : (vinculado ? 'Salvar e atualizar no Asaas' : 'Salvar dados') }}
+          <button type="submit" class="btn btn-primary btn-with-icon" :disabled="cadastro.salvando || !podeSalvarCadastro">
+            <IconeSvg nome="salvar" />
+            {{ cadastro.salvando ? 'Salvando...' : 'Salvar dados' }}
           </button>
         </div>
       </form>
@@ -436,6 +442,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useBilling } from '@/composables/useBilling';
 import { useConfirm } from '@/composables/useConfirm';
+import IconeSvg from '@/components/IconeSvg.vue';
 import { asaasStatusLabel } from '@/utils/asaasStatus';
 import {
   apenasDigitos, mascaraDocumento, mascaraCep, mascaraTelefone, mascaraUf,
@@ -473,7 +480,6 @@ const {
   addManualService,
   deleteManualItem,
   setInvoiceStatus,
-  closeInvoicePeriod,
   reopenInvoicePeriod,
   fetchBillingInfo,
   saveBillingInfo,
@@ -572,19 +578,28 @@ async function executar(nome, operacao, { sucesso } = {}) {
 
 /* ============================ Estado da fatura ============================ */
 
+/* Os mesmos nomes da lista: A cobrar -> Aguardando -> Paga. */
 function situacaoDaFatura(inv) {
   if (!inv) return { label: 'Sem fatura', classe: 'is-muted' };
   if (inv.status === 'paid') return { label: 'Paga', classe: 'is-paid' };
   if (inv.asaasPaymentId) {
     return inv.asaasStatus === 'OVERDUE'
       ? { label: 'Vencida', classe: 'is-overdue' }
-      : { label: 'Emitida', classe: 'is-sent' };
+      : { label: 'Aguardando', classe: 'is-sent' };
   }
-  if (!inv.isClosed) return { label: 'Aberta', classe: 'is-live' };
   if (!(inv.totalAmount > 0)) return { label: 'Sem valor', classe: 'is-muted' };
-  return { label: 'A emitir', classe: 'is-ready' };
+  return { label: 'A cobrar', classe: 'is-ready' };
 }
 const situacao = computed(() => situacaoDaFatura(fatura.value));
+
+/* Gerar a cobrança já calcula e trava o valor do mês: aqui basta haver valor e
+ * ainda não haver cobrança nem pagamento. */
+const podeGerar = computed(() => Boolean(fatura.value && !fatura.value.asaasPaymentId && !paga.value
+  && fatura.value.totalAmount > 0));
+const semValor = computed(() => Boolean(fatura.value && !fatura.value.asaasPaymentId && !paga.value
+  && !(fatura.value.totalAmount > 0)));
+const valorEmAndamento = computed(() => Boolean(fatura.value && !fatura.value.isClosed
+  && !fatura.value.asaasPaymentId && !paga.value));
 
 const somaDosItens = computed(() => (fatura.value?.items || [])
   .reduce((soma, item) => soma + paraCentavos(item.total_price), 0) / 100);
@@ -620,28 +635,18 @@ function quantidadeDoItem(item) {
   return `${quantidade.toLocaleString('pt-BR')}${unidade ? ` ${unidade}` : ''}`;
 }
 
-/* ============================ Fechamento ============================ */
-
-async function fecharCompetencia() {
-  const confirmado = await confirm({
-    title: `Fechar ${periodLabel(periodo.value)}`,
-    message: `${props.cliente.nome}: o valor é recalculado uma última vez e passa a ser definitivo.`,
-    detail: 'Venda com data retroativa e avulso lançados depois entram na competência seguinte.',
-    confirmText: 'Fechar competência',
-    tone: 'primary',
-  });
-  if (!confirmado) return;
-  await executar('fechar', () => closeInvoicePeriod(uid.value, periodo.value), {
-    sucesso: (r) => `Competência fechada em ${formatarMoeda(r?.invoice?.total_amount)}.`,
-  });
-}
+/* ============================ Reabrir ============================
+ *
+ * Gerar a cobrança já trava o valor do mês, então não há botão de "fechar".
+ * Reabrir é a volta: destrava o valor para lançar avulso ou recalcular, e
+ * depois é só gerar a cobrança de novo. */
 
 async function reabrir() {
   const confirmado = await confirm({
     title: `Reabrir ${periodLabel(periodo.value)}`,
-    message: 'O total volta a ser recalculado.',
-    detail: 'Serve para corrigir um fechamento feito antes da hora ou lançar o que faltou.',
-    confirmText: 'Reabrir competência',
+    message: 'O valor do mês volta a ser recalculado.',
+    detail: 'Serve para corrigir algo ou lançar o que faltou. Depois é só gerar a cobrança de novo.',
+    confirmText: 'Reabrir',
     tone: 'danger',
   });
   if (!confirmado) return;
@@ -651,16 +656,16 @@ async function reabrir() {
     } catch (e) {
       if (codigoDoErro(e) !== 'has_external_charge') throw e;
       const forcar = await confirm({
-        title: 'Esta competência já tem cobrança emitida',
-        message: 'Reabrir faz o total voltar a mudar, e ele pode ficar diferente do documento que o cliente recebeu.',
-        detail: 'Depois de corrigir, cancele a cobrança e emita de novo.',
+        title: 'Este mês já tem cobrança criada',
+        message: 'Reabrir faz o valor voltar a mudar, e ele pode ficar diferente do que o cliente recebeu.',
+        detail: 'Depois de corrigir, cancele a cobrança e gere de novo.',
         confirmText: 'Reabrir mesmo assim',
         tone: 'danger',
       });
       if (!forcar) return CANCELADO;
       return reopenInvoicePeriod(uid.value, periodo.value, { force: true });
     }
-  }, { sucesso: 'Competência reaberta: o valor volta a ser recalculado.' });
+  }, { sucesso: 'Fatura reaberta: o valor volta a ser recalculado.' });
 }
 
 /* ============================ Baixa manual ============================ */
@@ -912,7 +917,8 @@ watch(aba, (nova) => {
 /**
  * Salva no CyberDock e, se o cliente já existe no Asaas, leva os dados para lá
  * também — salvar só aqui deixaria o cadastro do Asaas desatualizado sem
- * ninguém saber.
+ * ninguém saber. Cliente que ainda não existe no Asaas é cadastrado lá na hora
+ * de gerar a cobrança, então não há passo manual de "vincular".
  */
 async function salvarCadastro() {
   if (!podeSalvarCadastro.value || cadastro.value.salvando) return;
@@ -943,22 +949,6 @@ async function salvarCadastro() {
     }
   } finally {
     cadastro.value.salvando = false;
-  }
-}
-
-async function vincularAoAsaas() {
-  if (ocupado.value) return;
-  ocupado.value = 'vincular';
-  aviso.value = null;
-  try {
-    await ensureAsaasCustomer(uid.value);
-    vinculado.value = true;
-    avisar('ok', 'Cliente vinculado ao Asaas.');
-    emit('alterado');
-  } catch (e) {
-    avisar('erro', mensagemDeErro(e, 'Não foi possível vincular o cliente ao Asaas.'));
-  } finally {
-    ocupado.value = '';
   }
 }
 </script>
@@ -1021,11 +1011,9 @@ async function vincularAoAsaas() {
 .aviso.is-erro { border: 1px solid #fecaca; background: #fef2f2; color: #b91c1c; }
 .aviso.is-info { border: 1px solid #bfdbfe; background: #eff6ff; color: #1e40af; }
 .aviso--fixo { display: block; }
-.aviso__fechar {
-  flex: 0 0 auto; padding: 0 0.2rem; border: none; background: none; color: inherit;
-  font-size: 1rem; line-height: 1; cursor: pointer; opacity: 0.7;
-}
-.aviso__fechar:hover { opacity: 1; }
+.aviso--acao { align-items: center; flex-wrap: wrap; }
+.aviso--acao > span { flex: 1 1 18rem; }
+.nota { margin: 0; color: #64748b; font-size: 0.8rem; }
 
 /* ---------------- Resumo ---------------- */
 .resumo {
@@ -1049,7 +1037,6 @@ async function vincularAoAsaas() {
   font-size: 0.68rem; font-weight: 750; letter-spacing: 0.02em; text-transform: uppercase;
 }
 .pill.is-muted { background: #f1f5f9; color: #64748b; }
-.pill.is-live { background: #fff7ed; color: #c2410c; }
 .pill.is-ready { background: #eff6ff; color: #1d4ed8; }
 .pill.is-sent { background: #eef2ff; color: #4338ca; }
 .pill.is-overdue { background: #fef2f2; color: #b91c1c; }
@@ -1067,6 +1054,7 @@ async function vincularAoAsaas() {
 }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25); }
+.btn-with-icon { gap: 0.4rem; }
 .btn-primary { background: #2563eb; border-color: #2563eb; color: #fff; }
 .btn-primary:hover:not(:disabled) { background: #1d4ed8; border-color: #1d4ed8; }
 .btn-secondary { background: #fff; border-color: #dbe3ef; color: #334155; }
@@ -1109,21 +1097,24 @@ async function vincularAoAsaas() {
 .grupo__topo span { color: #94a3b8; font-size: 0.72rem; font-weight: 650; }
 .grupo__topo strong { margin-left: auto; color: #0f172a; font-size: 0.86rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .itens { margin: 0; padding: 0; list-style: none; }
+/* Colunas de números com largura fixa: cada item é a sua própria grade, e
+   colunas `auto` ficariam desalinhadas de um item para outro. */
 .item {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto 28px; align-items: center; gap: 0.6rem;
+  display: grid; grid-template-columns: minmax(0, 1fr) 6.5rem 5.5rem 6rem auto; align-items: center; gap: 0.6rem;
   padding: 0.5rem 0.8rem; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem;
 }
 .item:last-child { border-bottom: none; }
 .item__desc { min-width: 0; color: #0f172a; font-weight: 650; overflow-wrap: anywhere; }
 .item__desc small { display: block; color: #94a3b8; font-size: 0.7rem; font-weight: 600; }
-.item__qtd { color: #475569; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.item__unit { color: #94a3b8; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.item__total { color: #0f172a; font-weight: 750; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.item__qtd { color: #475569; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.item__unit { color: #94a3b8; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.item__total { color: #0f172a; font-weight: 750; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .item__remover {
-  display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
-  border: 1px solid transparent; border-radius: 7px; background: transparent; color: #94a3b8; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 0.3rem; min-height: 28px; padding: 0 0.5rem;
+  border: 1px solid #e2e8f0; border-radius: 7px; background: #fff; color: #b91c1c;
+  font-size: 0.72rem; font-weight: 700; white-space: nowrap; cursor: pointer;
 }
-.item__remover:hover:not(:disabled) { border-color: #fecaca; background: #fef2f2; color: #dc2626; }
+.item__remover:hover:not(:disabled) { border-color: #fecaca; background: #fef2f2; }
 .item__remover:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ---------------- Avulso ---------------- */
@@ -1189,9 +1180,9 @@ async function vincularAoAsaas() {
 }
 @container painel (max-width: 560px) {
   .composicao { grid-template-columns: 1fr; }
-  .item { grid-template-columns: minmax(0, 1fr) auto 28px; }
+  .item { grid-template-columns: minmax(0, 1fr) auto auto; }
   .item__unit { display: none; }
-  .item__qtd { grid-column: 1; grid-row: 2; }
+  .item__qtd { grid-column: 1; grid-row: 2; text-align: left; }
   .historico__resumo { grid-template-columns: 1fr; }
   .historico__linha { grid-template-columns: minmax(0, 1fr) auto; }
   .historico__venc { display: none; }
