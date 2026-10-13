@@ -12,6 +12,7 @@ const ResumoCobranca = () => import('../views/ResumoCobranca.vue');
 const AdminView = () => import('../views/AdminView.vue');
 const MasterDashboardView = () => import('../views/MasterDashboardView.vue');
 const ManageUsersView = () => import('../views/ManageUsersView.vue');
+const MasterCobrancasView = () => import('../views/MasterCobrancasView.vue');
 const ShopeeCallbackView = () => import('../views/ShopeeCallbackView.vue');
 const TikTokCallbackView = () => import('../views/TikTokCallbackView.vue');
 // MasterResumoCobranca e ServiceHistory NÃO têm rota própria: são componentes
@@ -77,11 +78,21 @@ const routes = [
     meta: { requiresAuth: true, requiresMaster: true }
   },
   {
-    // Resumo de cobrança é sempre de UM cliente. Sem cliente escolhido não há
-    // fatura para mostrar, então o endereço leva à lista, onde a aba Cobrança
-    // de cada cliente abre este mesmo painel já com o uid.
+    // Tela geral de cobranças: todos os clientes de uma competência, com
+    // fechamento e emissão no Asaas um a um ou em lote. A competência vai na
+    // query (?competencia=AAAA-MM), e não no path, para o item do menu
+    // continuar ativo em qualquer mês.
+    path: '/admin/cobrancas',
+    name: 'MasterCobrancasView',
+    component: MasterCobrancasView,
+    meta: { requiresAuth: true, requiresMaster: true }
+  },
+  {
+    // Endereço antigo do "resumo de cobrança" do master. O resumo de UM
+    // cliente continua na aba Cobrança dele; sem cliente escolhido, o que faz
+    // sentido abrir é a visão geral de todos.
     path: '/admin/billing-summary',
-    redirect: { name: 'ManageUsersView' },
+    redirect: { name: 'MasterCobrancasView' },
   },
   {
     path: '/contas',

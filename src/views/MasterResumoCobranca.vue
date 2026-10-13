@@ -270,11 +270,34 @@
                 Dados de cobrança
               </button>
 
+              <!-- O texto que vai para o Asaas sai da composição da fatura (cada
+                   serviço com quantidade e valor). Conferir é opcional: emitir
+                   não depende deste clique. -->
+              <button
+                v-if="isPeriodClosed && !temCobranca"
+                class="charge-btn charge-btn--ghost"
+                :disabled="isLoadingChargePreview"
+                :aria-expanded="Boolean(chargePreview)"
+                title="Mostra o texto que vai na cobrança do Asaas: cada serviço com quantidade e valor"
+                @click="alternarDescricaoDaCobranca"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                {{ isLoadingChargePreview ? 'Montando...' : (chargePreview ? 'Ocultar descrição' : 'Ver descrição') }}
+              </button>
+
               <p v-if="!isPeriodClosed && !temCobranca" class="charge-box__hint">
                 Feche a competência para poder emitir.
               </p>
               <p v-if="chargeMessage" class="charge-box__msg">{{ chargeMessage }}</p>
               <p v-if="chargeError" class="charge-box__msg is-error">{{ chargeError }}</p>
+              <div v-if="chargePreview" class="charge-box__desc">
+                <pre>{{ chargePreview.description }}</pre>
+                <small>
+                  {{ chargePreview.length }}/{{ chargePreview.limit }} caracteres
+                  <template v-if="chargePreview.groupedItems"> · {{ chargePreview.groupedItems }} serviços agrupados para caber no limite do Asaas</template>
+                  <template v-if="!chargePreview.matches"> · os itens não somam o total: a emissão será recusada</template>
+                </small>
+              </div>
             </div>
           </section>
 
@@ -858,7 +881,8 @@ const {
   issueCharge,
   syncCharge,
   updateChargeDueDate,
-  cancelCharge
+  cancelCharge,
+  fetchChargePreview
 } = useBilling();
 
 const { confirm } = useConfirm();
@@ -1376,6 +1400,45 @@ function limparAvisosDeCobranca() {
   chargeError.value = '';
   chargeMessage.value = '';
 }
+
+/* ---------------- Descrição da cobrança (prévia) ----------------
+ *
+ * O backend monta a descrição a partir dos itens da fatura, com a mesma função
+ * que a emissão usa — a tela não refaz a conta, só mostra o texto. A prévia não
+ * toca o Asaas.
+ * ---------------------------------------------------------------- */
+const chargePreview = ref(null);
+const isLoadingChargePreview = ref(false);
+
+async function alternarDescricaoDaCobranca() {
+  if (chargePreview.value) {
+    chargePreview.value = null;
+    return;
+  }
+  if (!currentInvoice.value || !targetUserId.value) return;
+  limparAvisosDeCobranca();
+  isLoadingChargePreview.value = true;
+  try {
+    chargePreview.value = await fetchChargePreview(targetUserId.value, currentInvoice.value.period);
+  } catch (e) {
+    chargeError.value = mensagemDeErroCobranca(e, 'Não foi possível montar a descrição da cobrança.');
+  } finally {
+    isLoadingChargePreview.value = false;
+  }
+}
+
+/* A prévia vale para a fatura que estava na tela: trocar de cliente ou de
+ * competência, fechar, reabrir ou emitir invalida o texto mostrado. */
+watch(
+  [
+    () => targetUserId.value,
+    () => currentInvoice.value?.period,
+    () => currentInvoice.value?.isClosed,
+    () => currentInvoice.value?.asaasPaymentId,
+    () => currentInvoice.value?.totalAmount,
+  ],
+  () => { chargePreview.value = null; }
+);
 
 async function recarregarFatura() {
   await fetchInvoices(targetUserId.value, selectedPeriod.value);
@@ -1918,6 +1981,11 @@ watch(() => props.userId, (newId) => {
 .charge-btn--danger:hover:not(:disabled) { background: rgba(185, 28, 28, 0.35); }
 .charge-box__hint, .charge-box__msg { flex: 1 1 100%; margin: 0; font-size: 0.76rem; line-height: 1.45; color: rgba(255, 255, 255, 0.78); }
 .charge-box__msg.is-error { color: #fecaca; font-weight: 650; }
+/* Prévia da descrição do Asaas: o texto é o que o cliente lê, então vai em
+   fonte monoespaçada e com as quebras de linha preservadas. */
+.charge-box__desc { flex: 1 1 100%; display: flex; flex-direction: column; gap: 0.3rem; }
+.charge-box__desc pre { margin: 0; padding: 0.6rem 0.75rem; max-height: 14rem; overflow: auto; border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 8px; background: rgba(15, 23, 42, 0.22); color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.74rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.charge-box__desc small { color: rgba(255, 255, 255, 0.72); font-size: 0.7rem; }
 
 /* Teste da integração: o mesmo cartão azul da fatura, só mais baixo. Reaproveita
    .charge-btn, .charge-box__label/__msg e .invoice-hero__facts (grade de

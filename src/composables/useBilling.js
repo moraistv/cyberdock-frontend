@@ -213,6 +213,35 @@ export function useBilling() {
   const cancelCharge = async (uid, period) =>
     api.delete(`/billing/invoices/${uid}/${period}/charge`);
 
+  /**
+   * Prévia do texto que a emissão manda ao Asaas: cada serviço com quantidade
+   * e valor, montado pelo backend com a mesma função da emissão. Não toca o
+   * provedor. Devolve `{ description, length, limit, matches, closed, charged,
+   * total, itemsTotal, itemCount, groupedItems, compacted }`.
+   */
+  const fetchChargePreview = async (uid, period) =>
+    api.get(`/billing/invoices/${encodeURIComponent(uid)}/${period}/charge-preview`);
+
+  /* ======================= Tela geral de cobranças ======================= */
+
+  /**
+   * Todos os clientes com a fatura da competência, numa chamada só.
+   *
+   * Só leitura: o total de competência aberta é o último gravado, e não é
+   * recalculado aqui (ver `refreshBillingOverview`). Devolve `{ period, today,
+   * standardDueDate, clients: [{ uid, name, email, mlNickname, active,
+   * hasDocument, boletoReady, linked, invoice | null }] }`.
+   */
+  const fetchBillingOverview = async (period) =>
+    api.get(`/billing/overview?period=${encodeURIComponent(period)}`);
+
+  /**
+   * Recalcula as faturas ABERTAS da competência para os clientes informados
+   * (no máximo 25 por chamada). Fechada e paga são puladas pelo backend.
+   */
+  const refreshBillingOverview = async (period, uids) =>
+    api.post(`/billing/overview/${period}/refresh`, { uids });
+
   return {
     invoices,
     billingSummary,
@@ -236,5 +265,8 @@ export function useBilling() {
     syncCharge,
     updateChargeDueDate,
     cancelCharge,
+    fetchChargePreview,
+    fetchBillingOverview,
+    refreshBillingOverview,
   };
 }
