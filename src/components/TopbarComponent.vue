@@ -176,6 +176,7 @@ const breadcrumbs = computed(() => {
     '/admin': 'Painel Administrativo',
     '/admin/users': 'Usuários',
     '/admin/cobrancas': 'Cobranças',
+    '/admin/devolucoes': 'Devoluções',
     '/master/servicos-avulsos': 'Histórico de Serviços' // ROTA ADICIONADA
   };
   const parts = route.path.split('/').filter(Boolean);

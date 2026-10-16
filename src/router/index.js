@@ -13,6 +13,7 @@ const AdminView = () => import('../views/AdminView.vue');
 const MasterDashboardView = () => import('../views/MasterDashboardView.vue');
 const ManageUsersView = () => import('../views/ManageUsersView.vue');
 const MasterCobrancasView = () => import('../views/MasterCobrancasView.vue');
+const MasterDevolucoesView = () => import('../views/MasterDevolucoesView.vue');
 const ShopeeCallbackView = () => import('../views/ShopeeCallbackView.vue');
 const TikTokCallbackView = () => import('../views/TikTokCallbackView.vue');
 // MasterResumoCobranca e ServiceHistory NÃO têm rota própria: são componentes
@@ -85,6 +86,15 @@ const routes = [
     path: '/admin/cobrancas',
     name: 'MasterCobrancasView',
     component: MasterCobrancasView,
+    meta: { requiresAuth: true, requiresMaster: true }
+  },
+  {
+    // Devoluções do Mercado Livre de todos os clientes: da abertura no ML até
+    // a análise no CD (apto volta ao estoque). A devolução aberta no painel vai
+    // na query (?devolucao=ID), para F5 e link compartilhado abrirem nela.
+    path: '/admin/devolucoes',
+    name: 'MasterDevolucoesView',
+    component: MasterDevolucoesView,
     meta: { requiresAuth: true, requiresMaster: true }
   },
   {
