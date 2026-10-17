@@ -11,15 +11,15 @@
                     <th>Tipo</th>
                     <th>Quantidade</th>
                     <th>Motivo</th>
-                    <th></th>
+                    <th v-if="props.canDelete"><span class="sr-only">Ações</span></th>
                 </tr>
             </thead>
             <tbody>
                 <tr v-if="props.isLoading">
-                    <td colspan="6" class="feedback-cell">Carregando histórico...</td>
+                    <td :colspan="totalDeColunas" class="feedback-cell">Carregando histórico...</td>
                 </tr>
                 <tr v-else-if="props.movements.length === 0">
-                    <td colspan="6" class="feedback-cell">Nenhuma movimentação registrada.</td>
+                    <td :colspan="totalDeColunas" class="feedback-cell">Nenhuma movimentação registrada.</td>
                 </tr>
                 <tr v-for="movement in props.movements" :key="movement.id">
                     <td data-label="Data">{{ formatDate(movement.created_at) }}</td>
@@ -33,7 +33,7 @@
                         {{ movement.movement_type === 'entrada' ? '+' : '-' }}{{ movement.quantity_change }}
                     </td>
                     <td data-label="Motivo">{{ movement.reason }}</td>
-                    <td data-label="" class="td-actions">
+                    <td v-if="props.canDelete" data-label="" class="td-actions">
                         <button class="btn-delete" @click="confirmDelete(movement)" title="Excluir movimentação">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M4 7l16 0"/>
@@ -52,7 +52,7 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue';
+import { computed, defineProps, defineEmits } from 'vue';
 import { useConfirm } from '@/composables/useConfirm';
 
 const { confirm } = useConfirm();
@@ -65,12 +65,21 @@ const props = defineProps({
     isLoading: {
         type: Boolean,
         default: false,
+    },
+    /* Falso na tela do cliente: excluir movimentação muda o estoque, e isso é
+     * só do master. O padrão mantém o botão na tela do master. */
+    canDelete: {
+        type: Boolean,
+        default: true,
     }
 });
 
 const emit = defineEmits(['delete']);
 
+const totalDeColunas = computed(() => (props.canDelete ? 6 : 5));
+
 const confirmDelete = async (movement) => {
+    if (!props.canDelete) return;
     const descricao = `${movement.movement_type} ${movement.quantity_change} ${movement.sku || ''}`.trim();
     const confirmed = await confirm({
         title: 'Excluir movimentação',
@@ -114,6 +123,11 @@ const capitalize = (s) => {
 .movement-badge.saida { background-color: #dc2626; }
 .quantity-change.entrada { color: #16a34a; font-weight: 600; }
 .quantity-change.saida { color: #dc2626; font-weight: 600; }
+
+.sr-only {
+    position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
 
 /* Estilos para o botão de excluir */
 .td-actions { text-align: center; }

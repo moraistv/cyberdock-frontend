@@ -79,6 +79,10 @@
             </button>
         </div>        <div class="actions">
           <button @click="$emit('open-package-manager')" class="btn ghost">Gerenciar pacotes</button>
+          <button @click="$emit('open-kit-parents')" class="btn ghost" title="Kits pai deste cliente: criar, editar e desativar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 16.5l-5 -3l5 -3l5 3v5.5l-5 3z" /><path d="M2 13.5v5.5l5 3" /><path d="M7 16.545l5 -3.03" /><path d="M17 16.5l-5 -3l5 -3l5 3v5.5l-5 3z" /><path d="M12 19l5 3" /><path d="M17 16.5l5 -3" /><path d="M12 13.5v-5.5l-5 -3l5 -3l5 3v5.5" /><path d="M7 5.03v5.455" /><path d="M12 8l5 -3" /></svg>
+            Kits pai
+          </button>
           <button @click="$emit('open-kit-manager')" class="btn ghost kit-manager">
             <svg  xmlns="http://www.w3.org/2000/svg"  width="20"  height="20"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-package"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /><path d="M16 5.25l-8 4.5" /></svg>
             Gerenciar Kits
@@ -310,7 +314,7 @@ export default defineComponent({
     error: { type: String, default: null },
     calcularVolumePorSku: { type: Function, required: true },
   },
-  emits: ['add-sku', 'edit-sku', 'delete-sku', 'adjust-stock', 'adjust-component-stock', 'open-history', 'open-package-manager', 'open-kit-manager', 'connect-to-kit'],
+  emits: ['add-sku', 'edit-sku', 'delete-sku', 'adjust-stock', 'adjust-component-stock', 'open-history', 'open-package-manager', 'open-kit-manager', 'open-kit-parents', 'connect-to-kit'],
   setup(props) {
     const query = ref('')
     const pkgFilter = ref('')

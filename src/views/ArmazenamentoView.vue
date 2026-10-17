@@ -20,8 +20,11 @@
                             <span v-if="props.userId && props.userId !== user?.uid">
                                 Acompanhando o consumo do espaço de armazenamento e gerenciando SKUs do usuário selecionado.
                             </span>
-                            <span v-else>
+                            <span v-else-if="podeAlterar">
                                 Acompanhe o consumo do seu espaço de armazenamento e gerencie seus SKUs.
+                            </span>
+                            <span v-else>
+                                Acompanhe o consumo do seu espaço de armazenamento e o estoque dos seus SKUs. O cadastro e os ajustes de produtos são feitos pela equipe CyberDock.
                             </span>
                         </p>
                     </div>
@@ -32,7 +35,7 @@
                                 <path d="M12 11m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
                                 <path d="M12 12l0 2.5" />
                             </svg>
-                            Gerenciar Estoque
+                            {{ podeAlterar ? 'Gerenciar Estoque' : 'Ver kits e SKUs' }}
                         </button>
                     </div>
                 </div>
@@ -163,7 +166,7 @@
                                     <td>{{ calcularVolumePorSku(sku).toFixed(4) }}</td>
                                 </tr>
                                 <tr v-if="allItemsForDisplay.length === 0">
-                                    <td colspan="5" class="empty-state">Nenhum SKU corresponde aos filtros selecionados.</td>
+                                    <td colspan="5" class="empty-state">{{ mensagemDaTabelaVazia }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -180,7 +183,7 @@
                             </button>
                         </div>
                         <template v-else>
-                            <StockMovementsTable :movements="allMovements" :is-loading="isLoadingMovements" @delete="handleDeleteMovement" />
+                            <StockMovementsTable :movements="allMovements" :is-loading="isLoadingMovements" :can-delete="podeAlterar" @delete="handleDeleteMovement" />
                             <div v-if="movementPagination.totalPages > 1" class="movement-pagination">
                                 <button :disabled="isLoadingMovements || movementPagination.page <= 1" @click="loadMovementPage(movementPagination.page - 1)">Anterior</button>
                                 <span>Página {{ movementPagination.page }} de {{ movementPagination.totalPages }} · {{ movementPagination.total }} registros</span>
@@ -194,15 +197,15 @@
         
         <!-- Storage Management Modal -->
         <UniversalModal
-            :title="'Gerenciar Estoque'"
+            :title="podeAlterar ? 'Gerenciar Estoque' : 'Kits e SKUs'"
             :is-open="isStorageModalOpen"
             size="xl"
             @close="closeStorageModal"
         >
             <div class="storage-management">
-                <!-- Action Buttons -->
+                <!-- Action Buttons: cadastrar e alterar é só do master -->
                 <div class="storage-actions">
-                    <button @click="openSkuModal" class="btn btn-primary">
+                    <button v-if="podeAlterar" @click="openSkuModal" class="btn btn-primary">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M12 5v14M5 12h14"/>
                         </svg>
@@ -215,10 +218,10 @@
                             <path d="M2 13.5v5.5l5 3" />
                             <path d="M7 16.545l5 -3.03" />
                         </svg>
-                        Gerenciar Kits Pai
+                        {{ podeAlterar ? 'Gerenciar Kits Pai' : 'Ver Kits Pai' }}
                     </button>
                     
-                    <button @click="openKitManagementModal" class="btn btn-accent">
+                    <button v-if="podeAlterar" @click="openKitManagementModal" class="btn btn-accent">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M7 16.5l-5 -3l5 -3l5 3v5.5l-5 3z" />
                             <path d="M2 13.5v5.5l5 3" />
@@ -231,6 +234,11 @@
                     </button>
                     
                 </div>
+
+                <p v-if="!podeAlterar" class="aviso-somente-leitura" role="note">
+                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                    <span>Aqui você confere seus kits e SKUs. Para cadastrar ou alterar um produto, fale com a equipe CyberDock.</span>
+                </p>
                 
                 <!-- Hierarquia de Kits e SKUs -->
                 <div class="hierarchy-section">
@@ -276,7 +284,7 @@
                                     <th>Tipo</th>
                                     <th>Volume (m³)</th>
                                     <th>Quantidade</th>
-                                    <th>Ações</th>
+                                    <th v-if="podeAlterar">Ações</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -297,7 +305,7 @@
                                         </td>
                                         <td>0.0000</td>
                                         <td>{{ item.children.length }} SKUs</td>
-                                        <td>
+                                        <td v-if="podeAlterar">
                                             <div class="action-buttons">
                                                 <button @click="$router.push('/kits-pai')" class="btn-icon" title="Gerenciar Kit Pai">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -325,7 +333,7 @@
                                         </td>
                                         <td>0.0000</td>
                                         <td>{{ item.available_kit_quantity || 0 }}</td>
-                                        <td>
+                                        <td v-if="podeAlterar">
                                             <div class="action-buttons">
                                                 <button @click="editSku(item)" class="btn-icon" title="Editar Kit">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -361,7 +369,7 @@
                                         </td>
                                         <td>{{ calcularVolumePorSku(child).toFixed(4) }}</td>
                                         <td>{{ child.quantidade }}</td>
-                                        <td>
+                                        <td v-if="podeAlterar">
                                             <div class="action-buttons">
                                                 <button @click="editSku(child)" class="btn-icon" title="Editar SKU">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -401,7 +409,7 @@
                                         </td>
                                         <td>{{ calcularVolumePorSku(item).toFixed(4) }}</td>
                                         <td>{{ item.quantidade }}</td>
-                                        <td>
+                                        <td v-if="podeAlterar">
                                             <div class="action-buttons">
                                                 <button @click="editSku(item)" class="btn-icon" title="Editar SKU">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -429,7 +437,7 @@
                                 </template>
                                 
                                 <tr v-if="hierarchyItems.length === 0">
-                                    <td colspan="6" class="empty-state">Nenhum item criado ainda.</td>
+                                    <td :colspan="podeAlterar ? 6 : 5" class="empty-state">{{ podeAlterar ? 'Nenhum item criado ainda.' : 'Nenhum kit ou SKU cadastrado ainda.' }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -444,8 +452,10 @@
             </template>
         </UniversalModal>
         
+        <!-- Modais de cadastro e ajuste: só existem para o master -->
         <!-- SKU Form Modal -->
         <SkuFormModal
+            v-if="podeAlterar"
             :is-open="isSkuModalOpen"
             :is-editing="isEditingSku"
             :sku-data="currentSku"
@@ -459,6 +469,7 @@
         
         <!-- Kit Management Modal -->
         <KitManagementModal
+            v-if="podeAlterar"
             :is-open="isKitManagementModalOpen"
             :package-types="packageTypes"
             :available-skus="availableChildSkus"
@@ -471,6 +482,7 @@
         
         <!-- Adjust Stock Modal -->
         <AdjustStockModal
+            v-if="podeAlterar"
             :is-open="isAdjustStockModalOpen"
             :sku="skuToAdjust"
             @close="closeAdjustStockModal"
@@ -506,10 +518,26 @@ const props = defineProps({
   }
 });
 
-const { user } = useAuth();
+const { user, userRole } = useAuth();
 
 // O próprio usuário vê seu estoque; masters podem informar userId por prop.
 const userId = computed(() => props.userId || user.value?.uid || null);
+
+/* Cadastrar e alterar produtos, kits e estoque é só do master; o cliente
+ * consulta. O backend recusa a alteração de quem não é master
+ * (router/storage.js e router/kit-parent.js); aqui os botões e os modais nem
+ * aparecem. Antes de a sessão carregar, o papel vale 'usuario': a tela começa
+ * só para leitura. */
+const podeAlterar = computed(() => userRole.value === 'master');
+
+const MENSAGEM_SO_MASTER = 'O cadastro e os ajustes de produtos são feitos pela equipe CyberDock.';
+
+/** Barra a ação de quem não é master (devolve true quando barrou). */
+const bloquearSeNaoPuderAlterar = () => {
+    if (podeAlterar.value) return false;
+    showToast(MENSAGEM_SO_MASTER, 'info');
+    return true;
+};
 
 const { 
     skus, 
@@ -578,8 +606,16 @@ const skuToAdjust = ref(null);
 const stockFilter = ref('all'); // 'all', 'with', 'without'
 const skuTypeFilter = ref('all'); // 'all', 'parent', 'child'
 
+const mensagemDaTabelaVazia = computed(() => {
+    if ((skus.value || []).length > 0) return 'Nenhum SKU corresponde aos filtros selecionados.';
+    return podeAlterar.value
+        ? 'Nenhum SKU cadastrado ainda.'
+        : 'Nenhum produto cadastrado ainda. O cadastro é feito pela equipe CyberDock.';
+});
+
 // Kit Management Modal Methods
 const openKitManagementModal = async () => {
+    if (bloquearSeNaoPuderAlterar()) return;
     isKitManagementModalOpen.value = true;
     try {
         await loadAvailableChildSkus();
@@ -625,6 +661,7 @@ const closeStorageModal = () => {
 
 // SKU Modal Methods
 const openSkuModal = async () => {
+    if (bloquearSeNaoPuderAlterar()) return;
     await loadActiveKitParents();
     isEditingSku.value = false;
     currentSku.value = null;
@@ -632,6 +669,7 @@ const openSkuModal = async () => {
 };
 
 const editSku = (sku) => {
+    if (bloquearSeNaoPuderAlterar()) return;
     isEditingSku.value = true;
     currentSku.value = { ...sku };
     isSkuModalOpen.value = true;
@@ -644,9 +682,11 @@ const closeSkuModal = () => {
 };
 
 const handleSkuSave = async (skuData) => {
+    if (bloquearSeNaoPuderAlterar()) return;
     try {
         if (isEditingSku.value) {
-            await updateSku(currentSku.value.id, skuData);
+            // updateSku recebe um objeto só, com o id dentro.
+            await updateSku({ ...skuData, id: skuData?.id ?? currentSku.value.id });
             showToast('SKU atualizado com sucesso!', 'success');
         } else {
             await addSku(skuData);
@@ -669,6 +709,7 @@ const openPackageSelect = (data) => {
 
 // Delete SKU function
 const deleteSku = async (sku) => {
+    if (bloquearSeNaoPuderAlterar()) return;
     const confirmed = await confirm({
         title: 'Excluir SKU',
         message: `Tem certeza que deseja excluir o SKU "${sku.sku}"?`,
@@ -688,6 +729,7 @@ const deleteSku = async (sku) => {
 
 // Adjust Stock function (placeholder for now)
 const openAdjustStockModal = (sku) => {
+    if (bloquearSeNaoPuderAlterar()) return;
     skuToAdjust.value = sku;
     isAdjustStockModalOpen.value = true;
 };
@@ -698,6 +740,7 @@ const closeAdjustStockModal = () => {
 };
 
 const handleConfirmAdjustment = async ({ movementType, quantityChange, reason }) => {
+    if (bloquearSeNaoPuderAlterar()) return;
     try {
         await adjustStock(skuToAdjust.value, movementType, quantityChange, reason);
         closeAdjustStockModal();
@@ -709,7 +752,7 @@ const handleConfirmAdjustment = async ({ movementType, quantityChange, reason })
 
 // Handler para exclusão de movimentação (vinda do componente de tabela)
 const handleDeleteMovement = async (movementId) => {
-    if (!movementId) return;
+    if (!movementId || bloquearSeNaoPuderAlterar()) return;
     try {
         await deleteMovement(movementId);
         showToast('Movimentação excluída com sucesso!', 'success');
@@ -984,6 +1027,22 @@ const allItemsForDisplay = computed(() => {
     gap: 1rem;
     flex-wrap: wrap;
 }
+
+/* Cliente: a janela é só de consulta. */
+.aviso-somente-leitura {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid #bfdbfe;
+    border-radius: 0.6rem;
+    background: #eff6ff;
+    color: #1e40af;
+    font-size: 0.875rem;
+    line-height: 1.45;
+}
+.aviso-somente-leitura svg { flex: 0 0 auto; margin-top: 0.1rem; }
 
 .btn-secondary {
     background-color: #6b7280;

@@ -6,8 +6,8 @@
             <div class="dashboard-content">
                 <div class="header">
                     <div class="header-content">
-                        <h1 class="dashboard-title">Gerenciar Kits Pai</h1>
-                        <p class="dashboard-subtitle">Crie e organize kits pai para categorizar seus SKUs e produtos.</p>
+                        <h1 class="dashboard-title">{{ titulo }}</h1>
+                        <p class="dashboard-subtitle">{{ subtitulo }}</p>
                     </div>
                     <div class="header-actions">
                         <button @click="$router.go(-1)" class="btn btn-secondary">
@@ -16,7 +16,7 @@
                             </svg>
                             Voltar
                         </button>
-                        <button @click="openCreateModal" class="btn btn-primary">
+                        <button v-if="podeAlterar" @click="openCreateModal" class="btn btn-primary">
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 5v14M5 12h14"/>
                             </svg>
@@ -31,7 +31,7 @@
                             <path d="M21 12a9 9 0 11-6.219-8.56"/>
                         </svg>
                     </div>
-                    <p>Carregando seus kits pai...</p>
+                    <p>{{ clienteSelecionado ? 'Carregando os kits pai do cliente...' : 'Carregando seus kits pai...' }}</p>
                 </div>
 
                 <div v-else>
@@ -70,9 +70,9 @@
                                     <path d="M12 8l5 -3"/>
                                 </svg>
                             </div>
-                            <h3>Nenhum kit pai criado ainda</h3>
-                            <p>Crie seu primeiro kit pai para começar a organizar seus produtos.</p>
-                            <button @click="openCreateModal" class="btn btn-primary">
+                            <h3>{{ podeAlterar ? 'Nenhum kit pai criado ainda' : 'Nenhum kit pai cadastrado' }}</h3>
+                            <p>{{ textoDoVazio }}</p>
+                            <button v-if="podeAlterar" @click="openCreateModal" class="btn btn-primary">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M12 5v14M5 12h14"/>
                                 </svg>
@@ -89,7 +89,7 @@
                                             {{ kit.ativo ? 'Ativo' : 'Inativo' }}
                                         </span>
                                     </div>
-                                    <div class="kit-actions">
+                                    <div v-if="podeAlterar" class="kit-actions">
                                         <button @click="editKit(kit)" class="btn-icon" title="Editar">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <path d="M12 20h9"/>
@@ -130,8 +130,9 @@
             </div>
         </div>
 
-        <!-- Kit Parent Form Modal -->
+        <!-- Kit Parent Form Modal (só o master cadastra) -->
         <UniversalModal
+            v-if="podeAlterar"
             :title="isEditing ? 'Editar Kit Pai' : 'Criar Novo Kit Pai'"
             :is-open="isModalOpen"
             size="md"
@@ -185,7 +186,8 @@
 
         <!-- Delete Confirmation Modal -->
         <UniversalModal
-            title="Confirmar Exclução"
+            v-if="podeAlterar"
+            title="Confirmar Exclusão"
             :is-open="isDeleteModalOpen"
             size="sm"
             @close="cancelDelete"
@@ -224,15 +226,67 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import SidebarComponent from '../components/SidebarComponent.vue';
 import TopbarComponent from '../components/TopbarComponent.vue';
 import UniversalModal from '../components/UniversalModal.vue';
 import { useAuth } from '@/composables/useAuth';
 import { useKitParent } from '@/composables/useKitParent';
 
-const { user } = useAuth();
-const userId = computed(() => user.value?.uid);
+const route = useRoute();
+const { user, userRole } = useAuth();
+
+/* Kit pai é cadastro de produto: só o master cria, altera e exclui; o cliente
+ * consulta os dele. O backend também recusa (router/kit-parent.js). Antes de a
+ * sessão carregar, o papel vale 'usuario': a tela começa só para leitura. */
+const podeAlterar = computed(() => userRole.value === 'master');
+
+/* O master cuida dos kits pai de um cliente por /kits-pai?cliente=<uid>
+ * (botão "Kits pai" na aba Armazenamento do cliente). A tela fica viva no
+ * keep-alive: a query só vale quando a rota é esta, senão sair daqui trocaria
+ * o dono da lista em segundo plano. */
+const NOME_DA_ROTA = 'KitParentView';
+const clienteDaRota = ref(null);
+watch(
+    () => [route.name, route.query.cliente],
+    ([nome, cliente]) => {
+        if (nome !== NOME_DA_ROTA) return;
+        const uid = Array.isArray(cliente) ? cliente[0] : cliente;
+        clienteDaRota.value = typeof uid === 'string' && uid.trim() ? uid.trim() : null;
+    },
+    { immediate: true }
+);
+const clienteSelecionado = computed(() => {
+    const uid = clienteDaRota.value;
+    return podeAlterar.value && uid && uid !== user.value?.uid ? uid : null;
+});
+const userId = computed(() => clienteSelecionado.value || user.value?.uid);
+
+const titulo = computed(() => {
+    if (clienteSelecionado.value) return 'Kits Pai do Cliente';
+    return podeAlterar.value ? 'Gerenciar Kits Pai' : 'Kits Pai';
+});
+const subtitulo = computed(() => {
+    if (clienteSelecionado.value) return 'Crie e organize os kits pai do cliente que você abriu na aba Armazenamento.';
+    if (podeAlterar.value) return 'Crie e organize kits pai para categorizar seus SKUs e produtos.';
+    return 'Veja os kits pai que organizam seus SKUs e produtos. O cadastro e as alterações são feitos pela equipe CyberDock.';
+});
+const textoDoVazio = computed(() => {
+    if (!podeAlterar.value) return 'Quando a equipe CyberDock cadastrar kits pai para você, eles aparecem aqui.';
+    return clienteSelecionado.value
+        ? 'Crie o primeiro kit pai deste cliente para organizar os produtos dele.'
+        : 'Crie seu primeiro kit pai para começar a organizar seus produtos.';
+});
+
+const MENSAGEM_SO_MASTER = 'O cadastro e as alterações de kits pai são feitos pela equipe CyberDock.';
+
+/** Barra a ação de quem não é master (devolve true quando barrou). */
+const bloquearSeNaoPuderAlterar = () => {
+    if (podeAlterar.value) return false;
+    showToast(MENSAGEM_SO_MASTER, 'info');
+    return true;
+};
 
 const {
     kitParents,
@@ -271,6 +325,7 @@ const inactiveKitsCount = computed(() => {
 
 // Methods
 const openCreateModal = () => {
+    if (bloquearSeNaoPuderAlterar()) return;
     console.log('💫 [DEBUG] Abrindo modal de criação de kit');
     resetForm();
     isEditing.value = false;
@@ -281,6 +336,7 @@ const openCreateModal = () => {
 };
 
 const editKit = (kit) => {
+    if (bloquearSeNaoPuderAlterar()) return;
     console.log('✏️ [DEBUG] Editando kit:', kit);
     form.value = { 
         nome: kit.nome,
@@ -311,6 +367,7 @@ const resetForm = () => {
 };
 
 const handleSave = async () => {
+    if (bloquearSeNaoPuderAlterar()) return;
     console.log('🚀 [DEBUG] Iniciando handleSave');
     console.log('📝 [DEBUG] Dados do form:', form.value);
     console.log('🔍 [DEBUG] isEditing:', isEditing.value);
@@ -368,6 +425,7 @@ const handleSave = async () => {
 };
 
 const toggleKitStatus = async (kit) => {
+    if (bloquearSeNaoPuderAlterar()) return;
     isTogglingStatus.value = true;
     try {
         await toggleKitParentStatus(kit.id);
@@ -380,11 +438,13 @@ const toggleKitStatus = async (kit) => {
 };
 
 const deleteKit = async (kit) => {
+    if (bloquearSeNaoPuderAlterar()) return;
     kitToDelete.value = kit;
     isDeleteModalOpen.value = true;
 };
 
 const confirmDelete = async () => {
+    if (bloquearSeNaoPuderAlterar()) return;
     if (kitToDelete.value) {
         isDeletingKit.value = true;
         try {

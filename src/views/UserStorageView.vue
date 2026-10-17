@@ -34,6 +34,7 @@
         @open-history="openHistoryModal"
         @open-package-manager="openPackageTypeManagerModal"
         @open-kit-manager="openKitManagementModal"
+        @open-kit-parents="openKitParents"
         @connect-to-kit="openConnectToKitModal"
         @adjust-component-stock="openComponentStockModal"
       />
@@ -131,6 +132,7 @@
 
 <script>
 import { defineComponent, ref, computed, watchEffect, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { gsap } from 'gsap'
 import { useUserStorage } from '@/composables/useUserStorage'
 import { useSalesForUser } from '@/composables/useSalesForUser'
@@ -171,9 +173,17 @@ export default defineComponent({
     userId: { type: String, required: true }
   },
   setup(props) {
+    const router = useRouter()
     const reactiveUserId = computed(() => props.userId)
     const initialLoadComplete = ref(false)
     const viewWrapperEl = ref(null)
+
+    /* Kits pai do cliente: o cadastro agora é só do master, então ele cuida
+     * deles daqui (a tela /kits-pai lê o cliente da query). */
+    const openKitParents = () => {
+      if (!props.userId) return
+      router.push({ name: 'KitParentView', query: { cliente: props.userId } }).catch(() => {})
+    }
 
     const {
       skus, volumeContratado, volumeConsumido, percentualOcupacao,
@@ -578,6 +588,7 @@ export default defineComponent({
       openHistoryModal, closeHistoryModal,
       selectPackageType, openPackageTypeSelect, handleSavePackageType, handleDeletePackageType, openPackageTypeManagerModal,
       openKitManagementModal, closeKitManagementModal, handleKitCreated, handleKitUpdated, handleKitDeleted,
+      openKitParents,
       openConnectToKitModal, closeConnectToKitModal, handleConnectToKit, handleDisconnectFromKit,
       handleDeleteMovement
     }
