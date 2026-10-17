@@ -11,9 +11,10 @@ import { describeError } from './useNotification';
 
 const LIMITE_POR_PAGINA = 25;
 const INTERVALO_DO_ACOMPANHAMENTO = 2000;
-/* Uma sincronização longa (muitas contas) leva minutos; depois disso paramos
- * de perguntar e a lista volta a ser lida normalmente. */
-const ACOMPANHAMENTO_MAXIMO = 20 * 60 * 1000;
+/* Uma sincronização longa (a primeira lê 60 dias de todas as contas) leva
+ * minutos; depois disso paramos de perguntar e a lista volta a ser lida
+ * normalmente. */
+const ACOMPANHAMENTO_MAXIMO = 60 * 60 * 1000;
 const ATRASO_DA_BUSCA = 350;
 
 export const FILTROS_PADRAO = Object.freeze({

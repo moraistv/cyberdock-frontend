@@ -333,6 +333,81 @@ export function previaDoEstoque(detalhe, aptasDe) {
   return linhas;
 }
 
+/* ---------------- Sincronização ---------------- */
+
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+
+/**
+ * O que aconteceu com as contas que não foram lidas, e o que fazer. `falha`
+ * vem do backend (router/returns.js): tipo acesso, consulta, instavel ou outro.
+ */
+export function motivoDaFalhaDeSincronizacao(falha) {
+  const detalhe = falha?.detalhe ? ` (${String(falha.detalhe).slice(0, 160)})` : '';
+  switch (falha?.tipo) {
+    case 'acesso':
+      return 'o Mercado Livre recusou o acesso. Reconecte a conta em Contas.';
+    case 'consulta':
+      return `o Mercado Livre recusou a busca de devoluções${detalhe}. Não é problema na conexão das contas: precisa de ajuste no sistema.`;
+    case 'instavel':
+      return 'o Mercado Livre não respondeu a tempo. O sistema tenta de novo sozinho em até 30 minutos.';
+    default:
+      return 'aconteceu um erro inesperado. O detalhe ficou no registro do servidor.';
+  }
+}
+
+/**
+ * Avisos do fim da sincronização pedida pelo botão. Se nenhuma conta foi
+ * lida, é erro: "concluída" com tudo falhando escondia o problema.
+ * @returns {{ tipo: 'success'|'warning'|'error', texto: string, duracao?: number }[]}
+ */
+export function avisosDaSincronizacao(estado) {
+  if (!estado) return [];
+  if (estado.erro) return [{ tipo: 'error', texto: estado.erro }];
+  const contas = Number(estado.contas) || 0;
+  if (!contas) return [{ tipo: 'warning', texto: 'Nenhuma conta do Mercado Livre conectada e ativa para buscar devoluções.' }];
+
+  const comFalha = Math.min(contas, Number(estado.contasComFalha) || 0);
+  if (comFalha >= contas) {
+    return [{ tipo: 'error', texto: `Não foi possível buscar as devoluções: ${motivoDaFalhaDeSincronizacao(estado.falha)}`, duracao: 12000 }];
+  }
+
+  const lidas = Number(estado.devolucoes) || 0;
+  const novas = Number(estado.novas) || 0;
+  const partes = [plural(lidas, 'devolução atualizada', 'devoluções atualizadas')];
+  if (novas) partes.push(plural(novas, 'nova', 'novas'));
+  const avisos = [{ tipo: 'success', texto: `Sincronização concluída: ${partes.join(', ')}.`, duracao: 5000 }];
+  if (comFalha) {
+    avisos.push({ tipo: 'warning', texto: `${comFalha} de ${contas} contas não foram lidas: ${motivoDaFalhaDeSincronizacao(estado.falha)}`, duracao: 10000 });
+  }
+  const reclamacoes = Number(estado.reclamacoesComFalha) || 0;
+  if (reclamacoes) {
+    avisos.push({
+      tipo: 'warning',
+      texto: `${plural(reclamacoes, 'reclamação não pôde ser lida', 'reclamações não puderam ser lidas')} agora. O sistema tenta de novo na próxima busca.`,
+      duracao: 8000,
+    });
+  }
+  return avisos;
+}
+
+/**
+ * Linha fixa no topo quando a última busca (do botão ou automática) deixou
+ * contas sem ler. Some quando uma busca lê todas.
+ */
+export function avisoDaUltimaBusca(sync) {
+  if (!sync || sync.rodando || !sync.fim) return null;
+  const contas = Number(sync.contas) || 0;
+  const comFalha = Math.min(contas, Number(sync.contasComFalha) || 0);
+  if (!contas || !comFalha) return null;
+  const hora = formatarHora(sync.fim);
+  const quando = hora ? `Última busca (${hora})` : 'Última busca';
+  if (comFalha >= contas) {
+    return { classe: 'is-erro', texto: `${quando} não leu nenhuma conta: ${motivoDaFalhaDeSincronizacao(sync.falha)}` };
+  }
+  const motivo = motivoDaFalhaDeSincronizacao(sync.falha);
+  return { classe: 'is-aviso', texto: `${quando}: ${comFalha} de ${contas} contas não foram lidas. ${motivo.charAt(0).toUpperCase()}${motivo.slice(1)}` };
+}
+
 /* ---------------- Datas para arquivo ---------------- */
 
 /** Data de hoje no horário de Brasília, AAAA-MM-DD (nome de arquivo). */

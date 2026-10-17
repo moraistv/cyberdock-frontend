@@ -37,6 +37,10 @@
             <span class="sync__quando" title="O sistema também busca as devoluções sozinho a cada 30 minutos">
               Última atualização: {{ ultimaAtualizacao }}
             </span>
+            <p v-if="avisoDaBusca" class="sync__falha" :class="avisoDaBusca.classe" role="status">
+              <IconeSvg nome="alerta" :tamanho="14" />
+              <span>{{ avisoDaBusca.texto }}</span>
+            </p>
           </div>
         </header>
 
@@ -480,6 +484,7 @@ import {
   situacaoDa, resultadoDa, statusNoMl, situacaoDoPrazo, nomeDoCliente, quantidadeTotal, linkDaVendaNoMl,
   formatarData, formatarHora, formatarDataHora, formatarDuracaoEmHoras, variacaoPercentual,
   miniaturaSegura, tentarMiniaturaPeloProxy, montarCsv, linhasDaPlanilha, hojeEmBrasilia,
+  avisosDaSincronizacao, avisoDaUltimaBusca,
 } from '@/utils/devolucoesUi';
 
 const NOME_DA_ROTA = 'MasterDevolucoesView';
@@ -601,31 +606,20 @@ const textoDoBotaoDeSync = computed(() => {
   if (pedindoSync.value) return 'Iniciando...';
   const s = sync.value;
   if (s?.rodando) {
+    // As contas são lidas algumas ao mesmo tempo: o número é de contas já terminadas.
     return s.contas
-      ? `Sincronizando conta ${Math.min((Number(s.feitas) || 0) + 1, s.contas)} de ${s.contas}...`
+      ? `Sincronizando... ${Math.min(Number(s.feitas) || 0, s.contas)} de ${s.contas} contas`
       : 'Sincronizando...';
   }
   return 'Sincronizar com Mercado Livre';
 });
 
+/* Fica no topo enquanto a última busca (do botão ou automática) deixar contas sem ler. */
+const avisoDaBusca = computed(() => avisoDaUltimaBusca(sync.value));
+
 function avisarFimDaSincronizacao(estado) {
-  if (!estado) return;
-  if (estado.erro) {
-    notify.error(estado.erro);
-    return;
-  }
-  if (!estado.contas) {
-    notify.warning('Nenhuma conta do Mercado Livre conectada e ativa para buscar devoluções.');
-    return;
-  }
-  const lidas = Number(estado.devolucoes) || 0;
-  const novas = Number(estado.novas) || 0;
-  const partes = [`${lidas} ${lidas === 1 ? 'devolução atualizada' : 'devoluções atualizadas'}`];
-  if (novas) partes.push(`${novas} ${novas === 1 ? 'nova' : 'novas'}`);
-  notify.success(`Sincronização concluída: ${partes.join(', ')}.`, 5000);
-  const falhas = Number(estado.contasComFalha) || 0;
-  if (falhas) {
-    notify.warning(`${falhas} ${falhas === 1 ? 'conta do Mercado Livre não respondeu' : 'contas do Mercado Livre não responderam'}. Confira se a conexão da conta continua ativa.`, 8000);
+  for (const aviso of avisosDaSincronizacao(estado)) {
+    (notify[aviso.tipo] || notify.info)(aviso.texto, aviso.duracao);
   }
 }
 
@@ -951,6 +945,13 @@ button, input, select { font-family: var(--font-sans); }
 .subtitle { margin: 0.25rem 0 0; max-width: 46rem; color: #64748b; font-size: 0.86rem; }
 .sync { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; }
 .sync__quando { color: #64748b; font-size: 0.74rem; font-variant-numeric: tabular-nums; }
+.sync__falha {
+  display: flex; align-items: flex-start; gap: 0.35rem; max-width: 30rem; margin: 0; padding: 0.4rem 0.6rem;
+  border: 1px solid #fed7aa; border-radius: 9px; background: #fff7ed; color: #9a3412;
+  font-size: 0.74rem; font-weight: 650; line-height: 1.45;
+}
+.sync__falha svg { flex: 0 0 auto; margin-top: 0.12rem; }
+.sync__falha.is-erro { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
 
 /* ===================== NÚMEROS ===================== */
 .kpis { container-type: inline-size; container-name: kpis; margin-bottom: 0.9rem; }
@@ -1276,6 +1277,7 @@ button, input, select { font-family: var(--font-sans); }
   .page-header { flex-direction: column; align-items: stretch; }
   .sync { align-items: stretch; }
   .sync .btn { width: 100%; }
+  .sync__falha { max-width: none; }
   .filtros { flex-direction: column; align-items: stretch; }
   .busca { flex-basis: auto; }
   .seletor, .seletor select { width: 100%; }
