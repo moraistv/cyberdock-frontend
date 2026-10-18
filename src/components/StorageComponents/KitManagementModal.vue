@@ -137,6 +137,7 @@
               <th>Componentes</th>
               <th>Estoque Calculado</th>
               <th>Volume (m³)</th>
+              <th title="Soma do peso das peças do kit">Peso (kg)</th>
               <th>Ações</th>
             </tr>
           </thead>
@@ -186,6 +187,11 @@
               </td>
               <td>
                 <span class="volume">{{ calculateKitVolume(kit).toFixed(4) }}</span>
+              </td>
+              <!-- Soma do peso das peças; "incompleto" quando alguma peça está sem peso -->
+              <td :title="tituloDoPeso(kit)">
+                <span v-if="kit.pecas_sem_peso && kit.pecas_sem_peso.length" class="peso-vazio">incompleto</span>
+                <span v-else :class="['volume', { 'peso-vazio': kit.peso_kg == null }]">{{ formatarPeso(kit.peso_kg) }}</span>
               </td>
               <td>
                 <div class="action-buttons">
@@ -275,6 +281,7 @@
 <script>
 import { defineComponent, ref, computed, onMounted, watch } from 'vue'
 import { useKitManagement } from '@/composables/useKitManagement'
+import { formatarPeso, tituloDoPeso } from '@/utils/peso'
 import { useConfirm } from '@/composables/useConfirm'
 import UniversalModal from '@/components/UniversalModal.vue'
 import KitFormModal from './KitFormModal.vue'
@@ -562,6 +569,8 @@ export default defineComponent({
       deleteKit,
       calculateKitAvailableQuantity,
       calculateKitVolume,
+      formatarPeso,
+      tituloDoPeso,
       getEmptyStateTitle,
       getEmptyStateMessage
     }
@@ -811,6 +820,13 @@ export default defineComponent({
 .volume {
   font-family: ui-monospace, 'Courier New', monospace;
   font-weight: 600;
+}
+
+/* Kit sem peso calculável (sem peças ou peça sem peso) */
+.peso-vazio {
+  color: #6b7280;
+  font-style: italic;
+  font-weight: 400;
 }
 
 .action-buttons { display: flex; gap: 0.5rem; }

@@ -107,6 +107,7 @@
             <th>Descrição</th>
             <th>Tipo</th>
             <th>Tipo de Pacote</th>
+            <th title="Peso por unidade. Kit: soma das peças.">Peso (kg)</th>
             <th>Qtd.</th>
             <th>Volume Total (m³)</th>
             <th class="th-actions">Ações</th>
@@ -147,6 +148,11 @@
                 </span>
                 <span v-else class="muted">(sem pacote)</span>
               </td>
+              <!-- Kit: soma do peso das peças; "incompleto" quando falta peso em alguma -->
+              <td data-label="Peso (kg)" :title="tituloDoPeso(item)">
+                <span v-if="item.pecas_sem_peso && item.pecas_sem_peso.length" class="muted">incompleto</span>
+                <span v-else :class="{ muted: item.peso_kg == null }">{{ formatarPeso(item.peso_kg) }}</span>
+              </td>
                            <td data-label="Qtd." class="no-quantity">
                 <span class="kit-no-qty">—</span>
              </td>
@@ -183,6 +189,9 @@
                   {{ child.package_type_name }}
                 </span>
                 <span v-else class="muted">(sem pacote)</span>
+              </td>
+              <td data-label="Peso (kg)" :title="tituloDoPeso(child)">
+                <span :class="{ muted: child.peso_kg == null }">{{ formatarPeso(child.peso_kg) }}</span>
               </td>
               <td data-label="Qtd.">
                 <div class="quantity-cell">
@@ -241,6 +250,9 @@
                   {{ item.package_type_name }}
                 </span>
                 <span v-else class="muted">(sem pacote)</span>
+              </td>
+              <td data-label="Peso (kg)" :title="tituloDoPeso(item)">
+                <span :class="{ muted: item.peso_kg == null }">{{ formatarPeso(item.peso_kg) }}</span>
               </td>
               <td data-label="Qtd.">
                 <div class="quantity-cell">
@@ -304,6 +316,7 @@
 
 <script>
 import { defineComponent, ref, computed } from 'vue'
+import { formatarPeso, tituloDoPeso } from '@/utils/peso'
 
 export default defineComponent({
   name: 'SkuTable',
@@ -538,7 +551,9 @@ export default defineComponent({
       canDeleteSku,
       canAdjustStock,
       showKitDetails, 
-      calcularVolumeTotalKit 
+      calcularVolumeTotalKit,
+      formatarPeso,
+      tituloDoPeso
     };
   }
 })

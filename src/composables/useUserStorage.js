@@ -343,6 +343,8 @@ export function useUserStorage(userId, onInitialLoad = null, options = {}) {
       package_type_id: skuData?.package_type_id ?? null,
       kit_parent_id: skuData?.kit_parent_id ?? null,
       is_kit: skuData?.is_kit ?? false,
+      // Peso por unidade em kg (opcional). Kit não guarda peso: é a soma das peças.
+      peso_kg: skuData?.is_kit ? null : (skuData?.peso_kg ?? null),
       // NOVOS CAMPOS
       is_monthly: skuData?.is_monthly ?? false,
       monthly_price: skuData?.is_monthly ? Number(skuData?.monthly_price) : null,
@@ -427,7 +429,9 @@ const updateSku = async (skuData) => {
     dimensoes: skuData.dimensoes,
     package_type_id: skuData.package_type_id,
     kit_parent_id: skuData.kit_parent_id,
-    ativo: skuData.ativo
+    ativo: skuData.ativo,
+    // undefined some do JSON e o backend mantém o peso; null limpa.
+    peso_kg: skuData.peso_kg
   };
   
   console.log('🔧 [useUserStorage] updatePayload:', updatePayload)

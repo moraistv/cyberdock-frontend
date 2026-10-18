@@ -153,6 +153,23 @@
         </div>
       </div>
 
+      <!-- Peso por unidade (opcional). Texto, e não number, para aceitar "0,350". -->
+      <div class="form-group peso-group" :class="{ 'has-error': errors.peso_kg }">
+        <label for="sku-weight">Peso por unidade (kg) <span class="opcional">opcional</span></label>
+        <input
+          id="sku-weight"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          v-model="editableSku.peso_kg"
+          placeholder="Ex.: 0,350"
+          :aria-invalid="errors.peso_kg ? 'true' : 'false'"
+          :aria-describedby="errors.peso_kg ? 'sku-weight-error' : 'sku-weight-help'"
+        >
+        <small v-if="errors.peso_kg" id="sku-weight-error" class="err">{{ errors.peso_kg }}</small>
+        <small v-else id="sku-weight-help" class="dica-campo">{{ dicaPeso }}</small>
+      </div>
+
       <!-- Tipo de Pacote -->
       <div class="form-group">
         <label>Tipo de Pacote</label>
@@ -195,6 +212,7 @@
 <script>
 import { defineComponent, ref, watch, computed, defineExpose } from 'vue'
 import UniversalModal from '../UniversalModal.vue'
+import { lerPesoKg, erroDoPeso, dicaDoPeso, pesoParaCampo } from '@/utils/peso'
 
 export default defineComponent({
   name: 'SkuFormModal',
@@ -216,6 +234,7 @@ export default defineComponent({
       sku: '',
       descricao: '',
       dimensoes: { altura: null, largura: null, comprimento: null },
+      peso_kg: '',
       quantidade: null,
       package_type_id: null
     })
@@ -237,6 +256,8 @@ export default defineComponent({
             largura: Number(base?.dimensoes?.largura ?? 0),
             comprimento: Number(base?.dimensoes?.comprimento ?? 0),
           },
+          // Texto no formato do Brasil ("0,350"); vazio quando o SKU não tem peso.
+          peso_kg: pesoParaCampo(base?.peso_kg),
           quantidade: props.isEditing ? null : Number(base?.quantidade ?? 0),
           package_type_id: base?.package_type_id ?? null
         }
@@ -272,6 +293,8 @@ export default defineComponent({
       if (!Number.isFinite(alt) || alt <= 0) e.altura = 'Altura deve ser maior que 0.'
       if (!Number.isFinite(lar) || lar <= 0) e.largura = 'Largura deve ser maior que 0.'
       if (!Number.isFinite(com) || com <= 0) e.comprimento = 'Comprimento deve ser maior que 0.'
+      const erroPeso = erroDoPeso(s.peso_kg)
+      if (erroPeso) e.peso_kg = erroPeso
       
       // Apenas validação para SKUs normais (não há mais kits neste modal)
       if (!props.isEditing) {
@@ -281,6 +304,7 @@ export default defineComponent({
       return e
     })
     const isValid = computed(() => Object.keys(errors.value).length === 0)
+    const dicaPeso = computed(() => dicaDoPeso(editableSku.value.peso_kg))
 
     // Funções para gerenciar conexões com kits
     const getQuantityForKit = (kitId) => {
@@ -326,6 +350,8 @@ export default defineComponent({
           largura: Number(s.dimensoes.largura),
           comprimento: Number(s.dimensoes.comprimento),
         },
+        // kg com até 3 casas, ou null (sem peso). Inválido não chega aqui: o salvar fica bloqueado.
+        peso_kg: lerPesoKg(s.peso_kg),
         package_type_id: s.package_type_id ?? null,
         is_kit: false // Sempre SKU individual neste modal
       }
@@ -387,6 +413,7 @@ export default defineComponent({
       kitQuantities,
       errors, 
       isValid, 
+      dicaPeso,
       handleSave, 
       openPackageTypeSelect,
       getQuantityForKit,
@@ -480,6 +507,20 @@ export default defineComponent({
   color: #ef4444;
   font-size: 0.875rem;
   margin-top: 0.25rem;
+}
+
+/* Peso por unidade (opcional) */
+.peso-group input { max-width: 14rem; }
+.opcional {
+  margin-left: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #6b7280;
+}
+.dica-campo {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: #4b5563;
 }
 
 /* Modal Actions */

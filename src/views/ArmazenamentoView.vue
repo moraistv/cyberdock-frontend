@@ -150,6 +150,7 @@
                                     <th>SKU</th>
                                     <th>Descrição</th>
                                     <th>Dimensões (cm)</th>
+                                    <th title="Peso por unidade. Kit: soma das peças.">Peso (kg)</th>
                                     <th>Qtd. em Estoque</th>
                                     <th>Volume Total (m³)</th>
                                 </tr>
@@ -159,6 +160,10 @@
                                     <td class="sku-code">{{ sku.sku }}</td>
                                     <td>{{ sku.descricao }}</td>
                                     <td>{{ `${sku.dimensoes.altura} x ${sku.dimensoes.largura} x ${sku.dimensoes.comprimento}` }}</td>
+                                    <td :title="tituloDoPeso(sku)">
+                                        <span v-if="sku.is_kit && sku.pecas_sem_peso && sku.pecas_sem_peso.length" class="peso-vazio">incompleto</span>
+                                        <span v-else :class="{ 'peso-vazio': sku.peso_kg == null }">{{ formatarPeso(sku.peso_kg) }}</span>
+                                    </td>
                                     <td>
                                         <span v-if="sku.is_kit" class="kit-no-qty">—</span>
                                         <span v-else>{{ sku.quantidade }}</span>
@@ -166,7 +171,7 @@
                                     <td>{{ calcularVolumePorSku(sku).toFixed(4) }}</td>
                                 </tr>
                                 <tr v-if="allItemsForDisplay.length === 0">
-                                    <td colspan="5" class="empty-state">{{ mensagemDaTabelaVazia }}</td>
+                                    <td colspan="6" class="empty-state">{{ mensagemDaTabelaVazia }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -283,6 +288,7 @@
                                     <th>Descrição</th>
                                     <th>Tipo</th>
                                     <th>Volume (m³)</th>
+                                    <th title="Peso por unidade. Kit: soma das peças.">Peso (kg)</th>
                                     <th>Quantidade</th>
                                     <th v-if="podeAlterar">Ações</th>
                                 </tr>
@@ -304,6 +310,8 @@
                                             </span>
                                         </td>
                                         <td>0.0000</td>
+                                        <!-- Kit pai só agrupa SKUs; não tem peso -->
+                                        <td><span class="peso-vazio">—</span></td>
                                         <td>{{ item.children.length }} SKUs</td>
                                         <td v-if="podeAlterar">
                                             <div class="action-buttons">
@@ -332,6 +340,11 @@
                                             </span>
                                         </td>
                                         <td>0.0000</td>
+                                        <!-- Kit composto: soma do peso das peças -->
+                                        <td :title="tituloDoPeso(item)">
+                                            <span v-if="item.pecas_sem_peso && item.pecas_sem_peso.length" class="peso-vazio">incompleto</span>
+                                            <span v-else :class="{ 'peso-vazio': item.peso_kg == null }">{{ formatarPeso(item.peso_kg) }}</span>
+                                        </td>
                                         <td>{{ item.available_kit_quantity || 0 }}</td>
                                         <td v-if="podeAlterar">
                                             <div class="action-buttons">
@@ -368,6 +381,9 @@
                                             <span class="child-badge">SKU Filho</span>
                                         </td>
                                         <td>{{ calcularVolumePorSku(child).toFixed(4) }}</td>
+                                        <td :title="tituloDoPeso(child)">
+                                            <span :class="{ 'peso-vazio': child.peso_kg == null }">{{ formatarPeso(child.peso_kg) }}</span>
+                                        </td>
                                         <td>{{ child.quantidade }}</td>
                                         <td v-if="podeAlterar">
                                             <div class="action-buttons">
@@ -408,6 +424,9 @@
                                             <span class="orphan-badge">Individual</span>
                                         </td>
                                         <td>{{ calcularVolumePorSku(item).toFixed(4) }}</td>
+                                        <td :title="tituloDoPeso(item)">
+                                            <span :class="{ 'peso-vazio': item.peso_kg == null }">{{ formatarPeso(item.peso_kg) }}</span>
+                                        </td>
                                         <td>{{ item.quantidade }}</td>
                                         <td v-if="podeAlterar">
                                             <div class="action-buttons">
@@ -437,7 +456,7 @@
                                 </template>
                                 
                                 <tr v-if="hierarchyItems.length === 0">
-                                    <td :colspan="podeAlterar ? 6 : 5" class="empty-state">{{ podeAlterar ? 'Nenhum item criado ainda.' : 'Nenhum kit ou SKU cadastrado ainda.' }}</td>
+                                    <td :colspan="podeAlterar ? 7 : 6" class="empty-state">{{ podeAlterar ? 'Nenhum item criado ainda.' : 'Nenhum kit ou SKU cadastrado ainda.' }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -507,6 +526,7 @@ import { useAuth } from '@/composables/useAuth';
 import { useUserStorage } from '@/composables/useUserStorage';
 import { useApi } from '@/composables/useApi';
 import { useKitParent } from '@/composables/useKitParent';
+import { formatarPeso, tituloDoPeso } from '@/utils/peso';
 import { useKitManagement } from '@/composables/useKitManagement';
 import { useConfirm } from '@/composables/useConfirm';
 
@@ -1013,6 +1033,12 @@ const allItemsForDisplay = computed(() => {
   color: #9ca3af;
   font-size: 1.2rem;
   font-weight: 300;
+}
+
+/* Peso sem informação ("—") ou kit com peça sem peso ("incompleto") */
+.peso-vazio {
+  color: #6b7280;
+  font-style: italic;
 }
 
 /* Storage Management Modal Styles */
