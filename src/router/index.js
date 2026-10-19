@@ -14,6 +14,7 @@ const MasterDashboardView = () => import('../views/MasterDashboardView.vue');
 const ManageUsersView = () => import('../views/ManageUsersView.vue');
 const MasterCobrancasView = () => import('../views/MasterCobrancasView.vue');
 const MasterDevolucoesView = () => import('../views/MasterDevolucoesView.vue');
+const DevolucoesView = () => import('../views/DevolucoesView.vue');
 const ShopeeCallbackView = () => import('../views/ShopeeCallbackView.vue');
 const TikTokCallbackView = () => import('../views/TikTokCallbackView.vue');
 // MasterResumoCobranca e ServiceHistory NÃO têm rota própria: são componentes
@@ -146,6 +147,14 @@ const routes = [
     path: '/armazenamento',
     name: 'ArmazenamentoView',
     component: ArmazenamentoView,
+    meta: { requiresAuth: true }
+  },
+  {
+    // Devoluções do Mercado Livre na visão do cliente: só as dele, só leitura,
+    // com o recebimento confirmado pela CyberDock. Mesmo ?devolucao=ID do master.
+    path: '/devolucoes',
+    name: 'DevolucoesView',
+    component: DevolucoesView,
     meta: { requiresAuth: true }
   },
   {

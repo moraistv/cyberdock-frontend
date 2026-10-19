@@ -4,6 +4,10 @@
      estoque do cliente. Os dados vêm da API do ML (o backend busca sozinho a
      cada 30 minutos e pelo botão "Sincronizar"); a análise e a entrada no
      estoque acontecem no backend (utils/mlReturns.js).
+     "Confirmar recebimento" (menu da linha e painel) é o sinal de que a
+     CyberDock está com o pacote; o filtro "Recebimento" separa o que falta.
+     Com visao="cliente" (DevolucoesView, rota /devolucoes) a mesma tela mostra
+     só as devoluções do cliente logado, sem sincronizar e sem nenhuma ação.
      Tela larga: lista e detalhes lado a lado. Tela estreita: os detalhes abrem
      numa gaveta por cima. A lista não tem rolagem própria, só a da página. -->
 <template>
@@ -22,9 +26,15 @@
                 Mercado Livre
               </span>
             </div>
-            <p class="subtitle">Acompanhe cada devolução até chegar ao CD, confira o produto e devolva ao estoque o que estiver apto.</p>
+            <p v-if="ehCliente" class="subtitle">Acompanhe as devoluções das suas vendas: quando a CyberDock recebe o pacote, o que foi conferido e o que voltou ao seu estoque.</p>
+            <p v-else class="subtitle">Acompanhe cada devolução até chegar ao CD, confira o produto e devolva ao estoque o que estiver apto.</p>
           </div>
-          <div class="sync">
+          <div v-if="ehCliente" class="sync">
+            <span class="sync__quando" title="As devoluções são atualizadas com o Mercado Livre a cada 30 minutos">
+              Última atualização: {{ ultimaAtualizacao }}
+            </span>
+          </div>
+          <div v-else class="sync">
             <button
               type="button"
               class="btn btn-primary btn-with-icon"
@@ -88,10 +98,10 @@
               <strong>{{ kpis.unidadesAptas }}</strong> {{ kpis.unidadesAptas === 1 ? 'apta' : 'aptas' }} ·
               <strong>{{ kpis.unidadesNaoAptas }}</strong> {{ kpis.unidadesNaoAptas === 1 ? 'não apta' : 'não aptas' }}
             </span>
-            <button v-if="kpis.canceladas" type="button" class="link-btn" @click="definirFiltros({ situacao: 'cancelada', resultado: '' })">
+            <button v-if="kpis.canceladas" type="button" class="link-btn" @click="definirFiltros(filtroDoCartao({ situacao: 'cancelada' }))">
               {{ kpis.canceladas }} {{ kpis.canceladas === 1 ? 'cancelada' : 'canceladas' }}
             </button>
-            <button v-if="kpis.noMl" type="button" class="link-btn" @click="definirFiltros({ situacao: 'no_ml', resultado: '' })">
+            <button v-if="kpis.noMl" type="button" class="link-btn" @click="definirFiltros(filtroDoCartao({ situacao: 'no_ml' }))">
               {{ kpis.noMl }} {{ kpis.noMl === 1 ? 'foi' : 'foram' }} para o depósito do ML (Full)
             </button>
           </p>
@@ -101,13 +111,13 @@
         <section class="filtros" aria-label="Filtros da lista">
           <div class="busca">
             <IconeSvg nome="busca" class="busca__icone" />
-            <label class="sr-only" for="dev-busca">Buscar por pedido, SKU ou cliente</label>
+            <label class="sr-only" for="dev-busca">{{ ehCliente ? 'Buscar por pedido, SKU ou produto' : 'Buscar por pedido, SKU ou cliente' }}</label>
             <input
               id="dev-busca"
               v-model="filtros.busca"
               type="search"
               class="busca__campo"
-              placeholder="Buscar por pedido, SKU, cliente..."
+              :placeholder="ehCliente ? 'Buscar por pedido, SKU, produto...' : 'Buscar por pedido, SKU, cliente...'"
               autocomplete="off"
               maxlength="120"
               @input="buscarComAtraso"
@@ -137,6 +147,12 @@
               <option v-for="opcao in OPCOES_DE_RESULTADO" :key="opcao.valor" :value="opcao.valor">{{ opcao.rotulo }}</option>
             </select>
           </label>
+          <label class="seletor">
+            <span class="sr-only">Recebimento pela CyberDock</span>
+            <select v-model="filtros.recebimento" @change="aplicarFiltros">
+              <option v-for="opcao in OPCOES_DE_RECEBIMENTO" :key="opcao.valor" :value="opcao.valor">{{ opcao.rotulo }}</option>
+            </select>
+          </label>
 
           <button
             type="button"
@@ -157,7 +173,7 @@
         </section>
 
         <div v-show="avancados" id="dev-filtros-avancados" class="filtros-avancados">
-          <label class="campo-filtro">
+          <label v-if="!ehCliente" class="campo-filtro">
             <span>Cliente</span>
             <select v-model="filtros.cliente" @change="aplicarFiltros">
               <option value="">Todos os clientes</option>
@@ -204,7 +220,7 @@
 
             <div class="lista__cabecalho" aria-hidden="true">
               <span>Pedido / Devolução</span>
-              <span class="so-largo">Cliente</span>
+              <span class="so-largo">{{ ehCliente ? 'Conta do ML' : 'Cliente' }}</span>
               <span>Produto (SKU)</span>
               <span class="col-num">Qtd</span>
               <span>Status</span>
@@ -262,9 +278,10 @@
               </template>
               <template v-else>
                 <h3>{{ filtros.periodo === 'all' ? 'Nenhuma devolução por aqui ainda' : `Nenhuma devolução ${textoDoPeriodo}` }}</h3>
-                <p>As devoluções das contas do Mercado Livre conectadas aparecem aqui. O sistema busca sozinho a cada 30 minutos.</p>
+                <p v-if="ehCliente">As devoluções das vendas das suas contas do Mercado Livre aparecem aqui. A lista é atualizada a cada 30 minutos.</p>
+                <p v-else>As devoluções das contas do Mercado Livre conectadas aparecem aqui. O sistema busca sozinho a cada 30 minutos.</p>
                 <div class="estado__acoes">
-                  <button type="button" class="btn btn-primary btn-with-icon" :disabled="sincronizando || pedindoSync" @click="sincronizarAgora">
+                  <button v-if="!ehCliente" type="button" class="btn btn-primary btn-with-icon" :disabled="sincronizando || pedindoSync" @click="sincronizarAgora">
                     <IconeSvg nome="atualizar" :class="{ 'is-spinning': sincronizando || pedindoSync }" />
                     {{ textoDoBotaoDeSync }}
                   </button>
@@ -307,12 +324,20 @@
                         <span class="sr-only">Ver detalhes do pedido </span>#{{ d.order_id || '—' }}
                       </button>
                       <span class="c-pedido__dev">Dev. #{{ d.ml_return_id }}</span>
-                      <span class="c-pedido__cliente" :title="nomeDoCliente(d)">{{ nomeDoCliente(d) }}</span>
+                      <span
+                        v-if="!ehCliente || d.account_nickname"
+                        class="c-pedido__cliente"
+                        :title="ehCliente ? d.account_nickname : nomeDoCliente(d)"
+                      >{{ ehCliente ? d.account_nickname : nomeDoCliente(d) }}</span>
                       <span v-if="prazoDaLinha(d)" class="tag" :class="prazoDaLinha(d).classe">{{ prazoDaLinha(d).curto }}</span>
                     </div>
                   </div>
 
-                  <div class="c-cliente">
+                  <div v-if="ehCliente" class="c-cliente">
+                    <span class="c-cliente__nome" :title="d.account_nickname || ''">{{ d.account_nickname || 'Conta do ML não informada' }}</span>
+                    <span v-if="d.buyer_name" class="c-cliente__conta" :title="`Comprador: ${d.buyer_name}`">Comprador: {{ d.buyer_name }}</span>
+                  </div>
+                  <div v-else class="c-cliente">
                     <span class="c-cliente__nome" :title="nomeDoCliente(d)">{{ nomeDoCliente(d) }}</span>
                     <span class="c-cliente__conta">{{ d.account_nickname || 'Conta do ML não informada' }}</span>
                   </div>
@@ -336,6 +361,15 @@
                         <span class="status-dot" />{{ situacaoDa(d).rotulo }}
                       </span>
                       <span class="c-status__data">{{ formatarDataHora(d.status_changed_at) }}</span>
+                      <span
+                        v-if="etiquetasDeRecebimento[String(d.id)]"
+                        class="tag"
+                        :class="etiquetasDeRecebimento[String(d.id)].confirmado ? 'is-ok' : 'is-warning'"
+                        :title="etiquetasDeRecebimento[String(d.id)].texto"
+                      >
+                        <IconeSvg v-if="etiquetasDeRecebimento[String(d.id)].confirmado" nome="certo" :tamanho="11" />
+                        {{ etiquetasDeRecebimento[String(d.id)].etiqueta }}
+                      </span>
                     </span>
                     <span class="c-data">
                       <span>{{ formatarData(d.status_changed_at) }}</span>
@@ -371,6 +405,17 @@
                       <button type="button" role="menuitem" class="menu__item" @click="abrir(d)">
                         <IconeSvg nome="olho" />
                         Ver detalhes
+                      </button>
+                      <button
+                        v-if="!ehCliente && podeConfirmarRecebimento(d)"
+                        type="button"
+                        role="menuitem"
+                        class="menu__item"
+                        :disabled="Boolean(confirmandoNaLinha)"
+                        @click="confirmarRecebimentoDaLinha(d)"
+                      >
+                        <IconeSvg nome="recebido" />
+                        Confirmar recebimento
                       </button>
                       <button type="button" role="menuitem" class="menu__item" :disabled="!d.order_id" @click="copiarPedido(d)">
                         <IconeSvg nome="copiar" />
@@ -419,23 +464,43 @@
               :devolucao-id="selecionada"
               modo="lado"
               :ativa="telaAtiva"
+              :visao="visao"
               @fechar="fecharPainel"
               @alterada="aoAlterar"
             />
+            <div v-else-if="ehCliente" class="painel-vazio">
+              <span class="painel-vazio__icone"><IconeSvg nome="devolucao" :tamanho="22" /></span>
+              <h2 class="painel-vazio__titulo">Detalhes da Devolução</h2>
+              <p class="painel-vazio__texto">Escolha uma devolução na lista para ver o resumo, as fotos e o que voltou ao seu estoque.</p>
+              <ol class="painel-vazio__passos">
+                <li><IconeSvg nome="caminhao" :tamanho="15" /> O Mercado Livre avisa quando o comprador envia o pacote.</li>
+                <li><IconeSvg nome="recebido" :tamanho="15" /> Quando o pacote chega, a CyberDock confirma o recebimento.</li>
+                <li><IconeSvg nome="check" :tamanho="15" /> Na conferência, o que estiver apto volta ao seu estoque.</li>
+              </ol>
+              <button
+                v-if="kpis && kpis.noCd"
+                type="button"
+                class="btn btn-secondary btn-sm btn-with-icon"
+                @click="definirFiltros(filtroDoCartao({ situacao: 'no_cd' }))"
+              >
+                <IconeSvg nome="caixa" />
+                {{ kpis.noCd === 1 ? 'Ver a que está em conferência' : `Ver as ${kpis.noCd} em conferência` }}
+              </button>
+            </div>
             <div v-else class="painel-vazio">
               <span class="painel-vazio__icone"><IconeSvg nome="devolucao" :tamanho="22" /></span>
               <h2 class="painel-vazio__titulo">Detalhes da Devolução</h2>
               <p class="painel-vazio__texto">Escolha uma devolução na lista para ver o resumo, conferir o produto e decidir se volta ao estoque.</p>
               <ol class="painel-vazio__passos">
                 <li><IconeSvg nome="caminhao" :tamanho="15" /> O Mercado Livre avisa quando o comprador envia o pacote.</li>
-                <li><IconeSvg nome="caixa" :tamanho="15" /> Quando o pacote chega, a devolução fica "No CD".</li>
+                <li><IconeSvg nome="recebido" :tamanho="15" /> Quando o pacote chega, confirme o recebimento: o cliente vê na tela dele.</li>
                 <li><IconeSvg nome="check" :tamanho="15" /> Na inspeção você decide. O que estiver apto volta ao estoque do cliente.</li>
               </ol>
               <button
                 v-if="kpis && kpis.noCd"
                 type="button"
                 class="btn btn-secondary btn-sm btn-with-icon"
-                @click="definirFiltros({ situacao: 'no_cd', resultado: '' })"
+                @click="definirFiltros(filtroDoCartao({ situacao: 'no_cd' }))"
               >
                 <IconeSvg nome="caixa" />
                 {{ kpis.noCd === 1 ? 'Ver a que espera análise' : `Ver as ${kpis.noCd} que esperam análise` }}
@@ -459,6 +524,7 @@
               :devolucao-id="selecionada"
               modo="gaveta"
               :ativa="telaAtiva"
+              :visao="visao"
               @fechar="fecharPainel"
               @alterada="aoAlterar"
             />
@@ -471,23 +537,34 @@
 </template>
 
 <script setup>
+/* global defineProps */
 import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue';
 import { useRoute, useRouter, onBeforeRouteUpdate } from 'vue-router';
 import SidebarComponent from '@/components/SidebarComponent.vue';
 import TopbarComponent from '@/components/TopbarComponent.vue';
 import IconeSvg from '@/components/IconeSvg.vue';
 import DevolucaoPainel from '@/components/DevolucaoPainel.vue';
+import { useApi } from '@/composables/useApi';
+import { useConfirm } from '@/composables/useConfirm';
 import { useDevolucoes } from '@/composables/useDevolucoes';
 import { useNotification } from '@/composables/useNotification';
 import {
-  OPCOES_DE_PERIODO, OPCOES_DE_SITUACAO, OPCOES_DE_RESULTADO,
-  situacaoDa, resultadoDa, statusNoMl, situacaoDoPrazo, nomeDoCliente, quantidadeTotal, linkDaVendaNoMl,
+  OPCOES_DE_PERIODO, OPCOES_DE_SITUACAO, OPCOES_DE_RESULTADO, OPCOES_DE_RECEBIMENTO,
+  situacaoDa, resultadoDa, recebimentoDa, podeConfirmarRecebimento, perguntaDoRecebimento,
+  statusNoMl, situacaoDoPrazo, nomeDoCliente, quantidadeTotal, linkDaVendaNoMl,
   formatarData, formatarHora, formatarDataHora, formatarDuracaoEmHoras, variacaoPercentual,
   miniaturaSegura, tentarMiniaturaPeloProxy, montarCsv, linhasDaPlanilha, hojeEmBrasilia,
   avisosDaSincronizacao, avisoDaUltimaBusca,
 } from '@/utils/devolucoesUi';
 
-const NOME_DA_ROTA = 'MasterDevolucoesView';
+const props = defineProps({
+  /** 'master' (/admin/devolucoes) ou 'cliente' (/devolucoes, pelo DevolucoesView). Não muda depois de montar. */
+  visao: { type: String, default: 'master' },
+});
+
+const ehCliente = computed(() => props.visao === 'cliente');
+/* Cada visão tem a sua rota; a outra pode estar viva no keep-alive. */
+const nomeDaRota = computed(() => (ehCliente.value ? 'DevolucoesView' : 'MasterDevolucoesView'));
 /* A partir desta largura a lista e os detalhes cabem lado a lado. */
 const CONSULTA_DO_PAINEL_AO_LADO = '(min-width: 1280px)';
 
@@ -496,13 +573,15 @@ const DIAS_DO_PERIODO = { '7d': 7, '30d': 30, '90d': 90 };
 
 const route = useRoute();
 const router = useRouter();
+const api = useApi();
 const notify = useNotification();
+const { confirm } = useConfirm();
 const {
   filtros, pagina, lista, total, totalDePaginas, kpis, facetas, ultimaSincronizacao,
   carregando, carregouUmaVez, erro, sync, filtrosAtivos, sincronizando, limitePorPagina,
   carregar, aplicarFiltros, buscarComAtraso, definirFiltros, limparFiltros, irParaPagina,
   buscarTodas, sincronizar, acompanharSincronizacao, pausar,
-} = useDevolucoes();
+} = useDevolucoes({ visao: props.visao });
 
 const listaEl = ref(null);
 const gavetaEl = ref(null);
@@ -530,56 +609,78 @@ const painel = computed(() => (modoLado.value ? painelAoLado.value : painelNaGav
 
 const textoDoPeriodo = computed(() => TEXTO_DO_PERIODO[filtros.periodo] || TEXTO_DO_PERIODO['30d']);
 
+/* Os cartões (e os atalhos do rodapé) mexem nos três filtros juntos: clicar
+ * num número nunca soma com um filtro de recebimento esquecido. */
+const SEM_FILTRO_DE_CARTAO = Object.freeze({ situacao: '', resultado: '', recebimento: '' });
+const filtroDoCartao = (valores = {}) => ({ ...SEM_FILTRO_DE_CARTAO, ...valores });
+
 const cartoes = computed(() => {
   const k = kpis.value || {};
+  const doCliente = ehCliente.value;
   const analisadas = (Number(k.aptos) || 0) + (Number(k.naoAptos) || 0);
   const parte = (n) => (analisadas ? Math.round(((Number(n) || 0) / analisadas) * 100) : null);
   const pctAptos = parte(k.aptos);
   const pctNaoAptos = parte(k.naoAptos);
   const dias = DIAS_DO_PERIODO[filtros.periodo];
   const tendencia = dias ? variacaoPercentual(k.total, k.totalAnterior) : null;
+  const voltaramAoEstoque = doCliente ? 'voltaram ao seu estoque' : 'voltaram ao estoque';
+  /* Recebimento: o cliente vê o que a CyberDock já recebeu; o master, o que
+   * chegou pelo ML e ainda espera a confirmação dele. */
+  const recebimento = doCliente
+    ? {
+      id: 'recebidas', rotulo: 'Recebidas', numero: k.recebidas || 0, dica: 'pela CyberDock',
+      icone: 'recebido', cor: 'teal', filtro: filtroDoCartao({ recebimento: 'confirmado' }),
+      titulo: 'Devoluções que a CyberDock confirmou ter recebido',
+    }
+    : {
+      id: 'aConfirmar', rotulo: 'A confirmar', numero: k.aConfirmar || 0, dica: 'recebimento pendente',
+      icone: 'recebido', cor: 'amarelo', filtro: filtroDoCartao({ situacao: 'no_cd', recebimento: 'aguardando' }),
+      titulo: 'O Mercado Livre informou a entrega e o recebimento ainda não foi confirmado no CD',
+    };
   return [
     {
       id: 'total', rotulo: 'Total de devoluções', numero: k.total || 0, dica: textoDoPeriodo.value,
-      icone: 'devolucao', cor: 'azul', filtro: { situacao: '', resultado: '' }, tendencia,
+      icone: 'devolucao', cor: 'azul', filtro: filtroDoCartao(), tendencia,
       titulo: tendencia ? `Nos ${dias} dias anteriores: ${k.totalAnterior}` : 'Mostra todas as devoluções do período',
     },
     {
       id: 'transito', rotulo: 'Em trânsito', numero: k.emTransito || 0, dica: 'aguardando chegada',
-      icone: 'caminhao', cor: 'indigo', filtro: { situacao: 'a_caminho', resultado: '' },
-      titulo: 'Abertas no Mercado Livre e ainda a caminho do CD',
+      icone: 'caminhao', cor: 'indigo', filtro: filtroDoCartao({ situacao: 'a_caminho' }),
+      titulo: doCliente ? 'Abertas no Mercado Livre e ainda a caminho da CyberDock' : 'Abertas no Mercado Livre e ainda a caminho do CD',
     },
+    recebimento,
     {
-      id: 'cd', rotulo: 'No CD', numero: k.noCd || 0, dica: 'aguardando análise',
-      icone: 'caixa', cor: 'laranja', filtro: { situacao: 'no_cd', resultado: '' },
-      titulo: 'Chegaram ao CD e esperam a inspeção',
+      id: 'cd', rotulo: 'No CD', numero: k.noCd || 0, dica: doCliente ? 'em conferência' : 'aguardando análise',
+      icone: 'caixa', cor: 'laranja', filtro: filtroDoCartao({ situacao: 'no_cd' }),
+      titulo: doCliente ? 'Chegaram à CyberDock e esperam a conferência' : 'Chegaram ao CD e esperam a inspeção',
     },
     {
       id: 'aptos', rotulo: 'Aptos', numero: k.aptos || 0,
-      dica: pctAptos === null ? 'voltaram ao estoque' : `voltaram ao estoque · ${pctAptos}%`,
-      icone: 'check', cor: 'verde', filtro: { situacao: '', resultado: 'aptos' },
+      dica: pctAptos === null ? voltaramAoEstoque : `${voltaramAoEstoque} · ${pctAptos}%`,
+      icone: 'check', cor: 'verde', filtro: filtroDoCartao({ resultado: 'aptos' }),
       titulo: 'Analisadas com pelo menos uma unidade apta (inclui as parciais)',
     },
     {
       id: 'naoAptos', rotulo: 'Não aptos', numero: k.naoAptos || 0,
       dica: pctNaoAptos === null ? 'avaria ou descarte' : `avaria ou descarte · ${pctNaoAptos}%`,
-      icone: 'cancelar', cor: 'vermelho', filtro: { situacao: '', resultado: 'nao_apto' },
+      icone: 'cancelar', cor: 'vermelho', filtro: filtroDoCartao({ resultado: 'nao_apto' }),
       titulo: 'Analisadas sem nenhuma unidade apta',
     },
   ];
 });
 
 const cartaoAtivo = computed(() => {
-  const { situacao, resultado } = filtros;
-  if (!situacao && !resultado) return 'total';
-  const achado = cartoes.value.find((c) => c.id !== 'total' && c.filtro.situacao === situacao && c.filtro.resultado === resultado);
+  const { situacao, resultado, recebimento } = filtros;
+  if (!situacao && !resultado && !recebimento) return 'total';
+  const achado = cartoes.value.find((c) => c.id !== 'total'
+    && c.filtro.situacao === situacao && c.filtro.resultado === resultado && c.filtro.recebimento === recebimento);
   return achado ? achado.id : null;
 });
 
 /** Clicar no número filtra a lista; clicar de novo no mesmo volta para o total. */
 function filtrarPeloCartao(cartao) {
   const voltarAoTotal = cartao.id === 'total' || cartaoAtivo.value === cartao.id;
-  definirFiltros(voltarAoTotal ? { situacao: '', resultado: '' } : { ...cartao.filtro });
+  definirFiltros(voltarAoTotal ? filtroDoCartao() : { ...cartao.filtro });
 }
 
 /* Mais devoluções que no período anterior é ruim: vermelho; menos, verde. */
@@ -587,8 +688,9 @@ const classeDaTendencia = (t) => (t.valor > 0 ? 'is-sobe' : (t.valor < 0 ? 'is-d
 
 /* ============================ Filtros ============================ */
 
-const avancadosAtivos = computed(() => [filtros.cliente, filtros.conta].filter(Boolean).length);
-const filtrosAlemDoPeriodo = computed(() => ['busca', 'situacao', 'resultado', 'cliente', 'conta']
+const avancadosAtivos = computed(() => (ehCliente.value ? [filtros.conta] : [filtros.cliente, filtros.conta])
+  .filter(Boolean).length);
+const filtrosAlemDoPeriodo = computed(() => ['busca', 'situacao', 'resultado', 'recebimento', 'cliente', 'conta']
   .some((campo) => String(filtros[campo] || '').trim() !== ''));
 
 function limparBusca() {
@@ -661,6 +763,17 @@ function dicaDaSituacao(d) {
   return [situacao.dica, d.ml_status ? `No Mercado Livre: ${statusNoMl(d.ml_status)}.` : ''].filter(Boolean).join(' ');
 }
 
+/* Etiqueta "Recebida" / "Aguardando confirmação" de cada linha (só enquanto
+ * está "No CD"), calculada uma vez por leitura da lista. */
+const etiquetasDeRecebimento = computed(() => {
+  const porId = {};
+  for (const d of lista.value) {
+    const recebimento = recebimentoDa(d);
+    if (recebimento?.etiqueta) porId[String(d.id)] = recebimento;
+  }
+  return porId;
+});
+
 /* Prazo de revisão do ML na linha: só enquanto espera análise e só se aperta. */
 function prazoDaLinha(d) {
   if (d.stage !== 'no_cd') return null;
@@ -701,7 +814,7 @@ const selecionada = ref(idDaRota());
 
 watch(() => route.query.devolucao, () => {
   // A tela fica viva no keep-alive; mudança de query de OUTRA rota não é dela.
-  if (route.name !== NOME_DA_ROTA) return;
+  if (route.name !== nomeDaRota.value) return;
   selecionada.value = idDaRota();
 });
 
@@ -810,6 +923,30 @@ function aoApertarFora(evento) {
   fecharMenu();
 }
 
+/* Confirmar o recebimento direto da lista: quem recebe vários pacotes não
+ * precisa abrir um por um. Uma confirmação por vez. */
+const confirmandoNaLinha = ref('');
+
+async function confirmarRecebimentoDaLinha(d) {
+  fecharMenu({ devolverFoco: true });
+  if (ehCliente.value || confirmandoNaLinha.value || !podeConfirmarRecebimento(d)) return;
+  if (!(await confirm(perguntaDoRecebimento(d)))) return;
+  const id = String(d.id);
+  const pedido = d.order_id || d.ml_return_id;
+  confirmandoNaLinha.value = id;
+  try {
+    await api.post(`/returns/${id}/confirmar-recebimento`, {});
+    notify.success(`Recebimento do pedido #${pedido} confirmado.`);
+  } catch (falha) {
+    notify.fromError(falha, 'Não foi possível confirmar o recebimento.');
+  } finally {
+    confirmandoNaLinha.value = '';
+  }
+  // Mesmo com 409 (confirmada em outra aba) a lista e o painel mostram como está agora.
+  carregar({ silencioso: true });
+  if (selecionada.value === id) painel.value?.recarregar?.();
+}
+
 async function copiarPedido(d) {
   fecharMenu({ devolverFoco: true });
   const numero = String(d.order_id || '');
@@ -845,7 +982,7 @@ async function exportar() {
       notify.warning('Nenhuma devolução para exportar com esses filtros.');
       return;
     }
-    const planilha = linhasDaPlanilha(linhas);
+    const planilha = linhasDaPlanilha(linhas, { visao: props.visao });
     baixarArquivo(montarCsv(planilha.cabecalho, planilha.linhas), `devolucoes-mercado-livre-${hojeEmBrasilia()}.csv`);
     if (totalNoFiltro > linhas.length) {
       notify.warning(`A planilha saiu com as ${linhas.length} devoluções atualizadas mais recentemente, de ${totalNoFiltro}. Use os filtros para separar o restante.`, 8000);
@@ -955,7 +1092,7 @@ button, input, select { font-family: var(--font-sans); }
 
 /* ===================== NÚMEROS ===================== */
 .kpis { container-type: inline-size; container-name: kpis; margin-bottom: 0.9rem; }
-.kpis__grade { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.75rem; }
+.kpis__grade { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.75rem; }
 .kpi {
   display: flex; align-items: flex-start; gap: 0.75rem; min-width: 0; padding: 0.9rem 1rem;
   border: 1px solid #dbe3ef; border-radius: 14px; background: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
@@ -971,6 +1108,8 @@ button, input, select { font-family: var(--font-sans); }
 .kpi.is-laranja .kpi__icone { background: #fff7ed; color: #ea580c; }
 .kpi.is-verde .kpi__icone { background: #ecfdf5; color: #059669; }
 .kpi.is-vermelho .kpi__icone { background: #fef2f2; color: #dc2626; }
+.kpi.is-teal .kpi__icone { background: #f0fdfa; color: #0d9488; }
+.kpi.is-amarelo .kpi__icone { background: #fefce8; color: #a16207; }
 .kpi__texto { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
 .kpi__rotulo { overflow: hidden; color: #64748b; font-size: 0.68rem; font-weight: 750; letter-spacing: 0.05em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .kpi__linha { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; min-height: 1.85rem; }
@@ -1105,9 +1244,10 @@ button, input, select { font-family: var(--font-sans); }
 /* Nome do cliente embaixo do pedido: só quando a coluna Cliente some. */
 .c-pedido__cliente { display: none; }
 
-.tag { display: inline-flex; align-items: center; margin-top: 0.15rem; padding: 0.08rem 0.4rem; border-radius: 5px; font-size: 0.66rem; font-weight: 750; white-space: nowrap; }
+.tag { display: inline-flex; align-items: center; gap: 0.2rem; margin-top: 0.15rem; padding: 0.08rem 0.4rem; border-radius: 5px; font-size: 0.66rem; font-weight: 750; white-space: nowrap; }
 .tag.is-warning { background: #fff7ed; color: #c2410c; }
 .tag.is-danger { background: #fef2f2; color: #b91c1c; }
+.tag.is-ok { background: #ecfdf5; color: #047857; }
 
 .c-cliente, .c-produto { display: flex; flex-direction: column; min-width: 0; }
 .c-cliente__nome, .c-produto__titulo { overflow: hidden; color: #0f172a; font-size: 0.82rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -1236,7 +1376,7 @@ button, input, select { font-family: var(--font-sans); }
    Lista média (sem espaço para 8 colunas): Cliente vai para baixo do pedido e
    a data para baixo do status. Lista estreita: a linha vira um cartão de três
    faixas. Nada de rolagem horizontal em largura nenhuma. */
-@container kpis (max-width: 1000px) {
+@container kpis (max-width: 1240px) {
   .kpis__grade { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @container kpis (max-width: 620px) {

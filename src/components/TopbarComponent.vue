@@ -171,6 +171,7 @@ const breadcrumbs = computed(() => {
     '/tabela-vendas': 'Tabela de Vendas',
     '/contas': 'Contas',
     '/armazenamento': 'Armazenamento',
+    '/devolucoes': 'Devoluções',
     '/resumo-cobranca': 'Resumo de Cobrança',
     '/profile': 'Perfil',
     '/admin': 'Painel Administrativo',

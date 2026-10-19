@@ -1,8 +1,9 @@
 // src/utils/devolucoesUi.js
 //
 // Textos, cores e formatação da tela de devoluções do Mercado Livre
-// (MasterDevolucoesView e DevolucaoPainel). As chaves batem com o backend
-// (utils/mlReturns.js); mudar uma aqui exige mudar lá.
+// (MasterDevolucoesView e DevolucaoPainel, na visão do master e na do
+// cliente). As chaves batem com o backend (utils/mlReturns.js); mudar uma aqui
+// exige mudar lá.
 
 import { API_BASE_URL } from '@/config';
 
@@ -80,6 +81,76 @@ export const OPCOES_DE_RESULTADO = Object.freeze([
   { valor: 'parcial', rotulo: 'Parcial' },
   { valor: 'nao_apto', rotulo: 'Não apto' },
 ]);
+
+/* Recebimento confirmado pela CyberDock (filtro `recebimento` do backend).
+ * "Aguardando" é o que ainda vem ou já chegou pelo ML sem confirmação. */
+export const OPCOES_DE_RECEBIMENTO = Object.freeze([
+  { valor: '', rotulo: 'Recebimento: Todos' },
+  { valor: 'confirmado', rotulo: 'Recebimento confirmado' },
+  { valor: 'aguardando', rotulo: 'Aguardando confirmação' },
+]);
+
+/* Mesmas regras do backend (confirmarRecebimento): o que ainda vem pelo ML
+ * passa para "No CD" ao confirmar; o que já chegou pelo ML só é confirmado. */
+const PODEM_CHEGAR = new Set(['aguardando_envio', 'em_transito', 'cancelada']);
+const JA_CHEGARAM = new Set(['no_cd', 'analisado']);
+
+/** O master ainda pode confirmar o recebimento desta devolução? */
+export function podeConfirmarRecebimento(d) {
+  if (!d || d.receipt_confirmed_at) return false;
+  return PODEM_CHEGAR.has(d.stage) || JA_CHEGARAM.has(d.stage);
+}
+
+/** Pergunta antes de confirmar o recebimento (useConfirm), da lista ou do painel. */
+export function perguntaDoRecebimento(d) {
+  let detalhe = 'O cliente passa a ver na tela dele que a CyberDock recebeu a devolução.';
+  if (d?.stage === 'cancelada') {
+    detalhe = 'O Mercado Livre marcou esta devolução como cancelada. Confirme só se o pacote estiver mesmo aqui.';
+  } else if (PODEM_CHEGAR.has(d?.stage)) {
+    detalhe = 'A devolução passa para "No CD", fica pronta para a inspeção e o cliente vê que a CyberDock recebeu.';
+  }
+  return {
+    title: 'Confirmar recebimento',
+    message: `O pacote do pedido #${d?.order_id || d?.ml_return_id || '—'} está no CD?`,
+    detail: detalhe,
+    confirmText: 'Confirmar recebimento',
+    tone: 'primary',
+  };
+}
+
+/**
+ * Recebimento pela CyberDock, para a lista e o painel. `etiqueta` é o que vai
+ * na linha da lista, e só enquanto a devolução está "No CD": a caminho, o
+ * status já diz que não chegou; analisada, o resultado já diz que chegou.
+ * Devolução que não vem para o CD não tem recebimento.
+ */
+export function recebimentoDa(d) {
+  if (!d || d.stage === 'no_ml' || d.stage === 'sem_devolucao') return null;
+  if (d.receipt_confirmed_at) {
+    return {
+      confirmado: true,
+      classe: 'is-paid',
+      etiqueta: d.stage === 'no_cd' ? 'Recebida' : '',
+      texto: `Recebida pela CyberDock em ${formatarDataHora(d.receipt_confirmed_at)}`,
+    };
+  }
+  if (JA_CHEGARAM.has(d.stage)) {
+    return {
+      confirmado: false,
+      classe: 'is-warning',
+      etiqueta: 'Aguardando confirmação',
+      texto: 'O Mercado Livre informou a entrega. Falta a CyberDock confirmar o recebimento.',
+    };
+  }
+  return {
+    confirmado: false,
+    classe: 'is-muted',
+    etiqueta: '',
+    texto: d.stage === 'cancelada'
+      ? 'Devolução cancelada no Mercado Livre. O pacote não deve chegar.'
+      : 'O pacote ainda não chegou à CyberDock.',
+  };
+}
 
 /* Conferência da inspeção: as chaves são as do backend. */
 export const CHECKLIST = Object.freeze([
@@ -215,12 +286,16 @@ export function tentarMiniaturaPeloProxy(img) {
 /* ---------------- Histórico ---------------- */
 
 const ORIGENS = { mercadolivre: 'Mercado Livre', cd: 'CD', sistema: 'Sistema' };
+/* O cliente não vê quem da equipe fez (o backend já tira o nome): o CD e o
+ * sistema aparecem como CyberDock. */
+const ORIGENS_PARA_O_CLIENTE = { mercadolivre: 'Mercado Livre', cd: 'CyberDock', sistema: 'CyberDock' };
 
 const ICONES_DO_EVENTO = {
   aberta: 'devolucao',
   situacao: 'caminhao',
   status_ml: 'caminhao',
   chegada: 'caixa',
+  recebimento: 'recebido',
   analise_salva: 'salvar',
   analise_concluida: 'check',
   estoque: 'caixa',
@@ -230,6 +305,7 @@ const ICONES_DO_EVENTO = {
 const TEXTOS_PADRAO_DO_EVENTO = {
   aberta: 'Devolução aberta no Mercado Livre.',
   chegada: 'Chegada registrada no CD.',
+  recebimento: 'Recebimento confirmado pela CyberDock.',
   analise_salva: 'Análise salva sem decisão.',
   analise_concluida: 'Análise concluída.',
   foto: 'Foto adicionada.',
@@ -253,8 +329,9 @@ export function textoDoEvento(evento) {
   return evento.note || TEXTOS_PADRAO_DO_EVENTO[evento.kind] || 'Atualização registrada.';
 }
 
-/** "Mercado Livre", ou quem fez no CD. */
-export function origemDoEvento(evento) {
+/** "Mercado Livre", ou quem fez no CD. Na visão do cliente, só "CyberDock". */
+export function origemDoEvento(evento, visao = 'master') {
+  if (visao === 'cliente') return ORIGENS_PARA_O_CLIENTE[evento?.source] || 'CyberDock';
   const origem = ORIGENS[evento?.source] || 'Sistema';
   return evento?.actor && evento.source !== 'mercadolivre' ? `${origem} · ${evento.actor}` : origem;
 }
@@ -434,46 +511,54 @@ export function montarCsv(cabecalho, linhas) {
   return `\ufeff${[cabecalho, ...linhas].map((l) => l.map(celulaCsv).join(';')).join('\r\n')}`;
 }
 
-const CABECALHO_DA_PLANILHA = Object.freeze([
-  'Pedido', 'Carrinho', 'Devolução', 'Reclamação', 'Cliente', 'E-mail do cliente', 'Conta do ML', 'Comprador',
-  'SKU', 'Produto', 'Quantidade', 'Aptas', 'Não aptas', 'Situação', 'Status no ML', 'Resultado',
-  'Motivo (não apto)', 'Destino (não apto)', 'Aberta em', 'Chegou ao CD em', 'Analisada em', 'Analisada por',
-  'Rastreio', 'Motivo do comprador', 'Observação', 'Fotos',
+const quantidadeOuVazio = (valor) => (valor === null || valor === undefined ? '' : valor);
+
+/* Colunas da planilha, na ordem. `soMaster`: fica fora da planilha do cliente
+ * (dados do cadastro, quem da equipe fez e a observação interna). */
+const COLUNAS_DA_PLANILHA = Object.freeze([
+  { titulo: 'Pedido', valor: (d, item) => item?.orderId || d.order_id || '' },
+  { titulo: 'Carrinho', valor: (d) => d.pack_id || '' },
+  { titulo: 'Devolução', valor: (d) => d.ml_return_id || '' },
+  { titulo: 'Reclamação', valor: (d) => d.claim_id || '' },
+  { titulo: 'Cliente', soMaster: true, valor: (d) => d.client_name || '' },
+  { titulo: 'E-mail do cliente', soMaster: true, valor: (d) => d.client_email || '' },
+  { titulo: 'Conta do ML', valor: (d) => d.account_nickname || '' },
+  { titulo: 'Comprador', valor: (d) => d.buyer_name || '' },
+  { titulo: 'SKU', valor: (d, item) => item?.sku || '' },
+  { titulo: 'Produto', valor: (d, item) => item?.title || '' },
+  { titulo: 'Quantidade', valor: (d, item) => (item ? Number(item.quantity) || 0 : '') },
+  { titulo: 'Aptas', valor: (d, item) => (item ? quantidadeOuVazio(item.qtyApt) : '') },
+  { titulo: 'Não aptas', valor: (d, item) => (item ? quantidadeOuVazio(item.qtyNotApt) : '') },
+  { titulo: 'Situação', valor: (d) => rotuloDaSituacao(d.stage) },
+  { titulo: 'Status no ML', valor: (d) => (d.ml_status ? statusNoMl(d.ml_status) : '') },
+  { titulo: 'Resultado', valor: (d) => resultadoDa(d)?.rotulo || '' },
+  { titulo: 'Motivo (não apto)', valor: (d) => rotuloDe(MOTIVOS_NAO_APTO, d.not_apt_reason) || d.not_apt_reason || '' },
+  { titulo: 'Destino (não apto)', valor: (d) => rotuloDe(DESTINOS_NAO_APTO, d.not_apt_destination) || d.not_apt_destination || '' },
+  { titulo: 'Aberta em', valor: (d) => dataParaPlanilha(d.ml_created_at || d.created_at) },
+  { titulo: 'Chegou ao CD em', valor: (d) => dataParaPlanilha(d.received_at) },
+  { titulo: 'Recebimento confirmado em', valor: (d) => dataParaPlanilha(d.receipt_confirmed_at) },
+  { titulo: 'Recebimento confirmado por', soMaster: true, valor: (d) => d.receipt_confirmed_by || '' },
+  { titulo: 'Analisada em', valor: (d) => dataParaPlanilha(d.decided_at) },
+  { titulo: 'Analisada por', soMaster: true, valor: (d) => d.decided_by || '' },
+  { titulo: 'Rastreio', valor: (d) => d.tracking_number || '' },
+  { titulo: 'Motivo do comprador', valor: (d) => d.claim_reason_text || '' },
+  { titulo: 'Observação', soMaster: true, valor: (d) => d.notes || '' },
+  { titulo: 'Fotos', valor: (d) => Number(d.photo_count) || 0 },
 ]);
 
 /**
  * Planilha das devoluções da lista: uma linha por item devolvido, para dar
  * para somar por SKU e por cliente. Devolução sem item vira uma linha só.
+ * Na visão do cliente saem as colunas `soMaster`.
  */
-export function linhasDaPlanilha(devolucoes) {
+export function linhasDaPlanilha(devolucoes, { visao = 'master' } = {}) {
+  const colunas = COLUNAS_DA_PLANILHA.filter((coluna) => visao !== 'cliente' || !coluna.soMaster);
   const linhas = [];
   for (const d of devolucoes || []) {
-    const resultado = resultadoDa(d);
-    const comum = {
-      cliente: d.client_name || '',
-      email: d.client_email || '',
-      situacao: rotuloDaSituacao(d.stage),
-      statusMl: d.ml_status ? statusNoMl(d.ml_status) : '',
-      resultado: resultado ? resultado.rotulo : '',
-      motivo: rotuloDe(MOTIVOS_NAO_APTO, d.not_apt_reason) || d.not_apt_reason || '',
-      destino: rotuloDe(DESTINOS_NAO_APTO, d.not_apt_destination) || d.not_apt_destination || '',
-    };
     const itens = Array.isArray(d.items) && d.items.length ? d.items : [null];
-    for (const item of itens) {
-      linhas.push([
-        item?.orderId || d.order_id || '', d.pack_id || '', d.ml_return_id || '', d.claim_id || '',
-        comum.cliente, comum.email, d.account_nickname || '', d.buyer_name || '',
-        item?.sku || '', item?.title || '', item ? Number(item.quantity) || 0 : '',
-        item && item.qtyApt !== null && item.qtyApt !== undefined ? item.qtyApt : '',
-        item && item.qtyNotApt !== null && item.qtyNotApt !== undefined ? item.qtyNotApt : '',
-        comum.situacao, comum.statusMl, comum.resultado, comum.motivo, comum.destino,
-        dataParaPlanilha(d.ml_created_at || d.created_at), dataParaPlanilha(d.received_at),
-        dataParaPlanilha(d.decided_at), d.decided_by || '',
-        d.tracking_number || '', d.claim_reason_text || '', d.notes || '', Number(d.photo_count) || 0,
-      ]);
-    }
+    for (const item of itens) linhas.push(colunas.map((coluna) => coluna.valor(d, item)));
   }
-  return { cabecalho: [...CABECALHO_DA_PLANILHA], linhas };
+  return { cabecalho: colunas.map((coluna) => coluna.titulo), linhas };
 }
 
 /* ---------------- Fotos ---------------- */

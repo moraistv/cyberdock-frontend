@@ -4,6 +4,9 @@
 // filtros, lista paginada, números do período e o acompanhamento da
 // sincronização com o ML. A sincronização roda no servidor, em segundo plano;
 // aqui só pedimos para começar e acompanhamos até terminar.
+//
+// Na visão do cliente (`visao: 'cliente'`) tudo vem de /returns/minhas, que o
+// backend prende ao usuário logado; não há filtro de cliente nem sincronização.
 
 import { ref, reactive, computed } from 'vue';
 import { useApi } from './useApi';
@@ -22,6 +25,7 @@ export const FILTROS_PADRAO = Object.freeze({
   periodo: '30d',
   situacao: '',
   resultado: '',
+  recebimento: '',
   cliente: '',
   conta: '',
 });
@@ -32,7 +36,7 @@ export function montarConsulta(filtros, extra = {}) {
   const busca = String(filtros.busca || '').trim();
   if (busca) params.set('busca', busca);
   params.set('periodo', filtros.periodo || FILTROS_PADRAO.periodo);
-  for (const campo of ['situacao', 'resultado', 'cliente', 'conta']) {
+  for (const campo of ['situacao', 'resultado', 'recebimento', 'cliente', 'conta']) {
     if (filtros[campo]) params.set(campo, String(filtros[campo]));
   }
   for (const [chave, valor] of Object.entries(extra)) {
@@ -41,10 +45,14 @@ export function montarConsulta(filtros, extra = {}) {
   return params.toString();
 }
 
-export function useDevolucoes() {
+export function useDevolucoes({ visao = 'master' } = {}) {
   const api = useApi();
+  const doCliente = visao === 'cliente';
+  const base = doCliente ? '/returns/minhas' : '/returns';
 
   const filtros = reactive({ ...FILTROS_PADRAO });
+  /* O backend ignora `cliente` na rota do cliente; aqui ele nem sai. */
+  const consultaDe = (extra) => montarConsulta(doCliente ? { ...filtros, cliente: '' } : filtros, extra);
   const pagina = ref(1);
   const lista = ref([]);
   const total = ref(0);
@@ -87,8 +95,8 @@ export function useDevolucoes() {
     const pedido = ++ultimoPedido;
     if (!silencioso) carregando.value = true;
     try {
-      const consulta = montarConsulta(filtros, { page: pagina.value, limit: LIMITE_POR_PAGINA });
-      const resposta = await api.get(`/returns?${consulta}`, { signal: meuControle.signal });
+      const consulta = consultaDe({ page: pagina.value, limit: LIMITE_POR_PAGINA });
+      const resposta = await api.get(`${base}?${consulta}`, { signal: meuControle.signal });
       if (pedido !== ultimoPedido) return;
 
       const paginas = Math.max(1, Number(resposta.totalPages) || 1);
@@ -162,7 +170,7 @@ export function useDevolucoes() {
 
   /** Todas as devoluções do filtro atual (planilha). O servidor limita a 5000. */
   async function buscarTodas() {
-    const resposta = await api.get(`/returns?${montarConsulta(filtros, { todas: 1 })}`);
+    const resposta = await api.get(`${base}?${consultaDe({ todas: 1 })}`);
     return {
       linhas: Array.isArray(resposta.data) ? resposta.data : [],
       total: Number(resposta.total) || 0,
@@ -211,8 +219,9 @@ export function useDevolucoes() {
     temporizador = setTimeout(passoDoAcompanhamento, INTERVALO_DO_ACOMPANHAMENTO);
   }
 
-  /** Pede ao servidor para ler agora as devoluções no ML. */
+  /** Pede ao servidor para ler agora as devoluções no ML (só o master). */
   async function sincronizar(callback = null) {
+    if (doCliente) return;
     sync.value = await api.post('/returns/sync', {});
     acompanharSincronizacao(callback);
   }

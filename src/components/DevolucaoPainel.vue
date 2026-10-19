@@ -1,8 +1,11 @@
 <!-- Detalhes de uma devolução do Mercado Livre: resumo, inspeção (checklist,
      observação e fotos), histórico e a decisão apto / não apto. A decisão soma
      ao estoque do cliente as unidades aptas, na mesma transação no backend.
+     "Confirmar recebimento" é o sinal de que a CyberDock está com o pacote: é o
+     que o cliente vê na tela dele.
      Fica ao lado da lista em tela larga e vira gaveta em tela estreita; quem
-     escolhe é a MasterDevolucoesView, pela prop `modo`. -->
+     escolhe é a MasterDevolucoesView, pela prop `modo`. Com `visao="cliente"`
+     o painel só mostra (dados de /returns/minhas, sem nenhuma ação). -->
 <template>
   <aside
     ref="raiz"
@@ -85,6 +88,18 @@
           <span>{{ prazo.texto }}. Se o produto chegou com problema, avise o Mercado Livre na página da venda.</span>
         </p>
 
+        <!-- O ML disse que entregou; falta a equipe confirmar que o pacote está aqui. -->
+        <div v-if="avisoDeRecebimento" class="aviso is-recebimento">
+          <IconeSvg nome="recebido" :tamanho="15" />
+          <div class="aviso__corpo">
+            <span>O Mercado Livre informou a entrega. Confirme quando o pacote estiver no CD: o cliente passa a ver "Recebida pela CyberDock".</span>
+            <button type="button" class="btn btn-secondary btn-sm btn-with-icon" :disabled="ocupado" @click="confirmarRecebimento">
+              <IconeSvg nome="recebido" />
+              {{ acao === 'recebimento' ? 'Confirmando...' : 'Confirmar recebimento' }}
+            </button>
+          </div>
+        </div>
+
         <!-- Abas -->
         <div class="abas" role="tablist" aria-label="Seções da devolução" @keydown="aoTeclarAbas">
           <button
@@ -114,7 +129,7 @@
           class="secao"
         >
           <dl class="fatos">
-            <div class="fato">
+            <div v-if="!ehCliente" class="fato">
               <dt>Cliente</dt>
               <dd>
                 {{ nomeDoCliente(detalhe) }}
@@ -164,7 +179,21 @@
                 <small>{{ detalhe.received_by ? `por ${detalhe.received_by}` : 'informado pelo Mercado Livre' }}</small>
               </dd>
             </div>
-            <div v-if="itens.length === 1" class="fato">
+            <div v-if="recebimento" class="fato">
+              <dt>Recebimento</dt>
+              <dd v-if="recebimento.confirmado" class="is-ok">
+                Confirmado em {{ formatarDataHora(detalhe.receipt_confirmed_at) }}
+                <small>{{ !ehCliente && detalhe.receipt_confirmed_by ? `por ${detalhe.receipt_confirmed_by}` : 'pela CyberDock' }}</small>
+              </dd>
+              <dd v-else-if="recebimento.etiqueta" class="is-aviso">
+                Aguardando confirmação
+                <small>{{ ehCliente
+                  ? 'O Mercado Livre informou a entrega. A CyberDock confirma assim que conferir o pacote.'
+                  : 'O Mercado Livre informou a entrega. Confirme quando o pacote estiver no CD.' }}</small>
+              </dd>
+              <dd v-else>{{ recebimento.texto }}</dd>
+            </div>
+            <div v-if="!ehCliente && itens.length === 1" class="fato">
               <dt>Estoque do SKU</dt>
               <dd :class="{ 'is-aviso': !principal.estoque?.encontrado }">{{ textoDoEstoque(principal) }}</dd>
             </div>
@@ -186,7 +215,7 @@
               <div class="item__texto">
                 <strong :title="item.title">{{ item.title || 'Produto sem título' }}</strong>
                 <span>SKU: {{ item.sku || 'não identificado' }} · {{ item.quantity }} {{ Number(item.quantity) === 1 ? 'unidade' : 'unidades' }}</span>
-                <span class="item__estoque" :class="{ 'is-aviso': !item.estoque?.encontrado }">{{ textoDoEstoque(item) }}</span>
+                <span v-if="!ehCliente" class="item__estoque" :class="{ 'is-aviso': !item.estoque?.encontrado }">{{ textoDoEstoque(item) }}</span>
               </div>
               <span v-if="item.qty_apt !== null && item.qty_apt !== undefined" class="item__decisao">
                 {{ item.qty_apt }} {{ Number(item.qty_apt) === 1 ? 'apta' : 'aptas' }}
@@ -234,7 +263,7 @@
                 <span class="sr-only">{{ checklist[item.chave] ? ': conferido' : ': não marcado' }}</span>
               </li>
             </ul>
-            <div class="lido">
+            <div v-if="!ehCliente" class="lido">
               <span class="lido__rotulo">Observação</span>
               <p>{{ detalhe.notes || 'Sem observação.' }}</p>
             </div>
@@ -271,7 +300,7 @@
               <span class="evento__icone"><IconeSvg :nome="iconeDoEvento(evento)" :tamanho="14" /></span>
               <div class="evento__corpo">
                 <p class="evento__texto">{{ textoDoEvento(evento) }}</p>
-                <p class="evento__meta">{{ formatarDataHora(evento.created_at) }} · {{ origemDoEvento(evento) }}</p>
+                <p class="evento__meta">{{ formatarDataHora(evento.created_at) }} · {{ origemDoEvento(evento, visao) }}</p>
               </div>
             </li>
           </ol>
@@ -315,11 +344,7 @@
               </button>
             </li>
           </ul>
-          <p v-else class="nota">
-            {{ podeAdicionarFoto
-              ? 'Fotografe o produto e a embalagem. As fotos ficam guardadas como prova da análise.'
-              : 'As fotos entram depois que o pacote chegar ao CD.' }}
-          </p>
+          <p v-else class="nota">{{ notaSemFotos }}</p>
         </section>
       </div>
 
@@ -349,12 +374,12 @@
           <p v-if="!itens.length" class="painel__dica is-aviso">Esta devolução não tem itens identificados. Sincronize com o Mercado Livre e tente de novo.</p>
         </template>
 
-        <template v-else-if="podeRegistrarChegada">
-          <button type="button" class="btn btn-primary btn-with-icon btn-cheio" :disabled="ocupado" @click="registrarChegada">
-            <IconeSvg nome="caixa" />
-            {{ acao === 'chegada' ? 'Registrando...' : 'Registrar chegada no CD' }}
+        <template v-else-if="podeConfirmarChegada">
+          <button type="button" class="btn btn-primary btn-with-icon btn-cheio" :disabled="ocupado" @click="confirmarRecebimento">
+            <IconeSvg nome="recebido" />
+            {{ acao === 'recebimento' ? 'Confirmando...' : 'Confirmar recebimento' }}
           </button>
-          <p class="painel__dica">Use quando o pacote chegar, mesmo que o Mercado Livre ainda não tenha atualizado.</p>
+          <p class="painel__dica">Use quando o pacote chegar, mesmo que o Mercado Livre ainda não tenha atualizado. O cliente vê na tela dele que a CyberDock recebeu.</p>
         </template>
 
         <div v-else-if="etapa === 'analisado'" class="concluida">
@@ -364,6 +389,17 @@
           <div class="concluida__texto">
             <strong>Análise concluída: {{ resultado?.rotulo || '—' }}</strong>
             <span>{{ formatarDataHora(detalhe.decided_at) }}<template v-if="detalhe.decided_by"> · {{ detalhe.decided_by }}</template></span>
+          </div>
+        </div>
+
+        <!-- Cliente: a CyberDock está com o pacote e ainda vai conferir. -->
+        <div v-else-if="ehCliente && recebimento?.confirmado" class="concluida">
+          <span class="concluida__icone is-paid">
+            <IconeSvg nome="recebido" :tamanho="18" />
+          </span>
+          <div class="concluida__texto">
+            <strong>Recebida pela CyberDock</strong>
+            <span>{{ formatarDataHora(detalhe.receipt_confirmed_at) }} · a equipe confere o produto e decide se volta ao estoque.</span>
           </div>
         </div>
 
@@ -472,8 +508,8 @@
         <img v-if="urls[fotoAberta.id]" :src="urls[fotoAberta.id]" :alt="`Foto ${indiceDaFotoAberta + 1} do produto devolvido`" />
         <span v-else class="visualizador__vazio"><IconeSvg nome="imagem" :tamanho="28" /> Carregando a foto...</span>
         <figcaption>
-          Foto {{ indiceDaFotoAberta + 1 }} de {{ fotos.length }} · enviada em {{ formatarDataHora(fotoAberta.created_at) }}
-          <template v-if="fotoAberta.uploaded_by"> por {{ fotoAberta.uploaded_by }}</template>
+          Foto {{ indiceDaFotoAberta + 1 }} de {{ fotos.length }} · {{ ehCliente ? 'tirada pela CyberDock em' : 'enviada em' }} {{ formatarDataHora(fotoAberta.created_at) }}
+          <template v-if="!ehCliente && fotoAberta.uploaded_by"> por {{ fotoAberta.uploaded_by }}</template>
         </figcaption>
       </figure>
       <template #footer>
@@ -507,7 +543,8 @@ import { useNotification, describeError } from '@/composables/useNotification';
 import { useConfirm } from '@/composables/useConfirm';
 import {
   RESULTADOS, CHECKLIST, MOTIVOS_NAO_APTO, DESTINOS_NAO_APTO, MOTIVOS_SEM_ENTRADA, MAX_FOTOS,
-  rotuloDe, statusNoMl, situacaoDa, resultadoDa, situacaoDoPrazo, nomeDoCliente, quantidadeTotal,
+  rotuloDe, statusNoMl, situacaoDa, resultadoDa, recebimentoDa, podeConfirmarRecebimento, perguntaDoRecebimento,
+  situacaoDoPrazo, nomeDoCliente, quantidadeTotal,
   linkDaVendaNoMl, formatarDataHora, miniaturaSegura, tentarMiniaturaPeloProxy,
   textoDoEvento, origemDoEvento, iconeDoEvento, resultadoPrevisto, previaDoEstoque,
   reduzirFoto, base64ParaBlob,
@@ -519,6 +556,8 @@ const props = defineProps({
   modo: { type: String, default: 'lado' },
   /** Falso quando a tela sai de cena (keep-alive): os modais, que vão para o body, somem junto. */
   ativa: { type: Boolean, default: true },
+  /** 'master' (análise e ações) ou 'cliente' (só leitura, dados de /returns/minhas). */
+  visao: { type: String, default: 'master' },
 });
 const emit = defineEmits(['fechar', 'alterada']);
 
@@ -531,16 +570,27 @@ const ABAS = [
   { id: 'inspecao', rotulo: 'Inspeção' },
   { id: 'historico', rotulo: 'Histórico' },
 ];
-/* Mesmas regras do backend (registrarChegada / adicionarFoto). */
+/* Mesmas regras do backend (confirmarRecebimento / adicionarFoto). */
 const PODEM_CHEGAR = new Set(['aguardando_envio', 'em_transito', 'cancelada']);
 const FORA_DO_CD = new Set(['no_ml', 'sem_devolucao']);
+const JA_CHEGARAM = new Set(['no_cd', 'analisado']);
 
 const NOTAS_SEM_INSPECAO = {
   aguardando_envio: 'O comprador ainda não enviou o pacote. A inspeção começa quando ele chegar ao CD.',
   em_transito: 'O pacote está a caminho. A inspeção começa quando ele chegar ao CD.',
-  cancelada: 'O Mercado Livre cancelou esta devolução. Se o pacote chegar mesmo assim, registre a chegada.',
+  cancelada: 'O Mercado Livre cancelou esta devolução. Se o pacote chegar mesmo assim, confirme o recebimento.',
   no_ml: 'Este pacote vai para o depósito do Mercado Livre (Full) e não passa pelo CD. Não há nada a fazer aqui.',
   sem_devolucao: 'O Mercado Livre reembolsou o comprador sem pedir o produto de volta. Não existe pacote para receber.',
+};
+
+/* Visão do cliente: o que está acontecendo, sem instrução de trabalho do CD. */
+const NOTAS_DO_CLIENTE = {
+  aguardando_envio: 'O comprador ainda não enviou o pacote. A CyberDock confere o produto quando ele chegar.',
+  em_transito: 'O pacote está a caminho da CyberDock. A conferência começa quando ele chegar.',
+  no_cd: 'O Mercado Livre informou a entrega. A CyberDock confirma o recebimento e confere o produto.',
+  cancelada: 'O Mercado Livre cancelou esta devolução. O pacote não deve chegar à CyberDock.',
+  no_ml: 'Este pacote vai para o depósito do Mercado Livre (Full) e não passa pela CyberDock.',
+  sem_devolucao: 'O Mercado Livre reembolsou o comprador sem pedir o produto de volta. Não há pacote a receber.',
 };
 
 /* ---------------- Estado ---------------- */
@@ -553,7 +603,7 @@ const detalhe = ref(null);
 const carregando = ref(false);
 const erro = ref('');
 const aba = ref('resumo');
-/** Ação em andamento: 'chegada' | 'salvar' | 'decisao' | 'foto' | 'remover'. */
+/** Ação em andamento: 'recebimento' | 'salvar' | 'decisao' | 'foto' | 'remover'. */
 const acao = ref('');
 const checklist = reactive(Object.fromEntries(CHECKLIST.map((item) => [item.chave, false])));
 const observacao = ref('');
@@ -588,14 +638,32 @@ const prazo = computed(() => {
   return situacaoDoPrazo(detalhe.value.review_due_at);
 });
 
-const podeAnalisar = computed(() => etapa.value === 'no_cd');
-const podeRegistrarChegada = computed(() => PODEM_CHEGAR.has(etapa.value));
-const aceitaFotos = computed(() => Boolean(detalhe.value) && !FORA_DO_CD.has(etapa.value));
-const podeAdicionarFoto = computed(() => etapa.value === 'no_cd' || etapa.value === 'analisado');
+const ehCliente = computed(() => props.visao === 'cliente');
+/* O cliente lê pela rota dele, que o backend prende ao usuário logado. */
+const base = computed(() => (ehCliente.value ? '/returns/minhas' : '/returns'));
+const recebimento = computed(() => recebimentoDa(detalhe.value));
+
+const podeAnalisar = computed(() => !ehCliente.value && etapa.value === 'no_cd');
+const podeConfirmar = computed(() => !ehCliente.value && podeConfirmarRecebimento(detalhe.value));
+/* Ainda a caminho no ML: o botão principal do rodapé registra a chegada junto. */
+const podeConfirmarChegada = computed(() => podeConfirmar.value && PODEM_CHEGAR.has(etapa.value));
+/* Já chegou pelo ML: a confirmação fica em destaque no topo, sem tirar o lugar da análise. */
+const avisoDeRecebimento = computed(() => podeConfirmar.value && JA_CHEGARAM.has(etapa.value));
+const aceitaFotos = computed(() => {
+  if (!detalhe.value || FORA_DO_CD.has(etapa.value)) return false;
+  return !ehCliente.value || JA_CHEGARAM.has(etapa.value) || fotos.value.length > 0;
+});
+const podeAdicionarFoto = computed(() => !ehCliente.value && JA_CHEGARAM.has(etapa.value));
 /* Depois da análise as fotos são prova e o backend não deixa remover. */
-const podeRemoverFoto = computed(() => etapa.value === 'no_cd');
+const podeRemoverFoto = computed(() => !ehCliente.value && etapa.value === 'no_cd');
 const ocupado = computed(() => Boolean(acao.value));
-const notaSemInspecao = computed(() => NOTAS_SEM_INSPECAO[etapa.value] || '');
+const notaSemInspecao = computed(() => (ehCliente.value ? NOTAS_DO_CLIENTE : NOTAS_SEM_INSPECAO)[etapa.value] || '');
+const notaSemFotos = computed(() => {
+  if (ehCliente.value) return 'A CyberDock fotografa o produto na conferência. As fotos aparecem aqui.';
+  return podeAdicionarFoto.value
+    ? 'Fotografe o produto e a embalagem. As fotos ficam guardadas como prova da análise.'
+    : 'As fotos entram depois que o pacote chegar ao CD.';
+});
 
 const retratoDaEdicao = () => JSON.stringify({
   c: CHECKLIST.map((item) => Boolean(checklist[item.chave])),
@@ -656,7 +724,7 @@ function sincronizarFotos() {
     const id = String(foto.id);
     if (urls[id] || fotosBaixando.has(id)) return;
     fotosBaixando.add(id);
-    api.get(`/returns/${devolucao}/fotos/${id}`, { responseType: 'blob' })
+    api.get(`${base.value}/${devolucao}/fotos/${id}`, { responseType: 'blob' })
       .then((blob) => {
         const aindaExiste = fotos.value.some((f) => String(f.id) === id);
         if (minha !== geracao || !aindaExiste || urls[id] || !(blob instanceof Blob)) return;
@@ -693,7 +761,7 @@ async function carregar({ silencioso = false } = {}) {
     erro.value = '';
   }
   try {
-    const novo = await api.get(`/returns/${id}`, { signal: meuControle.signal });
+    const novo = await api.get(`${base.value}/${id}`, { signal: meuControle.signal });
     if (meuControle !== controle) return;
     aplicarDetalhe(novo, { manterEdicao: silencioso });
   } catch (falha) {
@@ -732,30 +800,27 @@ async function executar(nome, tarefa) {
   }
 }
 
-async function registrarChegada() {
-  if (!detalhe.value || acao.value) return;
-  const cancelada = etapa.value === 'cancelada';
-  const ok = await confirm({
-    title: 'Registrar chegada no CD',
-    message: `O pacote do pedido #${detalhe.value.order_id || detalhe.value.ml_return_id} chegou ao CD?`,
-    detail: cancelada
-      ? 'O Mercado Livre marcou esta devolução como cancelada. Registre só se o pacote estiver mesmo aqui.'
-      : 'A devolução passa para "No CD" e fica pronta para a inspeção.',
-    confirmText: 'Registrar chegada',
-    tone: 'primary',
-  });
-  if (!ok) return;
+/**
+ * A CyberDock confirma que está com o pacote. Ainda a caminho no ML, a
+ * devolução passa para "No CD" junto; já entregue pelo ML, só fica confirmada.
+ * O cliente vê "Recebida pela CyberDock" na tela dele.
+ */
+async function confirmarRecebimento() {
+  if (!detalhe.value || acao.value || !podeConfirmar.value) return;
+  const chegando = PODEM_CHEGAR.has(etapa.value);
+  if (!(await confirm(perguntaDoRecebimento(detalhe.value)))) return;
   const id = String(props.devolucaoId);
-  await executar('chegada', async (aindaAqui) => {
+  await executar('recebimento', async (aindaAqui) => {
     try {
-      const novo = await api.post(`/returns/${id}/chegada`, {});
+      const novo = await api.post(`/returns/${id}/confirmar-recebimento`, {});
       if (!aindaAqui()) return;
-      aplicarDetalhe(novo);
-      aba.value = 'inspecao';
-      notify.success('Chegada registrada. Agora faça a inspeção.');
+      // Já "No CD": o checklist que estava sendo preenchido continua na tela.
+      aplicarDetalhe(novo, { manterEdicao: true });
+      if (chegando) aba.value = 'inspecao';
+      notify.success(chegando ? 'Recebimento confirmado. Agora faça a inspeção.' : 'Recebimento confirmado.');
       emit('alterada', novo);
     } catch (falha) {
-      notify.fromError(falha, 'Não foi possível registrar a chegada.');
+      notify.fromError(falha, 'Não foi possível confirmar o recebimento.');
       if (falha?.status === 409 && aindaAqui()) carregar({ silencioso: true });
     }
   });
@@ -1086,9 +1151,11 @@ button, input, select, textarea { font-family: var(--font-sans); }
   display: flex; align-items: flex-start; gap: 0.45rem; margin: 0; padding: 0.5rem 0.65rem;
   border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; color: #475569; font-size: 0.76rem; line-height: 1.45;
 }
-.aviso svg { flex: 0 0 auto; margin-top: 0.1rem; }
+.aviso > svg { flex: 0 0 auto; margin-top: 0.1rem; }
 .aviso.is-warning { border-color: #fed7aa; background: #fff7ed; color: #9a3412; }
 .aviso.is-overdue { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
+.aviso.is-recebimento { border-color: #bfdbfe; background: #eff6ff; color: #1e3a8a; }
+.aviso__corpo { display: flex; flex-direction: column; align-items: flex-start; gap: 0.45rem; min-width: 0; }
 
 /* ---------------- Abas ---------------- */
 .abas { display: flex; gap: 0.25rem; border-bottom: 1px solid #e2e8f0; }
@@ -1120,6 +1187,7 @@ button, input, select, textarea { font-family: var(--font-sans); }
 .fato dd { display: flex; flex-direction: column; gap: 0.1rem; margin: 0; color: #0f172a; font-weight: 650; overflow-wrap: anywhere; }
 .fato dd small { color: #64748b; font-size: 0.72rem; font-weight: 500; }
 .fato .is-aviso, .fato dd.is-aviso { color: #c2410c; }
+.fato dd.is-ok { color: #047857; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.78rem; }
 .link {
   display: inline-flex; align-items: center; gap: 0.2rem; width: fit-content;
