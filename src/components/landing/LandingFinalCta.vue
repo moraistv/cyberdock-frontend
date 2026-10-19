@@ -24,13 +24,15 @@
             </a>
             <a
               v-if="contact"
-              class="lp-btn lp-btn--outline-light"
+              class="lp-btn"
+              :class="contact.channel === 'whatsapp' ? 'lp-btn--whatsapp' : 'lp-btn--outline-light'"
               :href="contact.href"
               :target="contact.external ? '_blank' : null"
               :rel="contact.external ? 'noopener noreferrer' : null"
             >
-              <LandingIcon name="message" />
+              <LandingIcon :name="contact.icon" />
               {{ contact.label }}
+              <span v-if="contact.external" class="lp-sr-only">(abre em nova aba)</span>
             </a>
             <router-link v-else to="/auth" class="lp-btn lp-btn--outline-light">
               Entrar no painel

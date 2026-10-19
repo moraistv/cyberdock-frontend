@@ -26,6 +26,7 @@
 
     <LandingFooter />
     <LandingMobileActions />
+    <LandingWhatsappFloat />
   </div>
 </template>
 
@@ -44,6 +45,7 @@ import LandingPlatform from '@/components/landing/LandingPlatform.vue';
 import LandingPricing from '@/components/landing/LandingPricing.vue';
 import LandingServices from '@/components/landing/LandingServices.vue';
 import LandingSteps from '@/components/landing/LandingSteps.vue';
+import LandingWhatsappFloat from '@/components/landing/LandingWhatsappFloat.vue';
 import { scrollToSection } from '@/composables/useLandingScroll';
 import { PAGE_DESCRIPTION, PAGE_TITLE } from '@/utils/landingContent';
 

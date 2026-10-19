@@ -20,20 +20,21 @@ import {
 /* ---------------------------------------------------------------------------
  * CONTATO
  *
- * Hoje o repositório não tem WhatsApp nem e-mail comercial, então os botões de
- * contato ficam ESCONDIDOS enquanto estes campos estiverem vazios. A página
- * continua inteira: os botões de ação passam a ser "Simular meu custo" e
- * "Entrar no painel".
+ * WhatsApp comercial da CyberDock: +55 11 95722-5620. Com ele preenchido, a
+ * página mostra os botões de WhatsApp (hero, menu do celular, calculadora,
+ * perguntas, próximo passo, rodapé e o botão flutuante). Campo vazio esconde
+ * todos eles e a página continua inteira, com "Simular meu custo" e "Entrar no
+ * painel" como ações.
  *
- * Para ativar, preencha aqui (ou defina VUE_APP_LANDING_WHATSAPP e
- * VUE_APP_LANDING_EMAIL na hora do build; o Dockerfile atual não repassa
- * variáveis ao build, então editar este arquivo é o caminho mais curto).
+ * Também dá para definir VUE_APP_LANDING_WHATSAPP e VUE_APP_LANDING_EMAIL na
+ * hora do build; o Dockerfile atual não repassa variáveis ao build, então editar
+ * este arquivo é o caminho mais curto.
  *
  *   whatsapp: DDD + número, com ou sem o 55. Ex.: '11999998888'
- *   email:    endereço completo.
+ *   email:    endereço completo (vazio: sem botão de e-mail).
  * ------------------------------------------------------------------------- */
 const CONTACT_SETTINGS = Object.freeze({
-  whatsapp: '',
+  whatsapp: '11957225620',
   email: '',
 });
 
@@ -58,6 +59,19 @@ export const LANDING_CONTACT = Object.freeze({
 
 export const HAS_CONTACT = Boolean(LANDING_CONTACT.whatsapp || LANDING_CONTACT.email);
 
+/** Número do WhatsApp para exibir: "(11) 95722-5620". Vazio quando não há. */
+export const WHATSAPP_DISPLAY = (() => {
+  const digits = LANDING_CONTACT.whatsapp;
+  if (!digits) return '';
+  const local = digits.startsWith('55') ? digits.slice(2) : '';
+  if (local.length === 10 || local.length === 11) {
+    const number = local.slice(2);
+    const cut = number.length - 4;
+    return `(${local.slice(0, 2)}) ${number.slice(0, cut)}-${number.slice(cut)}`;
+  }
+  return `+${digits}`;
+})();
+
 export function whatsappLink(message = '') {
   if (!LANDING_CONTACT.whatsapp) return '';
   const text = message ? `?text=${encodeURIComponent(message)}` : '';
@@ -73,18 +87,27 @@ export function mailLink(subject = '', body = '') {
   return `mailto:${LANDING_CONTACT.email}${query ? `?${query}` : ''}`;
 }
 
-const DEFAULT_CONTACT_MESSAGE = 'Olá! Vim pelo site da CyberDock e gostaria de uma proposta.';
+/**
+ * Mensagem que já chega escrita no WhatsApp, conforme o botão usado. Ajuda a
+ * equipe a saber de onde veio o contato. A calculadora manda a própria simulação.
+ */
+export const CONTACT_MESSAGES = Object.freeze({
+  proposal: 'Olá! Vim pelo site da CyberDock e gostaria de uma proposta.',
+  question: 'Olá! Vim pelo site da CyberDock e tenho uma dúvida.',
+  general: 'Olá! Vim pelo site da CyberDock e quero saber mais.',
+});
 
 /**
  * Ação de contato principal, ou null quando não há canal configurado (os
  * componentes então nem desenham o botão). WhatsApp tem prioridade sobre e-mail.
+ * `icon` é o nome em LandingIcon.
  */
-export function contactAction(message = DEFAULT_CONTACT_MESSAGE) {
+export function contactAction(message = CONTACT_MESSAGES.proposal) {
   if (LANDING_CONTACT.whatsapp) {
-    return { channel: 'whatsapp', href: whatsappLink(message), label: 'Falar no WhatsApp', external: true };
+    return { channel: 'whatsapp', icon: 'whatsapp', href: whatsappLink(message), label: 'Falar no WhatsApp', external: true };
   }
   if (LANDING_CONTACT.email) {
-    return { channel: 'email', href: mailLink('Proposta CyberDock', message), label: 'Falar por e-mail', external: false };
+    return { channel: 'email', icon: 'mail', href: mailLink('Proposta CyberDock', message), label: 'Falar por e-mail', external: false };
   }
   return null;
 }

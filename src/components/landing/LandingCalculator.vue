@@ -212,15 +212,18 @@
           </p>
 
           <div class="receipt__actions">
+            <!-- WhatsApp: a mensagem já vai com a simulação escrita. -->
             <a
               v-if="contact"
-              class="lp-btn lp-btn--blue"
+              class="lp-btn"
+              :class="contact.channel === 'whatsapp' ? 'lp-btn--whatsapp' : 'lp-btn--blue'"
               :href="contact.href"
               :target="contact.external ? '_blank' : null"
               :rel="contact.external ? 'noopener noreferrer' : null"
             >
-              <LandingIcon name="message" />
+              <LandingIcon :name="contact.icon" />
               Enviar esta simulação
+              <span class="lp-sr-only">{{ contact.channel === 'whatsapp' ? 'pelo WhatsApp (abre em nova aba)' : 'por e-mail' }}</span>
             </a>
             <button type="button" class="lp-btn" :class="{ 'lp-btn--ghost': contact }" @click="copySummary">
               <LandingIcon :name="copied ? 'check' : 'copy'" />

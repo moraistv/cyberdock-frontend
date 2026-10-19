@@ -7,6 +7,25 @@
         <p v-reveal="120" class="lp-lead">
           Como os serviços funcionam, o que está incluído e como calculamos os valores.
         </p>
+
+        <!-- Some quando não há canal de contato configurado. -->
+        <div v-if="contact" v-reveal="180" class="faq__contact">
+          <p class="faq__contact-text">
+            <strong>Não achou sua resposta?</strong>
+            Fale com a nossa equipe{{ contact.channel === 'whatsapp' ? ' no WhatsApp' : ' por e-mail' }}.
+          </p>
+          <a
+            class="lp-btn"
+            :class="contact.channel === 'whatsapp' ? 'lp-btn--whatsapp' : 'lp-btn--blue'"
+            :href="contact.href"
+            :target="contact.external ? '_blank' : null"
+            :rel="contact.external ? 'noopener noreferrer' : null"
+          >
+            <LandingIcon :name="contact.icon" />
+            {{ contact.channel === 'whatsapp' ? 'Perguntar no WhatsApp' : 'Perguntar por e-mail' }}
+            <span v-if="contact.external" class="lp-sr-only">(abre em nova aba)</span>
+          </a>
+        </div>
       </header>
 
       <div class="faq__list">
@@ -33,7 +52,9 @@
 <script setup>
 import LandingIcon from '@/components/landing/LandingIcon.vue';
 import { vReveal } from '@/composables/useReveal';
-import { FAQ_ITEMS } from '@/utils/landingContent';
+import { CONTACT_MESSAGES, FAQ_ITEMS, contactAction } from '@/utils/landingContent';
+
+const contact = contactAction(CONTACT_MESSAGES.question);
 </script>
 
 <style scoped>
@@ -51,6 +72,37 @@ import { FAQ_ITEMS } from '@/utils/landingContent';
 .faq__head {
   display: grid;
   justify-items: start;
+}
+
+.faq__contact {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+  margin-top: 28px;
+  padding: 20px 22px;
+  border: 1px solid var(--lp-line);
+  border-radius: var(--lp-radius-m);
+  background: var(--lp-sky-2);
+}
+
+.faq__contact-text {
+  color: var(--lp-muted);
+}
+
+.faq__contact-text strong {
+  display: block;
+  color: var(--lp-ink);
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .faq__contact {
+    width: 100%;
+  }
+
+  .faq__contact .lp-btn {
+    width: 100%;
+  }
 }
 
 .faq__list {

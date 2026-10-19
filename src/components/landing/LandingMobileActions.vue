@@ -10,44 +10,13 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import LandingIcon from '@/components/landing/LandingIcon.vue';
-import { scrollToSection } from '@/composables/useLandingScroll';
+import { scrollToSection, useQuickActionsVisibility } from '@/composables/useLandingScroll';
 
-const heroVisible = ref(true);
-const calculatorVisible = ref(false);
-const editing = ref(false);
-const visible = computed(() => !heroVisible.value && !calculatorVisible.value && !editing.value);
+/* Mesma regra do botão flutuante do WhatsApp (LandingWhatsappFloat), que fica
+ * logo acima desta barra no celular. */
+const visible = useQuickActionsVisibility();
 const go = (id) => scrollToSection(id);
-let frame = 0;
-function updateVisibility() {
-  frame = 0;
-  const hero = document.getElementById('topo')?.getBoundingClientRect();
-  const calculator = document.getElementById('calculadora')?.getBoundingClientRect();
-  heroVisible.value = Boolean(hero && hero.bottom > 76 && hero.top < window.innerHeight);
-  calculatorVisible.value = Boolean(calculator && calculator.top < window.innerHeight && calculator.bottom > 76);
-}
-function scheduleVisibility() {
-  if (!frame) frame = requestAnimationFrame(updateVisibility);
-}
-function updateFocus(event) {
-  editing.value = Boolean(event.target?.matches('input, textarea, select, [contenteditable="true"]'));
-}
-function clearFocus() { editing.value = false; }
-onMounted(() => {
-  updateVisibility();
-  window.addEventListener('scroll', scheduleVisibility, { passive: true });
-  window.addEventListener('resize', scheduleVisibility, { passive: true });
-  document.addEventListener('focusin', updateFocus);
-  document.addEventListener('focusout', clearFocus);
-});
-onBeforeUnmount(() => {
-  if (frame) cancelAnimationFrame(frame);
-  window.removeEventListener('scroll', scheduleVisibility);
-  window.removeEventListener('resize', scheduleVisibility);
-  document.removeEventListener('focusin', updateFocus);
-  document.removeEventListener('focusout', clearFocus);
-});
 </script>
 
 <style scoped>

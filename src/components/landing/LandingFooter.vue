@@ -30,7 +30,11 @@
           <h2 class="footer__heading">Contato</h2>
           <ul role="list">
             <li v-if="LANDING_CONTACT.whatsapp">
-              <a :href="whatsappLink()" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+              <a class="footer__whatsapp" :href="whatsappLink(CONTACT_MESSAGES.general)" target="_blank" rel="noopener noreferrer">
+                <LandingIcon name="whatsapp" />
+                <span>WhatsApp {{ WHATSAPP_DISPLAY }}</span>
+                <span class="lp-sr-only">(abre em nova aba)</span>
+              </a>
             </li>
             <li v-if="LANDING_CONTACT.email">
               <a :href="mailLink()">{{ LANDING_CONTACT.email }}</a>
@@ -48,8 +52,16 @@
 
 <script setup>
 import logo from '@/assets/logo.png';
+import LandingIcon from '@/components/landing/LandingIcon.vue';
 import { scrollToSection, scrollToTop } from '@/composables/useLandingScroll';
-import { LANDING_CONTACT, NAV_LINKS, mailLink, whatsappLink } from '@/utils/landingContent';
+import {
+  CONTACT_MESSAGES,
+  LANDING_CONTACT,
+  NAV_LINKS,
+  WHATSAPP_DISPLAY,
+  mailLink,
+  whatsappLink,
+} from '@/utils/landingContent';
 
 const year = new Date().getFullYear();
 
@@ -134,6 +146,17 @@ const goTop = () => scrollToTop();
   color: var(--lp-blue-bright);
   text-decoration: underline;
   text-underline-offset: 4px;
+}
+
+.footer__whatsapp {
+  gap: 10px;
+  white-space: nowrap;
+}
+
+/* Verde da marca sobre o rodapé escuro: 7,3:1. */
+.footer__whatsapp .lp-icon {
+  color: #25d366;
+  --icon-size: 20px;
 }
 
 .footer__bottom {

@@ -2,7 +2,7 @@
 //
 // Rolagem entre as seções da landing e destaque da seção visível no menu.
 
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { prefersReducedMotion } from '@/composables/useReveal';
 
 /**
@@ -26,6 +26,52 @@ export function scrollToSection(id, { updateHash = true, smooth = true } = {}) {
     history.replaceState(history.state, '', `#${id}`);
   }
   return true;
+}
+
+/**
+ * Quando mostrar os atalhos fixos (barra do celular e botão do WhatsApp):
+ * fora do hero e da calculadora, que já têm os próprios botões, e nunca com um
+ * campo em edição, para não cobrir o que se digita nem o teclado do celular.
+ * Os dois atalhos usam esta mesma regra, então aparecem e somem juntos.
+ */
+export function useQuickActionsVisibility() {
+  const heroVisible = ref(true);
+  const calculatorVisible = ref(false);
+  const editing = ref(false);
+  const visible = computed(() => !heroVisible.value && !calculatorVisible.value && !editing.value);
+
+  let frame = 0;
+  function update() {
+    frame = 0;
+    const hero = document.getElementById('topo')?.getBoundingClientRect();
+    const calculator = document.getElementById('calculadora')?.getBoundingClientRect();
+    heroVisible.value = Boolean(hero && hero.bottom > 76 && hero.top < window.innerHeight);
+    calculatorVisible.value = Boolean(calculator && calculator.top < window.innerHeight && calculator.bottom > 76);
+  }
+  function schedule() {
+    if (!frame) frame = requestAnimationFrame(update);
+  }
+  function onFocusIn(event) {
+    editing.value = Boolean(event.target?.matches('input, textarea, select, [contenteditable="true"]'));
+  }
+  function onFocusOut() { editing.value = false; }
+
+  onMounted(() => {
+    update();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule, { passive: true });
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
+  });
+  onBeforeUnmount(() => {
+    if (frame) cancelAnimationFrame(frame);
+    window.removeEventListener('scroll', schedule);
+    window.removeEventListener('resize', schedule);
+    document.removeEventListener('focusin', onFocusIn);
+    document.removeEventListener('focusout', onFocusOut);
+  });
+
+  return visible;
 }
 
 export function scrollToTop({ smooth = true } = {}) {

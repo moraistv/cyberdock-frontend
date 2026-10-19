@@ -27,17 +27,19 @@
             Simular meu custo
             <LandingIcon name="arrow-right" />
           </a>
-          <a class="hero__price-link" href="#precos" @click.prevent="go('precos')">Conhecer os preços <LandingIcon name="arrow-down" /></a>
           <a
             v-if="contact"
-            class="lp-btn lp-btn--blue"
+            class="lp-btn"
+            :class="contact.channel === 'whatsapp' ? 'lp-btn--whatsapp' : 'lp-btn--blue'"
             :href="contact.href"
             :target="contact.external ? '_blank' : null"
             :rel="contact.external ? 'noopener noreferrer' : null"
           >
-            <LandingIcon name="message" />
+            <LandingIcon :name="contact.icon" />
             {{ contact.label }}
+            <span v-if="contact.external" class="lp-sr-only">(abre em nova aba)</span>
           </a>
+          <a class="hero__price-link" href="#precos" @click.prevent="go('precos')">Conhecer os preços <LandingIcon name="arrow-down" /></a>
         </div>
 
         <ul v-reveal="320" class="hero__points">

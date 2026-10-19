@@ -55,6 +55,19 @@
         <div class="nav__sheet-actions">
           <router-link to="/auth" class="lp-btn lp-btn--ghost">Entrar no painel</router-link>
           <a class="lp-btn" href="#calculadora" @click.prevent="go('calculadora')">Simular meu custo</a>
+          <a
+            v-if="contact"
+            class="lp-btn"
+            :class="contact.channel === 'whatsapp' ? 'lp-btn--whatsapp' : 'lp-btn--blue'"
+            :href="contact.href"
+            :target="contact.external ? '_blank' : null"
+            :rel="contact.external ? 'noopener noreferrer' : null"
+            @click="open = false"
+          >
+            <LandingIcon :name="contact.icon" />
+            {{ contact.label }}
+            <span v-if="contact.external" class="lp-sr-only">(abre em nova aba)</span>
+          </a>
         </div>
       </nav>
     </div>
@@ -69,8 +82,11 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import logo from '@/assets/logo.png';
 import LandingIcon from '@/components/landing/LandingIcon.vue';
 import { scrollToSection, scrollToTop, useActiveSection } from '@/composables/useLandingScroll';
-import { NAV_LINKS } from '@/utils/landingContent';
+import { NAV_LINKS, contactAction } from '@/utils/landingContent';
 
+/* No menu do celular. No computador o contato fica no botão flutuante: o
+ * cabeçalho já está no limite de largura em 1040 px. */
+const contact = contactAction();
 const open = ref(false);
 const stuck = ref(false);
 const progress = ref(0);

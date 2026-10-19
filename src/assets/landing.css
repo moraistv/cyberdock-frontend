@@ -343,6 +343,20 @@ html.lp-page {
   box-shadow: 0 14px 30px -12px rgba(77, 179, 240, 0.75);
 }
 
+/* WhatsApp: o verde da marca com texto escuro. Branco sobre #25d366 dá só
+ * 2:1; o --lp-ink dá 7,3:1. Funciona igual sobre fundo claro e escuro. */
+.lp-btn--whatsapp {
+  --btn-bg: #25d366;
+  --btn-fg: var(--lp-ink);
+  --btn-bd: #25d366;
+}
+
+.lp-btn--whatsapp:hover {
+  --btn-bg: #3ddc7a;
+  --btn-bd: #3ddc7a;
+  box-shadow: 0 14px 30px -12px rgba(18, 140, 126, 0.7);
+}
+
 .lp-btn[disabled] {
   opacity: 0.5;
   pointer-events: none;
