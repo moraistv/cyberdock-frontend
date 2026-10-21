@@ -26,6 +26,8 @@ export const FILTROS_PADRAO = Object.freeze({
   situacao: '',
   resultado: '',
   recebimento: '',
+  /** Modalidade de envio da venda (full, sem_full, flex...). */
+  envio: '',
   cliente: '',
   conta: '',
 });
@@ -36,7 +38,7 @@ export function montarConsulta(filtros, extra = {}) {
   const busca = String(filtros.busca || '').trim();
   if (busca) params.set('busca', busca);
   params.set('periodo', filtros.periodo || FILTROS_PADRAO.periodo);
-  for (const campo of ['situacao', 'resultado', 'recebimento', 'cliente', 'conta']) {
+  for (const campo of ['situacao', 'resultado', 'recebimento', 'envio', 'cliente', 'conta']) {
     if (filtros[campo]) params.set(campo, String(filtros[campo]));
   }
   for (const [chave, valor] of Object.entries(extra)) {

@@ -141,6 +141,13 @@
               <dt>Conta do ML</dt>
               <dd>{{ detalhe.account_nickname || '—' }}</dd>
             </div>
+            <div v-if="envio" class="fato">
+              <dt>Mod. envio da venda</dt>
+              <dd :class="{ 'is-mudo': !envio.conhecida }">
+                <span class="envio" :class="{ 'is-full': envio.full }">{{ envio.rotulo }}</span>{{ ' ' }}
+                <small v-if="envio.dica">{{ envio.dica }}</small>
+              </dd>
+            </div>
             <div class="fato">
               <dt>Comprador</dt>
               <dd>{{ detalhe.buyer_name || '—' }}</dd>
@@ -543,7 +550,7 @@ import { useNotification, describeError } from '@/composables/useNotification';
 import { useConfirm } from '@/composables/useConfirm';
 import {
   RESULTADOS, CHECKLIST, MOTIVOS_NAO_APTO, DESTINOS_NAO_APTO, MOTIVOS_SEM_ENTRADA, MAX_FOTOS,
-  rotuloDe, statusNoMl, situacaoDa, resultadoDa, recebimentoDa, podeConfirmarRecebimento, perguntaDoRecebimento,
+  rotuloDe, statusNoMl, situacaoDa, resultadoDa, recebimentoDa, envioDa, podeConfirmarRecebimento, perguntaDoRecebimento,
   situacaoDoPrazo, nomeDoCliente, quantidadeTotal,
   linkDaVendaNoMl, formatarDataHora, miniaturaSegura, tentarMiniaturaPeloProxy,
   textoDoEvento, origemDoEvento, iconeDoEvento, resultadoPrevisto, previaDoEstoque,
@@ -642,6 +649,8 @@ const ehCliente = computed(() => props.visao === 'cliente');
 /* O cliente lê pela rota dele, que o backend prende ao usuário logado. */
 const base = computed(() => (ehCliente.value ? '/returns/minhas' : '/returns'));
 const recebimento = computed(() => recebimentoDa(detalhe.value));
+/* Modalidade de envio da venda que gerou a devolução (Full, Flex, Coleta...). */
+const envio = computed(() => envioDa(detalhe.value));
 
 const podeAnalisar = computed(() => !ehCliente.value && etapa.value === 'no_cd');
 const podeConfirmar = computed(() => !ehCliente.value && podeConfirmarRecebimento(detalhe.value));
@@ -1188,6 +1197,12 @@ button, input, select, textarea { font-family: var(--font-sans); }
 .fato dd small { color: #64748b; font-size: 0.72rem; font-weight: 500; }
 .fato .is-aviso, .fato dd.is-aviso { color: #c2410c; }
 .fato dd.is-ok { color: #047857; }
+.fato dd.is-mudo { color: #64748b; font-weight: 600; }
+/* Full no amarelo do Mercado Livre, como na lista. */
+.envio.is-full {
+  width: fit-content; padding: 0.05rem 0.45rem; border-radius: 5px;
+  background: #fff7b8; box-shadow: inset 0 0 0 1px #f5d90a; color: #4d3f00;
+}
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.78rem; }
 .link {
   display: inline-flex; align-items: center; gap: 0.2rem; width: fit-content;

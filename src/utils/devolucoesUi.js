@@ -82,6 +82,61 @@ export const OPCOES_DE_RESULTADO = Object.freeze([
   { valor: 'nao_apto', rotulo: 'Não apto' },
 ]);
 
+/* Modalidade de envio da VENDA que gerou a devolução (filtro `envio` do
+ * backend, utils/mlReturns.js). Full + "todas, menos Full" somam o total;
+ * "não identificada" é venda que não está nas vendas sincronizadas. */
+export const OPCOES_DE_ENVIO = Object.freeze([
+  { valor: '', rotulo: 'Mod. envio: Todas' },
+  { valor: 'full', rotulo: 'Full' },
+  { valor: 'sem_full', rotulo: 'Todas, menos Full' },
+  { valor: 'flex', rotulo: 'Flex' },
+  { valor: 'coleta', rotulo: 'Coleta' },
+  { valor: 'agencia', rotulo: 'Agência' },
+  { valor: 'correios', rotulo: 'Correios' },
+  { valor: 'padrao', rotulo: 'Envio padrão' },
+  { valor: 'outras', rotulo: 'Outras' },
+  { valor: 'nao_identificada', rotulo: 'Não identificada' },
+]);
+
+/* Valor gravado na venda (o mesmo da Tabela de vendas) → como aparece aqui. */
+const MODALIDADES_DE_ENVIO = Object.freeze({
+  FULL: { rotulo: 'Full', classe: 'is-full', dica: 'Venda Full: o produto saiu do depósito do Mercado Livre.' },
+  FLEX: { rotulo: 'Flex', classe: 'is-envio', dica: '' },
+  Coleta: { rotulo: 'Coleta', classe: 'is-envio', dica: '' },
+  'Agência': { rotulo: 'Agência', classe: 'is-envio', dica: '' },
+  Correios: { rotulo: 'Correios', classe: 'is-envio', dica: '' },
+  'Envio Padrão': { rotulo: 'Envio padrão', classe: 'is-envio', dica: '' },
+  Outros: { rotulo: 'Outra', classe: 'is-envio', dica: '' },
+});
+
+/**
+ * Modalidade de envio da venda (`sale_shipping_mode`). `conhecida` falso: a
+ * venda não está nas vendas sincronizadas e não há o que mostrar na linha.
+ * null: o backend ainda não manda o campo (versão anterior no ar); a tela não
+ * mostra nada em vez de dizer "não identificada" para todas.
+ */
+export function envioDa(d) {
+  if (!d || !Object.prototype.hasOwnProperty.call(d, 'sale_shipping_mode')) return null;
+  const valor = d.sale_shipping_mode;
+  if (!valor) {
+    return {
+      conhecida: false,
+      full: false,
+      rotulo: 'Não identificada',
+      classe: 'is-envio',
+      dica: 'A venda não foi encontrada nas vendas sincronizadas.',
+    };
+  }
+  const conhecida = MODALIDADES_DE_ENVIO[valor];
+  return {
+    conhecida: true,
+    full: valor === 'FULL',
+    rotulo: conhecida ? conhecida.rotulo : String(valor),
+    classe: conhecida ? conhecida.classe : 'is-envio',
+    dica: conhecida ? conhecida.dica : '',
+  };
+}
+
 /* Recebimento confirmado pela CyberDock (filtro `recebimento` do backend).
  * "Aguardando" é o que ainda vem ou já chegou pelo ML sem confirmação. */
 export const OPCOES_DE_RECEBIMENTO = Object.freeze([
@@ -523,6 +578,7 @@ const COLUNAS_DA_PLANILHA = Object.freeze([
   { titulo: 'Cliente', soMaster: true, valor: (d) => d.client_name || '' },
   { titulo: 'E-mail do cliente', soMaster: true, valor: (d) => d.client_email || '' },
   { titulo: 'Conta do ML', valor: (d) => d.account_nickname || '' },
+  { titulo: 'Mod. envio', valor: (d) => envioDa(d)?.rotulo ?? '' },
   { titulo: 'Comprador', valor: (d) => d.buyer_name || '' },
   { titulo: 'SKU', valor: (d, item) => item?.sku || '' },
   { titulo: 'Produto', valor: (d, item) => item?.title || '' },

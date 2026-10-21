@@ -6,6 +6,8 @@
      estoque acontecem no backend (utils/mlReturns.js).
      "Confirmar recebimento" (menu da linha e painel) é o sinal de que a
      CyberDock está com o pacote; o filtro "Recebimento" separa o que falta.
+     "Mod. envio" filtra pela modalidade de envio da VENDA (Full, Flex,
+     Coleta...), para separar as devoluções de venda Full das demais.
      Com visao="cliente" (DevolucoesView, rota /devolucoes) a mesma tela mostra
      só as devoluções do cliente logado, sem sincronizar e sem nenhuma ação.
      Tela larga: lista e detalhes lado a lado. Tela estreita: os detalhes abrem
@@ -153,6 +155,12 @@
               <option v-for="opcao in OPCOES_DE_RECEBIMENTO" :key="opcao.valor" :value="opcao.valor">{{ opcao.rotulo }}</option>
             </select>
           </label>
+          <label class="seletor" title="Modalidade de envio da venda que gerou a devolução">
+            <span class="sr-only">Modalidade de envio da venda</span>
+            <select v-model="filtros.envio" @change="aplicarFiltros">
+              <option v-for="opcao in OPCOES_DE_ENVIO" :key="opcao.valor" :value="opcao.valor">{{ opcao.rotulo }}</option>
+            </select>
+          </label>
 
           <button
             type="button"
@@ -269,7 +277,21 @@
               <template v-if="filtrosAlemDoPeriodo">
                 <h3>Nenhuma devolução com esses filtros</h3>
                 <p>Tente outro status, outro período ou uma busca diferente.</p>
+                <!-- Venda Full quase sempre volta para o depósito do ML, que fica fora da lista sem escolher no Status. -->
+                <p v-if="ocultasNoMl">
+                  {{ ocultasNoMl === 1 ? 'Uma devolução com esses filtros foi' : `${ocultasNoMl} devoluções com esses filtros foram` }}
+                  para o depósito do Mercado Livre e não aparecem com "Status: Todos".
+                </p>
                 <div class="estado__acoes">
+                  <button
+                    v-if="ocultasNoMl"
+                    type="button"
+                    class="btn btn-primary btn-with-icon"
+                    @click="definirFiltros(filtroDoCartao({ situacao: 'no_ml' }))"
+                  >
+                    <IconeSvg nome="olho" />
+                    {{ ocultasNoMl === 1 ? 'Ver a que foi para o ML' : `Ver as ${ocultasNoMl} que foram para o ML` }}
+                  </button>
                   <button type="button" class="btn btn-secondary btn-with-icon" @click="limparFiltros">
                     <IconeSvg nome="desfazer" />
                     Limpar filtros
@@ -329,7 +351,15 @@
                         class="c-pedido__cliente"
                         :title="ehCliente ? d.account_nickname : nomeDoCliente(d)"
                       >{{ ehCliente ? d.account_nickname : nomeDoCliente(d) }}</span>
-                      <span v-if="prazoDaLinha(d)" class="tag" :class="prazoDaLinha(d).classe">{{ prazoDaLinha(d).curto }}</span>
+                      <span v-if="envioDa(d)?.conhecida || prazoDaLinha(d)" class="c-pedido__tags">
+                        <span
+                          v-if="envioDa(d)?.conhecida"
+                          class="tag tag-envio"
+                          :class="envioDa(d).classe"
+                          :title="`Modalidade de envio da venda: ${envioDa(d).rotulo}`"
+                        ><span class="sr-only">Modalidade de envio da venda: </span>{{ envioDa(d).rotulo }}</span>
+                        <span v-if="prazoDaLinha(d)" class="tag" :class="prazoDaLinha(d).classe">{{ prazoDaLinha(d).curto }}</span>
+                      </span>
                     </div>
                   </div>
 
@@ -549,8 +579,8 @@ import { useConfirm } from '@/composables/useConfirm';
 import { useDevolucoes } from '@/composables/useDevolucoes';
 import { useNotification } from '@/composables/useNotification';
 import {
-  OPCOES_DE_PERIODO, OPCOES_DE_SITUACAO, OPCOES_DE_RESULTADO, OPCOES_DE_RECEBIMENTO,
-  situacaoDa, resultadoDa, recebimentoDa, podeConfirmarRecebimento, perguntaDoRecebimento,
+  OPCOES_DE_PERIODO, OPCOES_DE_SITUACAO, OPCOES_DE_RESULTADO, OPCOES_DE_RECEBIMENTO, OPCOES_DE_ENVIO,
+  situacaoDa, resultadoDa, recebimentoDa, envioDa, podeConfirmarRecebimento, perguntaDoRecebimento,
   statusNoMl, situacaoDoPrazo, nomeDoCliente, quantidadeTotal, linkDaVendaNoMl,
   formatarData, formatarHora, formatarDataHora, formatarDuracaoEmHoras, variacaoPercentual,
   miniaturaSegura, tentarMiniaturaPeloProxy, montarCsv, linhasDaPlanilha, hojeEmBrasilia,
@@ -690,8 +720,17 @@ const classeDaTendencia = (t) => (t.valor > 0 ? 'is-sobe' : (t.valor < 0 ? 'is-d
 
 const avancadosAtivos = computed(() => (ehCliente.value ? [filtros.conta] : [filtros.cliente, filtros.conta])
   .filter(Boolean).length);
-const filtrosAlemDoPeriodo = computed(() => ['busca', 'situacao', 'resultado', 'recebimento', 'cliente', 'conta']
+const filtrosAlemDoPeriodo = computed(() => ['busca', 'situacao', 'resultado', 'recebimento', 'envio', 'cliente', 'conta']
   .some((campo) => String(filtros[campo] || '').trim() !== ''));
+
+/* Lista vazia com "Status: Todos": quantas, com estes filtros, foram para o
+ * depósito do ML (não entram na lista sem escolher no Status). É o caso comum
+ * de "Mod. envio: Full". Com filtro de resultado ou de recebimento elas não
+ * casariam de qualquer jeito. */
+const ocultasNoMl = computed(() => {
+  if (filtros.situacao || filtros.resultado || filtros.recebimento) return 0;
+  return Number(kpis.value?.noMl) || 0;
+});
 
 function limparBusca() {
   filtros.busca = '';
@@ -1248,6 +1287,13 @@ button, input, select { font-family: var(--font-sans); }
 .tag.is-warning { background: #fff7ed; color: #c2410c; }
 .tag.is-danger { background: #fef2f2; color: #b91c1c; }
 .tag.is-ok { background: #ecfdf5; color: #047857; }
+/* Modalidade de envio e prazo lado a lado, embaixo do pedido. */
+.c-pedido__tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.15rem; }
+.c-pedido__tags .tag { margin-top: 0; }
+.tag-envio { letter-spacing: 0.04em; text-transform: uppercase; }
+.tag.is-envio { background: #f1f5f9; color: #475569; }
+/* Full no amarelo do Mercado Livre (o mesmo do selo do topo): é o que se quer separar. */
+.tag.is-full { background: #fff7b8; color: #4d3f00; box-shadow: inset 0 0 0 1px #f5d90a; }
 
 .c-cliente, .c-produto { display: flex; flex-direction: column; min-width: 0; }
 .c-cliente__nome, .c-produto__titulo { overflow: hidden; color: #0f172a; font-size: 0.82rem; text-overflow: ellipsis; white-space: nowrap; }
