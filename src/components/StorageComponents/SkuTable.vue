@@ -261,12 +261,14 @@
               </td>
               <td data-label="Volume Total (m³)">{{ calcularVolumePorSku(item).toFixed(4) }}</td>
               <td data-label="Ações" class="actions">
+                <!-- SKU filho vai pelo ajuste de componente, o mesmo da linha
+                     aninhada sob o kit: o endpoint geral recusa componentes. -->
                 <button 
-                  @click="$emit('adjust-stock', item)" 
+                  @click="$emit(usaAjusteDeComponente(item) ? 'adjust-component-stock' : 'adjust-stock', item)" 
                   class="icon" 
                   :disabled="!canAdjustStock(item)"
                   :title="getAdjustStockTooltip(item)"
-                  :class="{ 'disabled-action': !canAdjustStock(item) }"
+                  :class="{ 'disabled-action': !canAdjustStock(item), 'component-stock': usaAjusteDeComponente(item) }"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9l-8 4.5-8-4.5v-9L12 3"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/><path d="M12 12L4 7.5"/><path d="M16 5.25L8 9.75"/></svg>
                 </button>
@@ -377,6 +379,14 @@ export default defineComponent({
     
     const canAdjustStock = (sku) => {
       return !sku.is_kit
+    }
+
+    // Componente de kit tem estoque físico próprio, mas o endpoint geral de
+    // movimentação o recusa ("o estoque é controlado através do kit"). Por isso
+    // o filho listado sozinho ("Somente filho") ou o avulso que ainda pertence
+    // a um kit inativo abre o mesmo ajuste de componente da linha do kit.
+    const usaAjusteDeComponente = (sku) => {
+      return !sku.is_kit && (sku.type === 'child' || Boolean(isSkuComponent(sku)))
     }
     
     // Função para alternar a expansão de um kit
@@ -550,6 +560,7 @@ export default defineComponent({
       isSkuComponent,
       canDeleteSku,
       canAdjustStock,
+      usaAjusteDeComponente,
       showKitDetails, 
       calcularVolumeTotalKit,
       formatarPeso,

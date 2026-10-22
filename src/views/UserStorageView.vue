@@ -403,7 +403,7 @@ export default defineComponent({
     const handleConfirmComponentAdjustment = async ({ movementType, quantityChange, reason }) => {
       try {
         const { post } = useApi()
-        const result = await post(`/storage/component/${componentToAdjust.value.sku}/movements`, {
+        const result = await post(`/storage/component/${encodeURIComponent(componentToAdjust.value.sku)}/movements`, {
           userId: props.userId,
           movementType,
           quantityChange,

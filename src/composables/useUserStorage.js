@@ -496,8 +496,17 @@ const removeSku = async (skuId) => {
     }
 
     const skuCode = encodeURIComponent(sku.sku);
-    
-    const url = `${API_BASE_URL}/storage/sku/${skuCode}/movements?uid=${currentUserId}`;
+
+    // Componente de kit (SKU filho) tem estoque físico próprio, mas o endpoint
+    // geral recusa componentes ("o estoque é controlado através do kit"). O
+    // ajuste manual dele vai pelo endpoint de componente, o mesmo usado pela
+    // linha do filho dentro do kit; os demais SKUs seguem no endpoint geral.
+    const ehComponente = Array.isArray(sku?.used_in_kits) && sku.used_in_kits.length > 0;
+
+    const url = ehComponente
+      ? `${API_BASE_URL}/storage/component/${skuCode}/movements`
+      : `${API_BASE_URL}/storage/sku/${skuCode}/movements?uid=${currentUserId}`;
+    const body = ehComponente ? { ...payload, forceComponent: true } : payload;
 
     const res = await fetch(url, {
         method: 'POST',
@@ -506,7 +515,7 @@ const removeSku = async (skuId) => {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(body)
     });
 
     if (!res.ok) throw new Error(await safeErrorMessage(res));
