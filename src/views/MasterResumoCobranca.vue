@@ -1880,8 +1880,11 @@ watch(() => props.userId, (newId) => {
 
 <style scoped>
 .dashboard-wrapper { display: flex; min-height: 100vh; font-family: var(--font-sans); }
-.main-content { flex: 1; display: flex; flex-direction: column; }
-.dashboard-content { flex: 1; }
+/* min-width: 0 deixa a coluna encolher até a tela: sem ele o item flex fica
+   da largura mínima do conteúdo, e no celular a aba Cobrança abria com quase
+   o dobro da largura da tela, cortando botões e a fatura. */
+.main-content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.dashboard-content { flex: 1; min-width: 0; }
 .error-state { padding: 2rem; text-align: center; font-size: 1rem; color: #b91c1c; background-color: #fee2e2; border-radius: 0.5rem; }
 .empty-state-full-page { text-align: center; padding: 4rem 1rem; color: #6b7280; }
 .filters-and-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; background-color: #fff; padding: 1rem; border-radius: 0.75rem; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }

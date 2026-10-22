@@ -7,16 +7,18 @@
     <div>
       <div class="sidebar-header">
         <img src="@/assets/logo.png" alt="Logo" class="sidebar-logo" />
-        <!-- Recolher/expandir também a partir do próprio menu, além do topo -->
+        <!-- Recolher/expandir também a partir do próprio menu, além do topo.
+             No mobile o mesmo botão fecha a gaveta, então vira um "X". -->
         <button
           type="button"
           class="sidebar-toggle"
-          :title="isIconOnly ? 'Expandir menu' : 'Recolher menu'"
-          :aria-label="isIconOnly ? 'Expandir menu' : 'Recolher menu'"
+          :title="sidebarToggleLabel"
+          :aria-label="sidebarToggleLabel"
           @click="toggle"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17">
-            <path v-if="isIconOnly" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            <path v-if="isMobile" d="M18 6 6 18M6 6l12 12" />
+            <path v-else-if="isIconOnly" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
             <path v-else d="M11 19l-7-7 7-7M19 19l-7-7 7-7" />
           </svg>
         </button>
@@ -213,6 +215,17 @@ const handleNavLinkClick = (event) => {
   // navega mas continua vendo o menu por cima da página.
   if (isMobile.value) closeMobile();
 };
+
+const sidebarToggleLabel = computed(() => {
+  if (isMobile.value) return 'Fechar menu';
+  return isIconOnly.value ? 'Expandir menu' : 'Recolher menu';
+});
+
+// Qualquer navegação fecha a gaveta, não só os itens da lista: "Adicionar
+// Conta" e o voltar do navegador abriam a tela nova coberta pelo menu.
+watch(() => route.fullPath, () => {
+  if (isMobileOpen.value) closeMobile();
+});
 
 watch(() => [route.path, navItems.value], () => { 
     nextTick(updateIndicator); 
@@ -438,23 +451,32 @@ watch(() => route.fullPath, (newPath) => {
 /* ---------------- Gaveta no mobile ---------------- */
 .sidebar-backdrop { display: none; }
 @media (max-width: 1024px) {
+  /* A gaveta tem a altura da tela visível (100dvh desconta a barra do
+     navegador) e rola por dentro: em celular baixo a lista de contas passava
+     da tela e não havia como alcançar o fim. Fechada, fica `hidden` para o
+     Tab e o leitor de tela não entrarem num menu que não está na tela. */
   .sidebar {
     position: fixed; top: 0; left: 0; z-index: 50;
-    height: 100vh; width: var(--sidebar-width);
+    height: 100vh; height: 100dvh; min-height: 0;
+    width: var(--sidebar-width); max-width: 86vw;
+    overflow-y: auto; overscroll-behavior: contain;
     transform: translateX(-100%);
-    transition: transform 0.24s ease;
+    visibility: hidden;
+    transition: transform 0.24s ease, visibility 0s linear 0.24s;
     box-shadow: 0 0 40px rgba(15, 23, 42, 0.18);
   }
-  .sidebar.is-mobile-open { transform: translateX(0); }
+  .sidebar.is-mobile-open { transform: translateX(0); visibility: visible; transition: transform 0.24s ease; }
   /* Numa tela estreita "só ícones" não ajuda: ou abre inteiro, ou fica fora. */
   .sidebar.is-icon-only { width: var(--sidebar-width); }
   .sidebar.is-icon-only .sidebar-logo { display: block; }
   .sidebar.is-icon-only .nav-link { justify-content: flex-start; padding: 0.7rem 1rem; }
   .sidebar.is-icon-only .nav-icon { margin-right: 0.75rem; }
   .sidebar.is-icon-only .nav-text { display: inline; }
+  /* touch-action: arrastar o dedo no fundo não rola a página por trás. */
   .sidebar-backdrop {
     display: block; position: fixed; inset: 0; z-index: 45;
     background: rgba(15, 23, 42, 0.45);
+    touch-action: none;
   }
 }
 .sliding-indicator {
@@ -663,15 +685,14 @@ watch(() => route.fullPath, (newPath) => {
     transition: opacity 0.2s;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
-@media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    left: calc(var(--sidebar-width) * -1);
-    z-index: 1000;
-    height: 100%;
-  }
-  .sidebar.is-open {
-      left: 0;
-  }
+/* O bloco antigo de até 768px saiu daqui: ele empurrava o menu para
+   left: -250px e só voltava com a classe `is-open`, que nada aplica. Em
+   celular o botão do menu escurecia a tela e a gaveta ficava fora dela.
+   A gaveta é toda definida no bloco de 1024px acima. */
+
+/* Em tela de toque o hover não sai sozinho: o balão da conta ficaria preso
+   em cima do conteúdo depois do toque. O status já está na bolinha. */
+@media (hover: none) {
+  .global-tooltip { display: none; }
 }
 </style>

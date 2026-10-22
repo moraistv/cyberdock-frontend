@@ -1150,5 +1150,48 @@ onActivated(() => {
 
 @media (max-width: 768px) {
   .dashboard-content { padding: 1rem; }
+
+  /* Resumo em duas colunas: com um cartão por linha a fila só começava
+     depois de sete cartões de rolagem. */
+  .summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  .s-card { gap: 0.6rem; min-width: 0; padding: 0.75rem; }
+  .s-card__icon { width: 36px; height: 36px; border-radius: 10px; }
+  .s-card__value { font-size: 1.35rem; }
+  .s-card--modes { grid-column: 1 / -1; }
+
+  /* Fila em cartões, um por pacote. A tabela tem 940px e layout fixo: no
+     celular a coluna Produto ficava com ~25px e o SKU aparecia só pela
+     primeira letra. Cada pacote abre com a faixa azul (número, envio,
+     itens), depois conta, comprador, envio e prazo, e por fim os itens. */
+  .table-scroll { max-height: none; overflow: visible; }
+  .sep-table { min-width: 0; table-layout: auto; }
+  .sep-table, .sep-table tbody, .sep-table tr, .sep-table td { display: block; width: auto; }
+  .sep-table thead { display: none; }
+  .sep-table tbody tr.package-row ~ tr.package-row { margin-top: 0.75rem; }
+  .package-item-row {
+    display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.55rem 0.75rem;
+    padding: 0.7rem 0.9rem; border-bottom: 1px solid #eef2f7;
+  }
+  .sep-table tbody .package-item-row td { padding: 0; border-bottom: none; }
+  /* Os dados do pacote só existem na primeira linha (rowspan): `order` os
+     coloca antes do item, dois por linha. */
+  .package-item-row .package-common {
+    order: 0; flex: 1 1 calc(50% - 0.75rem); min-width: 0;
+    background: none; border-left: none;
+  }
+  .package-item-row .col-qtd { order: 1; flex: 0 0 auto; text-align: left; }
+  .package-item-row .col-produto { order: 1; flex: 1 1 0; min-width: 0; }
+  .package-common::before {
+    display: block; margin-bottom: 0.15rem;
+    color: var(--color-text-secondary); font-size: 0.62rem; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .package-common.col-conta::before { content: 'Conta / Cliente'; }
+  .package-common.col-comprador::before { content: 'Comprador'; }
+  .package-common.col-envio::before { content: 'Envio'; }
+  .package-common.col-prazo::before { content: 'Despachar'; }
+  .prod__desc { white-space: normal; overflow-wrap: anywhere; }
+  .chip { max-width: 100%; }
+  .prazo { white-space: normal; }
 }
 </style>

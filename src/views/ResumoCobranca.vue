@@ -423,6 +423,13 @@ const podePagarOnline = (invoice) =>
     && /^https:\/\//i.test(invoice.asaasInvoiceUrl || '')
     && String(invoice.asaasStatus || '').trim().toUpperCase() !== 'DELETED';
 
+/* Status no modal de detalhes, com a mesma regra do cartão e da tabela.
+ * O modal chamava estas duas funções sem que elas existissem: "Ver Detalhes"
+ * quebrava a renderização e a fatura nunca abria (no celular o botão é só a
+ * setinha, e parecia que ela não fazia nada). */
+const getStatusClass = (status) => (status === 'paid' ? 'status-paid' : 'status-open');
+const getStatusLabel = (status) => (status === 'paid' ? 'Pago' : 'Em Aberto');
+
 const handlePeriodChange = () => {
     if (targetUserId.value) {
         fetchInvoices(targetUserId.value, selectedPeriod.value);
@@ -633,7 +640,10 @@ button, select { font-family: var(--font-sans); }
 .table-container { overflow: hidden; border: 1px solid var(--billing-line); border-radius: 0.95rem; background: #fff; box-shadow: 0 5px 18px rgba(15, 71, 105, 0.055); }
 .table-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.15rem; border-bottom: 1px solid #e6eef4; }
 .invoice-count { padding: 0.32rem 0.65rem; color: var(--billing-blue-800); border: 1px solid #c8e2f0; border-radius: 999px; background: var(--billing-blue-50); font-size: 0.68rem; font-weight: 700; white-space: nowrap; }
-.table-scroll { overflow-x: auto; }
+/* position: relative prende aqui o .sr-only (absoluto) do cabeçalho. Sem
+   isso ele escapava da rolagem da tabela e alargava a PÁGINA no celular, que
+   ganhava rolagem lateral até a borda da tabela de 720px. */
+.table-scroll { position: relative; overflow-x: auto; }
 .history-table { width: 100%; min-width: 720px; border-collapse: collapse; text-align: left; }
 .history-table th, .history-table td { padding: 0.78rem 1.15rem; border-bottom: 1px solid #e9f0f5; vertical-align: middle; white-space: nowrap; }
 .history-table thead th { color: #6d8292; background: #f7fafc; font-size: 0.65rem; font-weight: 750; letter-spacing: 0.07em; text-transform: uppercase; }

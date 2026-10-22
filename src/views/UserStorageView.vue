@@ -598,8 +598,11 @@ export default defineComponent({
 
 <style scoped>  
 
+/* minmax(0, 1fr): a coluna implícita (auto) crescia até a largura mínima da
+   tabela mais larga, e no celular a tela inteira passava da largura. */
 .content-wrapper {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 2rem;
 }
 
@@ -649,8 +652,10 @@ export default defineComponent({
 }
 
 @media (max-width: 768px) {
+  /* A aba já fica dentro da área de conteúdo da tela de usuários, que tem o
+     próprio respiro: um segundo padding aqui só tirava largura do celular. */
   .storage-view-wrapper {
-    padding: 1rem;
+    padding: 0;
   }
   
   .content-wrapper {

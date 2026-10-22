@@ -966,7 +966,10 @@ onMounted(() => {
     width: 100%;
   }
 
-  .btn-action {
+  /* Só os botões da barra principal ocupam a largura toda. Sem o
+     `.main-actions` na frente, a regra pegava os ícones de editar/excluir
+     de cada linha, que viravam botões de 100%. */
+  .main-actions .btn-action {
     width: 100%;
     justify-content: center;
   }
@@ -995,6 +998,26 @@ onMounted(() => {
   .input-icon-wrapper input {
     padding: 0.625rem 2.5rem 0.625rem 1rem;
     font-size: 0.875rem;
+  }
+
+  /* Cada serviço vira um cartão com rótulo (data-label) à esquerda. A tabela
+     tem sete colunas e o contêiner corta o que passa: no celular Preço, Data
+     e as ações de editar/excluir ficavam fora da tela, sem rolagem. */
+  .history-table thead { display: none; }
+  .history-table,
+  .history-table tbody,
+  .history-table tr { display: block; }
+  .history-table tr { padding: 0.5rem 0; border-bottom: 1px solid #e5e7eb; }
+  .history-table tr:last-child { border-bottom: none; }
+  /* Rótulo à esquerda (margin-right: auto) e o resto encostado à direita:
+     na célula de ações os dois ícones ficam juntos, não espalhados. */
+  .history-table td {
+    display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem;
+    padding: 0.35rem 1rem; border-bottom: none; text-align: right; overflow-wrap: anywhere;
+  }
+  .history-table td::before {
+    content: attr(data-label); flex: 0 0 auto; margin-right: auto;
+    color: #6b7280; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; text-align: left;
   }
 }
 </style>

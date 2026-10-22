@@ -166,6 +166,24 @@ const capitalize = (s) => {
 
 /* Estilos Responsivos para telas menores */
 @media screen and (max-width: 768px) {
+    /* Tabela e corpo como bloco: como `table`, a largura mínima das células
+       (com o padding-left de 45%) empurrava a tela para além da largura. */
+    .sku-table,
+    .sku-table tbody {
+        display: block;
+    }
+
+    .table-header {
+        padding: 1rem;
+    }
+
+    /* A linha de aviso (carregando / sem movimentação) não tem rótulo: sem
+       isto ela herdava o recuo de 45% e o texto quebrava no canto. */
+    .sku-table td.feedback-cell {
+        padding: 1.5rem 1rem;
+        text-align: center;
+    }
+
     .sku-table thead {
         /* Esconde o cabeçalho da tabela */
         display: none;

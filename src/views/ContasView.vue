@@ -895,8 +895,13 @@ onUnmounted(() => {
   background-color: var(--bg);
   color: var(--text);
 }
-.main-content { flex: 1; display: flex; flex-direction: column; }
+/* min-width: 0 deixa a coluna encolher até a tela do celular; sem ele o
+   conteúdo empurrava a página alguns pixels para além da largura. */
+.main-content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .dashboard-content { flex: 1; padding: 1.75rem 2rem 2.25rem; }
+@media (max-width: 640px) {
+  .dashboard-content { padding: 1rem; }
+}
 .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
 .header__intro { min-width: 0; }
 .header-actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }

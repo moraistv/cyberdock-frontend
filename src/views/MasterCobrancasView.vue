@@ -1539,7 +1539,9 @@ button, input, select { font-family: var(--font-sans); }
   .period-picker { flex: 1 1 100%; }
   .period-picker__select { flex: 1; min-width: 0; }
   .table-controls { align-items: stretch; flex-direction: column; }
-  .search-wrapper { max-width: none; }
+  /* Em coluna, o `flex: 1 1 260px` vira ALTURA: a busca ganhava 260px de
+     caixa vazia, com a lupa solta no meio dela. */
+  .search-wrapper { max-width: none; flex: 0 0 auto; min-width: 0; }
   .controls-end { margin-left: 0; }
   .resumo-mes__kpis { grid-template-columns: 1fr; }
   .lista__cabecalho { position: static; }

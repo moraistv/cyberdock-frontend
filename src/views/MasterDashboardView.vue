@@ -874,4 +874,10 @@ onUnmounted(() => {
   .thead, .trow { grid-template-columns: minmax(120px, 2fr) 0.7fr 1fr 1fr; }
   .thead > :nth-child(5), .trow > :nth-child(5) { display: none; }
 }
+/* Celular estreito (360px): as quatro colunas não cabiam e a página ganhava
+   rolagem lateral. Fica cliente, consumido e contratado. */
+@media (max-width: 480px) {
+  .thead, .trow { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); gap: 0.5rem; }
+  .thead > :nth-child(2), .trow > :nth-child(2) { display: none; }
+}
 </style>

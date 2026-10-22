@@ -28,7 +28,7 @@
                                 <path d="m6 9 6 6 6-6"></path>
                             </svg>
                         </button>
-                        <div v-if="isSaleStatusDropdownOpen" ref="saleStatusFilterDropdownRef" class="filter-popover">
+                        <div v-if="isSaleStatusDropdownOpen" ref="saleStatusFilterDropdownRef" v-cabe-na-tela class="filter-popover">
                             <ul class="filter-popover-list">
                                 <li @click="applySaleStatusFilter(null)">
                                     <span :class="{ 'font-bold': !selectedSaleStatusFilter }">Todos</span>
@@ -53,7 +53,7 @@
                                 <path d="m6 9 6 6 6-6"></path>
                             </svg>
                         </button>
-                        <div v-if="isStatusDropdownOpen" ref="statusFilterDropdownRef" class="filter-popover">
+                        <div v-if="isStatusDropdownOpen" ref="statusFilterDropdownRef" v-cabe-na-tela class="filter-popover">
                             <ul class="filter-popover-list">
                                 <li @click="applyStatusFilter(null)">
                                     <span :class="{ 'font-bold': !selectedStatusFilter }">Todos</span>
@@ -82,7 +82,7 @@
                                 <path d="m6 9 6 6 6-6"></path>
                             </svg>
                         </button>
-                        <div v-if="isProcessedDropdownOpen" class="filter-popover">
+                        <div v-if="isProcessedDropdownOpen" v-cabe-na-tela class="filter-popover">
                             <ul class="filter-popover-list">
                                 <li @click="applyProcessedFilter(null)"><span :class="{ 'font-bold': !selectedProcessedFilter }">Todos</span></li>
                                 <li @click="applyProcessedFilter('yes')"><span :class="{ 'font-bold': selectedProcessedFilter === 'yes' }">Processados</span></li>
@@ -101,7 +101,7 @@
                                 <path d="m6 9 6 6 6-6"></path>
                             </svg>
                         </button>
-                        <div v-if="isAccountDropdownOpen" ref="accountFilterDropdownRef" class="filter-popover">
+                        <div v-if="isAccountDropdownOpen" ref="accountFilterDropdownRef" v-cabe-na-tela class="filter-popover">
                             <ul class="filter-popover-list">
                                 <li @click="applyAccountFilter(null)">
                                     <span :class="{ 'font-bold': !selectedAccountFilterId }">Todas as Contas</span>
@@ -564,6 +564,8 @@ import { useSyncManager } from '@/composables/useSyncManager';
 import { useAuth } from '@/composables/useAuth';
 import { useNotification } from '@/composables/useNotification';
 import { API_BASE_URL } from '@/config';
+// v-cabe-na-tela: no celular as listas dos filtros saíam pela borda da tela.
+import { vCabeNaTela } from '@/directives/cabeNaTela';
 
 
 
@@ -3689,7 +3691,8 @@ onUnmounted(() => {
 @media (max-width: 768px) {
     .sale-card__layout {
         flex-wrap: wrap;
-        gap: 1rem;
+        align-items: flex-start;
+        gap: 0.75rem;
     }
     .sale-card__thumb {
         width: 44px;
@@ -3702,8 +3705,13 @@ onUnmounted(() => {
         padding-top: 0.75rem;
         min-width: 0;
     }
+    /* O prazo (LIMITE) é o que a expedição precisa ver primeiro: no celular
+       ele estava escondido junto com o bloco. Só a data da venda sai daqui,
+       porque já aparece no topo do cartão (sale-card__date-mobile). */
     .sale-card__date-block {
         align-items: flex-start;
+    }
+    .sale-card__exp-date {
         display: none;
     }
     .sale-card__date-mobile {
@@ -3714,6 +3722,15 @@ onUnmounted(() => {
     }
     .sale-card__product-title {
         max-width: 100%;
+    }
+    /* Busca na largura toda; sem border-box o padding somava 50px à largura
+       de 100% e o campo passava da tela, criando rolagem lateral. */
+    .search-wrapper {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+    .search-input {
+        box-sizing: border-box;
     }
 }
 

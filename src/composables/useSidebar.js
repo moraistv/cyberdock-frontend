@@ -40,9 +40,15 @@ function handleResize() {
   if (viewportWidth.value > MOBILE_BREAKPOINT) isMobileOpen.value = false;
 }
 
+// Esc fecha a gaveta, como em qualquer painel que cobre a tela.
+function handleKeydown(event) {
+  if (event.key === 'Escape' && isMobileOpen.value) isMobileOpen.value = false;
+}
+
 export function useSidebar() {
   if (!listening && typeof window !== 'undefined') {
     window.addEventListener('resize', handleResize, { passive: true });
+    window.addEventListener('keydown', handleKeydown);
     listening = true;
   }
 

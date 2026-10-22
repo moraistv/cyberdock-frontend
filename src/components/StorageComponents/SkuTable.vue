@@ -748,16 +748,40 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
 .orphan-code { color: #374151; background: #f9fafb; border-color: #d1d5db; }
 .orphan-badge { background: #f0f9ff; color: #0c4a6e; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; border: 1px solid #bfdbfe; }
 
+/* Celular: cada linha vira um cartão com rótulo à esquerda.
+   Antes este bloco escondia a TABELA inteira (`.sku-table { display: none }`),
+   não só o cabeçalho: no celular a lista ficava vazia, sem como expandir o
+   kit nem ajustar estoque. Agora só o thead sai e a tabela vira bloco. */
 @media (max-width: 760px) {
-  .sku-table, .sku-table thead { display: none; }
+  .sku-table { display: block; }
+  .sku-table thead { display: none; }
   .table-container { padding: 8px; }
   tbody { display: grid; gap: 8px; }
   tbody tr { display: block; border: 1px solid #e5e7eb; border-radius: 12px; background: #ffffff; }
-  tbody tr td { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px dashed #e5e7eb; }
+  tbody tr td { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 1px dashed #e5e7eb; min-width: 0; text-align: right; }
   tbody tr td:last-child { border-bottom: none; }
-  tbody tr td::before { content: attr(data-label); color: #94a3b8; }
+  tbody tr td::before { content: attr(data-label); flex: 0 0 auto; margin-right: auto; color: #94a3b8; text-align: left; }
   .th-actions, .actions { justify-content: flex-end; }
+  td.actions { flex-wrap: wrap; }
+  .hierarchy-col { width: auto; min-width: 0; }
+  /* A hierarquia (botão de expandir + código) ocupa a linha toda. */
+  td.hierarchy-col::before { display: none; }
+  .kit-parent-item, .child-sku-item, .orphan-sku-item { flex-wrap: wrap; }
+  .ellipsis { max-width: none; white-space: normal; overflow-wrap: anywhere; }
   .hierarchy-line { display: none; }
   .child-sku-item { padding-left: 0; }
+  .sku { overflow-wrap: anywhere; }
+  /* Kit e filho continuam diferentes no cartão: a borda colorida do kit e o
+     recuo do filho mostram quem pertence a quem. */
+  .child-sku-row { margin-left: 12px; }
+
+  /* Barra de ferramentas: busca na largura toda e botões que quebram linha
+     em vez de sair pela direita. */
+  .search { flex: 1 1 100%; }
+  .search input { min-width: 0; width: 100%; box-sizing: border-box; }
+  .select { flex: 1 1 auto; }
+  .stock-filter-group { flex-wrap: wrap; }
+  .tools > .actions { flex-wrap: wrap; margin-left: 0; width: 100%; }
+  .tools > .actions .btn { flex: 1 1 auto; justify-content: center; }
 }
 </style>

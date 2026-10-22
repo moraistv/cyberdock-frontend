@@ -74,7 +74,7 @@
                                     <polyline points="6 9 12 15 18 9"></polyline>
                                 </svg>
                             </button>
-                            <div v-if="isFilterDropdownOpen" ref="filterDropdownRef" class="filter-dropdown">
+                            <div v-if="isFilterDropdownOpen" ref="filterDropdownRef" v-cabe-na-tela class="filter-dropdown">
                                 <div class="filter-dropdown__head">
                                     <span>Selecione um ou mais</span>
                                     <button v-if="selectedStatuses.length" class="filter-dropdown__clear"
@@ -119,7 +119,7 @@
                                 </svg>
                             </button>
                             <div v-if="isMarketplaceDropdownOpen" ref="marketplaceFilterDropdownRef"
-                                class="filter-dropdown">
+                                v-cabe-na-tela class="filter-dropdown">
                                 <div class="filter-dropdown__head">
                                     <span>Selecione um ou mais</span>
                                     <button v-if="selectedMarketplaces.length" class="filter-dropdown__clear"
@@ -161,7 +161,7 @@
                                     <polyline points="6 9 12 15 18 9"></polyline>
                                 </svg>
                             </button>
-                            <div v-if="isAccountDropdownOpen" ref="accountFilterDropdownRef" class="filter-dropdown">
+                            <div v-if="isAccountDropdownOpen" ref="accountFilterDropdownRef" v-cabe-na-tela class="filter-dropdown">
                                 <div class="filter-dropdown__head">
                                     <span>Selecione uma ou mais</span>
                                     <button v-if="selectedAccountIds.length" class="filter-dropdown__clear"
@@ -206,7 +206,7 @@
                                 </svg>
                             </button>
                             <div v-if="isShippingModeDropdownOpen" ref="shippingModeFilterDropdownRef"
-                                class="filter-dropdown">
+                                v-cabe-na-tela class="filter-dropdown">
                                 <div class="filter-dropdown__head">
                                     <span>Selecione um ou mais</span>
                                     <button v-if="selectedShippingModes.length" class="filter-dropdown__clear"
@@ -718,6 +718,8 @@ import { useSystemStatus } from '@/composables/useSystemStatus';
 import { useLabels } from '@/composables/useLabels';
 import { useApi } from '@/composables/useApi';
 import { useNotification } from '@/composables/useNotification';
+// v-cabe-na-tela: no celular as listas dos filtros saíam pela borda da tela.
+import { vCabeNaTela } from '@/directives/cabeNaTela';
 import {
     MK_LOGOS, MARKETPLACE_OPTIONS, saleMarketplace, marketplacePlatform, marketplaceLabel as mkLabel,
 } from '@/utils/marketplaces';
@@ -3274,7 +3276,7 @@ function hideTooltip() {
 }
 
 @media (max-width: 768px) {
-    .sale-card__layout { flex-wrap: wrap; gap: 0.75rem; }
+    .sale-card__layout { flex-wrap: wrap; align-items: flex-start; gap: 0.75rem; }
     .sale-card__aside {
         width: 100%;
         align-items: flex-start;
@@ -3282,7 +3284,10 @@ function hideTooltip() {
         padding-top: 0.75rem;
         min-width: 0;
     }
-    .sale-card__date-block { align-items: flex-start; display: none; }
+    /* O LIMITE ENVIO é o prazo da expedição: no celular ele sumia junto com o
+       bloco. Só a data da venda sai, porque já aparece no topo do cartão. */
+    .sale-card__date-block { align-items: flex-start; }
+    .sale-card__exp-date { display: none; }
     .sale-card__date-mobile { display: inline; }
     .sale-card__actions { justify-content: flex-start; }
     .sale-card__product-title { max-width: 100%; }
@@ -3621,6 +3626,10 @@ function hideTooltip() {
     .header-buttons, .btn-sync-sales { width: 100%; justify-content: center; }
     .sales-overview { grid-template-columns: 1fr 1fr; }
     .filters-panel, .sales-table-container { padding: 0.65rem; }
+    /* A busca ocupava só a largura natural do input (com o texto de exemplo
+       cortado) e ficava alta, porque o min-height somava ao padding. */
+    .search-wrapper { flex: 1 1 100%; min-width: 0; }
+    .search-input { width: 100%; box-sizing: border-box; }
     .quick-filters > .filter-container { flex: 1 1 calc(50% - 0.4rem); }
     .filter-btn { width: 100%; justify-content: space-between; }
 }

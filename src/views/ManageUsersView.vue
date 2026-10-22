@@ -2043,7 +2043,9 @@ button, input, select, table { font-family: var(--font-sans); }
   .stats-strip { grid-template-columns: 1fr; }
   .panel-buttons { grid-template-columns: 1fr; }
   .table-controls { align-items: stretch; flex-direction: column; }
-  .search-wrapper { max-width: none; }
+  /* Em coluna, o `flex: 1 1 260px` vira ALTURA: a busca ganhava 260px de
+     caixa vazia, com a lupa solta no meio dela. */
+  .search-wrapper { max-width: none; flex: 0 0 auto; min-width: 0; }
   .status-filter-wrapper { align-items: flex-start; flex-direction: column; gap: 0.35rem; }
   .chip-row { width: 100%; }
   .chip { flex: 1 1 auto; justify-content: center; }
@@ -2052,5 +2054,31 @@ button, input, select, table { font-family: var(--font-sans); }
   .pagination-controls { justify-content: center; }
   .table-wrapper { max-height: none; }
   .users-table th { position: static; }
+
+  /* Cada usuário vira um cartão. A tabela tem 940px: no celular "Ações" só
+     aparecia rolando a tabela de lado. */
+  .users-table { min-width: 0; }
+  .users-table, .users-table tbody, .users-table tr { display: block; width: auto; }
+  .users-table thead { display: none; }
+  .users-table tbody tr { padding: 0.4rem 0; border-bottom: 1px solid #eef2f7; }
+  .users-table tbody tr:last-child { border-bottom: none; }
+  .users-table td {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+    min-width: 0; padding: 0.4rem 1rem; border-bottom: none;
+  }
+  .users-table td::before {
+    content: attr(data-label); flex: 0 0 auto;
+    color: #94a3b8; font-size: 0.66rem; font-weight: 750; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  /* Nome e e-mail abrem o cartão, sem rótulo. */
+  .users-table td[data-label="Usuário"] { padding-top: 0.6rem; }
+  .users-table td[data-label="Usuário"]::before { display: none; }
+  .user-cell { width: 100%; }
+  .col-user, .col-actions { width: auto; }
+
+  /* Abas do cliente em grade 2x2: as quatro não cabem numa linha e a rolagem
+     lateral da faixa escondia "Contas". */
+  .user-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.25rem; padding: 0.35rem; overflow: visible; }
+  .user-tab { justify-content: center; min-width: 0; padding: 0.6rem 0.5rem; border-radius: 8px; }
 }
 </style>
