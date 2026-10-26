@@ -77,7 +77,43 @@
             >
                 Somente filho
             </button>
-        </div>        <div class="actions">
+        </div>
+
+        <!-- Em "Somente filho": com pai é componente de kit ativo; sem pai é o
+             SKU individual. Por padrão aparecem os dois. -->
+        <div
+            v-if="skuTypeFilter === 'child'"
+            class="stock-filter-group"
+            role="group"
+            aria-label="Filtrar SKU filho pelo kit pai"
+        >
+            <button
+                type="button"
+                class="filter-btn"
+                :class="{ active: childParentFilter === 'any' }"
+                @click="childParentFilter = 'any'"
+            >
+                Com ou sem pai
+            </button>
+            <button
+                type="button"
+                class="filter-btn"
+                :class="{ active: childParentFilter === 'with' }"
+                @click="childParentFilter = 'with'"
+            >
+                Com pai
+            </button>
+            <button
+                type="button"
+                class="filter-btn"
+                :class="{ active: childParentFilter === 'without' }"
+                @click="childParentFilter = 'without'"
+            >
+                Sem pai
+            </button>
+        </div>
+
+        <div class="actions">
           <button @click="$emit('open-package-manager')" class="btn ghost">Gerenciar pacotes</button>
           <button @click="$emit('open-kit-parents')" class="btn ghost" title="Kits pai deste cliente: criar, editar e desativar">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 16.5l-5 -3l5 -3l5 3v5.5l-5 3z" /><path d="M2 13.5v5.5l5 3" /><path d="M7 16.545l5 -3.03" /><path d="M17 16.5l-5 -3l5 -3l5 3v5.5l-5 3z" /><path d="M12 19l5 3" /><path d="M17 16.5l5 -3" /><path d="M12 13.5v-5.5l-5 -3l5 -3l5 3v5.5" /><path d="M7 5.03v5.455" /><path d="M12 8l5 -3" /></svg>
@@ -243,7 +279,9 @@
               <td data-label="Descrição" class="ellipsis">{{ item.descricao }}</td>
               <td data-label="Tipo">
                 <span v-if="item.type === 'child'" class="child-badge" :title="item.parent_label">SKU FILHO</span>
-                <span v-else class="orphan-badge">Individual</span>
+                <span v-else class="orphan-badge" :title="skuTypeFilter === 'child' ? 'SKU filho sem kit pai' : null">
+                  {{ skuTypeFilter === 'child' ? 'Filho sem pai' : 'Individual' }}
+                </span>
               </td>
               <td data-label="Tipo de Pacote">
                 <span v-if="item.package_type_name" :class="['badge', getPackageTypeClass(item.package_type_name)]">
@@ -335,6 +373,8 @@ export default defineComponent({
     const pkgFilter = ref('')
     const stockFilter = ref('all') // 'all', 'with', 'without'
     const skuTypeFilter = ref('all') // 'all', 'parent', 'child'
+    // Só vale em "Somente filho": 'any' (com ou sem pai), 'with', 'without'.
+    const childParentFilter = ref('any')
     
     // Estado para controlar a expansão dos kits
     const expandedKits = ref([])
@@ -423,11 +463,11 @@ export default defineComponent({
         return true;
       };
 
-      /* "Somente filho": os componentes viram linhas próprias.
-       *
-       * Fora deste modo eles aparecem apenas aninhados sob o kit, então listar
-       * só os pais deixaria a tela sem os filhos e vice-versa. Um componente
-       * usado em mais de um kit aparece uma única vez, com os pais no título. */
+      /* "Somente filho": todo SKU que não é kit vira linha própria, com ou sem
+       * pai (o segundo filtro escolhe). Com pai é componente de kit ativo e sai
+       * como 'child'; sem pai é o SKU individual e continua 'orphan', com as
+       * mesmas ações de "Todos os tipos". Um componente usado em mais de um
+       * kit aparece uma única vez, com os pais no título. */
       if (skuTypeFilter.value === 'child') {
         const parentsBySku = new Map();
         kits.forEach(kit => {
@@ -439,8 +479,15 @@ export default defineComponent({
         });
 
         allSkus.forEach(sku => {
-          if (sku.is_kit || !childSkuIds.has(sku.id)) return;
+          if (sku.is_kit) return;
+          const temPai = childSkuIds.has(sku.id);
+          if (childParentFilter.value === 'with' && !temPai) return;
+          if (childParentFilter.value === 'without' && temPai) return;
           if (!matchesFilter(sku.quantidade || 0)) return;
+          if (!temPai) {
+            hierarchy.push({ ...sku, type: 'orphan' });
+            return;
+          }
           const parents = parentsBySku.get(sku.id) || [];
           hierarchy.push({
             ...sku,
@@ -551,6 +598,7 @@ export default defineComponent({
       pkgFilter, 
       stockFilter,
       skuTypeFilter,
+      childParentFilter,
       filteredSkus, 
       expandedKits,
       toggleKitExpansion,

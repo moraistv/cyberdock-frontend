@@ -117,6 +117,39 @@
                                     Somente filho
                                 </button>
                             </div>
+                            <!-- Em "Somente filho": com pai é componente de kit; sem pai é o
+                                 SKU individual. Por padrão aparecem os dois. -->
+                            <div
+                                v-if="skuTypeFilter === 'child'"
+                                class="stock-filter-group"
+                                role="group"
+                                aria-label="Filtrar SKU filho pelo kit pai"
+                            >
+                                <button
+                                    type="button"
+                                    class="filter-btn"
+                                    :class="{ active: childParentFilter === 'any' }"
+                                    @click="childParentFilter = 'any'"
+                                >
+                                    Com ou sem pai
+                                </button>
+                                <button
+                                    type="button"
+                                    class="filter-btn"
+                                    :class="{ active: childParentFilter === 'with' }"
+                                    @click="childParentFilter = 'with'"
+                                >
+                                    Com pai
+                                </button>
+                                <button
+                                    type="button"
+                                    class="filter-btn"
+                                    :class="{ active: childParentFilter === 'without' }"
+                                    @click="childParentFilter = 'without'"
+                                >
+                                    Sem pai
+                                </button>
+                            </div>
                             <div class="stock-filter-group">
                                 <button 
                                     type="button" 
@@ -625,6 +658,8 @@ const isAdjustStockModalOpen = ref(false);
 const skuToAdjust = ref(null);
 const stockFilter = ref('all'); // 'all', 'with', 'without'
 const skuTypeFilter = ref('all'); // 'all', 'parent', 'child'
+// Só vale em "Somente filho": 'any' (com ou sem pai), 'with', 'without'.
+const childParentFilter = ref('any');
 
 const mensagemDaTabelaVazia = computed(() => {
     if ((skus.value || []).length > 0) return 'Nenhum SKU corresponde aos filtros selecionados.';
@@ -904,15 +939,18 @@ const allItemsForDisplay = computed(() => {
         is_kit: true
     })) || []
 
-    // O tipo é independente do estoque: pai é um kit composto; filho é um
-    // SKU comum vinculado como componente a pelo menos um kit. SKUs simples
-    // continuam disponíveis em "Todos os tipos".
+    // O tipo é independente do estoque: pai é um kit composto; filho é todo
+    // SKU comum, com pai (vinculado como componente a pelo menos um kit) ou
+    // sem pai (individual). O segundo filtro escolhe; por padrão, os dois.
     if (skuTypeFilter.value === 'parent') {
         individualSkus = []
     } else if (skuTypeFilter.value === 'child') {
-        individualSkus = individualSkus.filter(
-            sku => Array.isArray(sku.used_in_kits) && sku.used_in_kits.length > 0
-        )
+        const temPai = (sku) => Array.isArray(sku.used_in_kits) && sku.used_in_kits.length > 0
+        if (childParentFilter.value === 'with') {
+            individualSkus = individualSkus.filter(temPai)
+        } else if (childParentFilter.value === 'without') {
+            individualSkus = individualSkus.filter(sku => !temPai(sku))
+        }
         activeKitsForDisplay = []
     }
     
