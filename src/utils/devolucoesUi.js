@@ -307,6 +307,28 @@ export function variacaoPercentual(atual, anterior) {
 
 export const nomeDoCliente = (d) => d?.client_name || d?.client_email || 'Cliente não identificado';
 
+/**
+ * Comprador da venda que gerou a devolução: o apelido (o do Mercado Livre) e o
+ * nome. O backend lê os dois na venda; sem nome no pedido, `buyer_name` pode
+ * vir com o próprio apelido, e aí só o apelido aparece, sem repetir.
+ * `null` quando nenhum dos dois é conhecido (venda fora do CyberDock).
+ */
+export function compradorDa(d) {
+  const nome = String(d?.buyer_name || '').trim();
+  const apelido = String(d?.buyer_nickname || '').trim();
+  if (!nome && !apelido) return null;
+  const repetido = Boolean(nome && apelido) && nome.toLocaleLowerCase('pt-BR') === apelido.toLocaleLowerCase('pt-BR');
+  return { apelido, nome: repetido ? '' : nome };
+}
+
+/** "Maria Silva (MARIASILVA123)", ou só o que existir. Para dica e leitor de tela. */
+export function textoDoComprador(d) {
+  const comprador = compradorDa(d);
+  if (!comprador) return '';
+  if (comprador.nome && comprador.apelido) return `${comprador.nome} (${comprador.apelido})`;
+  return comprador.nome || comprador.apelido;
+}
+
 export const quantidadeTotal = (d) => (d?.items || []).reduce((soma, i) => soma + (Number(i.quantity) || 0), 0);
 
 export const situacaoDa = (d) => SITUACOES[d?.stage] || { rotulo: d?.stage || '—', classe: 'is-muted', dica: '' };
@@ -579,7 +601,8 @@ const COLUNAS_DA_PLANILHA = Object.freeze([
   { titulo: 'E-mail do cliente', soMaster: true, valor: (d) => d.client_email || '' },
   { titulo: 'Conta do ML', valor: (d) => d.account_nickname || '' },
   { titulo: 'Mod. envio', valor: (d) => envioDa(d)?.rotulo ?? '' },
-  { titulo: 'Comprador', valor: (d) => d.buyer_name || '' },
+  { titulo: 'Apelido do comprador', valor: (d) => compradorDa(d)?.apelido || '' },
+  { titulo: 'Nome do comprador', valor: (d) => compradorDa(d)?.nome || '' },
   { titulo: 'SKU', valor: (d, item) => item?.sku || '' },
   { titulo: 'Produto', valor: (d, item) => item?.title || '' },
   { titulo: 'Quantidade', valor: (d, item) => (item ? Number(item.quantity) || 0 : '') },

@@ -113,13 +113,13 @@
         <section class="filtros" aria-label="Filtros da lista">
           <div class="busca">
             <IconeSvg nome="busca" class="busca__icone" />
-            <label class="sr-only" for="dev-busca">{{ ehCliente ? 'Buscar por pedido, SKU ou produto' : 'Buscar por pedido, SKU ou cliente' }}</label>
+            <label class="sr-only" for="dev-busca">{{ ehCliente ? 'Buscar por pedido, SKU, produto ou comprador' : 'Buscar por pedido, SKU, cliente ou comprador' }}</label>
             <input
               id="dev-busca"
               v-model="filtros.busca"
               type="search"
               class="busca__campo"
-              :placeholder="ehCliente ? 'Buscar por pedido, SKU, produto...' : 'Buscar por pedido, SKU, cliente...'"
+              :placeholder="ehCliente ? 'Buscar pedido, SKU, produto ou comprador' : 'Buscar pedido, SKU, cliente ou comprador'"
               autocomplete="off"
               maxlength="120"
               @input="buscarComAtraso"
@@ -363,9 +363,9 @@
                     </div>
                   </div>
 
+                  <!-- O comprador fica embaixo do produto, em toda largura. -->
                   <div v-if="ehCliente" class="c-cliente">
                     <span class="c-cliente__nome" :title="d.account_nickname || ''">{{ d.account_nickname || 'Conta do ML não informada' }}</span>
-                    <span v-if="d.buyer_name" class="c-cliente__conta" :title="`Comprador: ${d.buyer_name}`">Comprador: {{ d.buyer_name }}</span>
                   </div>
                   <div v-else class="c-cliente">
                     <span class="c-cliente__nome" :title="nomeDoCliente(d)">{{ nomeDoCliente(d) }}</span>
@@ -377,6 +377,22 @@
                     <span class="c-produto__sku">
                       SKU: {{ primeiroItem(d).sku || 'não identificado' }}
                       <template v-if="(d.items || []).length > 1"> · +{{ d.items.length - 1 }} {{ d.items.length === 2 ? 'item' : 'itens' }}</template>
+                    </span>
+                    <!-- Comprador da venda: nome e, entre parênteses, o apelido do ML.
+                         Sem espaço para os dois, o apelido desce para a linha de baixo. -->
+                    <span
+                      v-if="compradorDa(d)"
+                      class="c-produto__comprador"
+                      :title="`Comprador: ${textoDoComprador(d)}`"
+                    >
+                      <IconeSvg nome="usuario" :tamanho="11" />
+                      <span class="c-produto__comprador-texto">
+                        <span class="sr-only">Comprador: </span>
+                        <span v-if="compradorDa(d).nome" class="c-produto__comprador-nome">{{ compradorDa(d).nome }}</span>
+                        <span v-if="compradorDa(d).apelido" class="c-produto__comprador-apelido">
+                          <span class="sr-only">apelido </span>{{ compradorDa(d).nome ? `(${compradorDa(d).apelido})` : compradorDa(d).apelido }}
+                        </span>
+                      </span>
                     </span>
                   </div>
 
@@ -581,7 +597,7 @@ import { useNotification } from '@/composables/useNotification';
 import {
   OPCOES_DE_PERIODO, OPCOES_DE_SITUACAO, OPCOES_DE_RESULTADO, OPCOES_DE_RECEBIMENTO, OPCOES_DE_ENVIO,
   situacaoDa, resultadoDa, recebimentoDa, envioDa, podeConfirmarRecebimento, perguntaDoRecebimento,
-  statusNoMl, situacaoDoPrazo, nomeDoCliente, quantidadeTotal, linkDaVendaNoMl,
+  statusNoMl, situacaoDoPrazo, nomeDoCliente, compradorDa, textoDoComprador, quantidadeTotal, linkDaVendaNoMl,
   formatarData, formatarHora, formatarDataHora, formatarDuracaoEmHoras, variacaoPercentual,
   miniaturaSegura, tentarMiniaturaPeloProxy, montarCsv, linhasDaPlanilha, hojeEmBrasilia,
   avisosDaSincronizacao, avisoDaUltimaBusca,
@@ -1301,6 +1317,19 @@ button, input, select { font-family: var(--font-sans); }
 .c-produto__titulo { font-weight: 650; }
 .c-cliente__conta { overflow: hidden; color: #64748b; font-size: 0.72rem; text-overflow: ellipsis; white-space: nowrap; }
 .c-produto__sku { color: #64748b; font-size: 0.72rem; overflow-wrap: anywhere; }
+/* Comprador embaixo do SKU. O texto quebra entre nome e apelido; cada um corta
+   com reticências só se sozinho não couber na largura da coluna. */
+.c-produto__comprador {
+  display: flex; align-items: flex-start; gap: 0.25rem; min-width: 0; margin-top: 0.1rem;
+  color: #475569; font-size: 0.72rem; line-height: 1.35;
+}
+.c-produto__comprador > svg { flex: 0 0 auto; margin-top: 0.12rem; color: #94a3b8; }
+.c-produto__comprador-texto { display: flex; flex-wrap: wrap; column-gap: 0.25rem; min-width: 0; }
+.c-produto__comprador-nome, .c-produto__comprador-apelido {
+  max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.c-produto__comprador-nome { font-weight: 650; }
+.c-produto__comprador-apelido { color: #64748b; }
 
 /* No desktop os itens de `meta` viram colunas da grade. */
 .linha__meta { display: contents; }

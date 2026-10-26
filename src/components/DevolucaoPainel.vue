@@ -149,8 +149,12 @@
               </dd>
             </div>
             <div class="fato">
-              <dt>Comprador</dt>
-              <dd>{{ detalhe.buyer_name || '—' }}</dd>
+              <dt>Apelido do comprador</dt>
+              <dd :class="{ 'is-mudo': !comprador?.apelido }">{{ comprador?.apelido || 'Não informado' }}</dd>
+            </div>
+            <div class="fato">
+              <dt>Nome do comprador</dt>
+              <dd :class="{ 'is-mudo': !comprador?.nome }">{{ comprador?.nome || 'Não informado' }}</dd>
             </div>
             <div v-if="itens.length === 1" class="fato">
               <dt>Produto</dt>
@@ -551,7 +555,7 @@ import { useConfirm } from '@/composables/useConfirm';
 import {
   RESULTADOS, CHECKLIST, MOTIVOS_NAO_APTO, DESTINOS_NAO_APTO, MOTIVOS_SEM_ENTRADA, MAX_FOTOS,
   rotuloDe, statusNoMl, situacaoDa, resultadoDa, recebimentoDa, envioDa, podeConfirmarRecebimento, perguntaDoRecebimento,
-  situacaoDoPrazo, nomeDoCliente, quantidadeTotal,
+  situacaoDoPrazo, nomeDoCliente, compradorDa, quantidadeTotal,
   linkDaVendaNoMl, formatarDataHora, miniaturaSegura, tentarMiniaturaPeloProxy,
   textoDoEvento, origemDoEvento, iconeDoEvento, resultadoPrevisto, previaDoEstoque,
   reduzirFoto, base64ParaBlob,
@@ -651,6 +655,8 @@ const base = computed(() => (ehCliente.value ? '/returns/minhas' : '/returns'));
 const recebimento = computed(() => recebimentoDa(detalhe.value));
 /* Modalidade de envio da venda que gerou a devolução (Full, Flex, Coleta...). */
 const envio = computed(() => envioDa(detalhe.value));
+/* Apelido (do ML) e nome do comprador da venda. */
+const comprador = computed(() => compradorDa(detalhe.value));
 
 const podeAnalisar = computed(() => !ehCliente.value && etapa.value === 'no_cd');
 const podeConfirmar = computed(() => !ehCliente.value && podeConfirmarRecebimento(detalhe.value));
