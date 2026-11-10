@@ -27,6 +27,7 @@
         :is-loading="isLoading"
         :error="error"
         :calcular-volume-por-sku="calcularVolumePorSku"
+        :can-edit="canEdit"
         @add-sku="openAddModal"
         @edit-sku="openEditModal"
         @delete-sku="openDeleteModal"
@@ -42,6 +43,7 @@
       <StockMovementsTable
         :movements="allMovements"
         :is-loading="isLoadingMovements"
+        :can-delete="canEdit"
         @delete="handleDeleteMovement"
       />
     </div>
@@ -170,7 +172,10 @@ export default defineComponent({
     StockMovementsTable,
   },
   props: {
-    userId: { type: String, required: true }
+    userId: { type: String, required: true },
+    /* Falso na tela do cliente: a tela e a leitura sao as mesmas do master,
+     * mas cadastrar, ajustar e excluir continuam sendo so dele. */
+    canEdit: { type: Boolean, default: true },
   },
   setup(props) {
     const router = useRouter()

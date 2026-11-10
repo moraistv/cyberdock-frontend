@@ -6,7 +6,7 @@ const DashboardView = () => import('../views/DashboardView.vue');
 const ContasView = () => import('../views/ContasView.vue');
 const TabelaVendas = () => import('../views/TabelaVendas.vue');
 const SeparacaoItensView = () => import('../views/SeparacaoItensView.vue');
-const ArmazenamentoView = () => import('../views/ArmazenamentoView.vue');
+const StorageEntryView = () => import('../views/StorageEntryView.vue');
 const KitParentView = () => import('../views/KitParentView.vue');
 const ResumoCobranca = () => import('../views/ResumoCobranca.vue');
 const AdminView = () => import('../views/AdminView.vue');
@@ -144,9 +144,10 @@ const routes = [
     meta: { requiresAuth: true, requiresMaster: true }
   },
   {
+    // Mesma tela para cliente e master; o papel decide o que pode ser feito.
     path: '/armazenamento',
     name: 'ArmazenamentoView',
-    component: ArmazenamentoView,
+    component: StorageEntryView,
     meta: { requiresAuth: true }
   },
   {

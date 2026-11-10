@@ -114,21 +114,26 @@
         </div>
 
         <div class="actions">
-          <button @click="$emit('open-package-manager')" class="btn ghost">Gerenciar pacotes</button>
-          <button @click="$emit('open-kit-parents')" class="btn ghost" title="Kits pai deste cliente: criar, editar e desativar">
+          <!-- "Kits pai" fica para todos: é consulta, e o cliente precisa ver
+               a que kit cada SKU pertence. Cadastro e ajuste são só do master. -->
+          <button @click="$emit('open-kit-parents')" class="btn ghost" :title="canEdit ? 'Kits pai deste cliente: criar, editar e desativar' : 'Kits pai deste cliente'">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 16.5l-5 -3l5 -3l5 3v5.5l-5 3z" /><path d="M2 13.5v5.5l5 3" /><path d="M7 16.545l5 -3.03" /><path d="M17 16.5l-5 -3l5 -3l5 3v5.5l-5 3z" /><path d="M12 19l5 3" /><path d="M17 16.5l5 -3" /><path d="M12 13.5v-5.5l-5 -3l5 -3l5 3v5.5" /><path d="M7 5.03v5.455" /><path d="M12 8l5 -3" /></svg>
             Kits pai
           </button>
-          <button @click="$emit('open-kit-manager')" class="btn ghost kit-manager">
-            <svg  xmlns="http://www.w3.org/2000/svg"  width="20"  height="20"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-package"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /><path d="M16 5.25l-8 4.5" /></svg>
-            Gerenciar Kits
-          </button>
-          <button @click="$emit('add-sku')" class="btn primary">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Novo SKU
-          </button>
+
+          <template v-if="canEdit">
+            <button @click="$emit('open-package-manager')" class="btn ghost">Gerenciar pacotes</button>
+            <button @click="$emit('open-kit-manager')" class="btn ghost kit-manager">
+              <svg  xmlns="http://www.w3.org/2000/svg"  width="20"  height="20"  viewBox="0 0 24 24"  fill="none"  stroke="currentColor"  stroke-width="2"  stroke-linecap="round"  stroke-linejoin="round"  class="icon icon-tabler icons-tabler-outline icon-tabler-package"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /><path d="M16 5.25l-8 4.5" /></svg>
+              Gerenciar Kits
+            </button>
+            <button @click="$emit('add-sku')" class="btn primary">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Novo SKU
+            </button>
+          </template>
         </div>
       </div>
     </div>
@@ -194,7 +199,7 @@
              </td>
               <td data-label="Volume Total (m³)">{{ calcularVolumeTotalKit(item).toFixed(4) }}</td>
               <td data-label="Ações" class="actions">
-                <button @click="$emit('open-kit-manager')" class="icon" title="Gerenciar Kits">
+                <button v-if="canEdit" @click="$emit('open-kit-manager')" class="icon" title="Gerenciar Kits">
                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                 </button>
               </td>
@@ -237,6 +242,7 @@
               <td data-label="Volume Total (m³)">{{ calcularVolumePorSku(child).toFixed(4) }}</td>
               <td data-label="Ações" class="actions">
                 <button 
+                  v-if="canEdit"
                   @click="$emit('adjust-component-stock', child)" 
                   class="icon component-stock" 
                   title="Ajustar Estoque do Componente"
@@ -253,14 +259,14 @@
                   </svg>
                 </button>
                 <button
-                  v-if="activeKits.length > 0"
+                  v-if="canEdit && activeKits.length > 0"
                   @click="$emit('connect-to-kit', child)"
                   class="icon kit-connect"
                   title="Gerenciar vínculos deste SKU com kits"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.5l-5 -3l5 -3l5 3v5.5l-5 3z"/><path d="M2 13.5v5.5l5 3"/><path d="M7 16.545l5 -3.03"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/></svg>
                 </button>
-                <button @click="$emit('edit-sku', child)" class="icon" title="Editar SKU">
+                <button v-if="canEdit" @click="$emit('edit-sku', child)" class="icon" title="Editar SKU">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1"/><path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z"/><path d="M16 5l3 3"/></svg>
                 </button>
               </td>
@@ -302,6 +308,7 @@
                 <!-- SKU filho vai pelo ajuste de componente, o mesmo da linha
                      aninhada sob o kit: o endpoint geral recusa componentes. -->
                 <button 
+                  v-if="canEdit"
                   @click="$emit(usaAjusteDeComponente(item) ? 'adjust-component-stock' : 'adjust-stock', item)" 
                   class="icon" 
                   :disabled="!canAdjustStock(item)"
@@ -311,17 +318,18 @@
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9l-8 4.5-8-4.5v-9L12 3"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/><path d="M12 12L4 7.5"/><path d="M16 5.25L8 9.75"/></svg>
                 </button>
                 <button 
-                  v-if="activeKits.length > 0"
+                  v-if="canEdit && activeKits.length > 0"
                   @click="$emit('connect-to-kit', item)" 
                   class="icon kit-connect" 
                   title="Gerenciar vínculos deste SKU com kits"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.5l-5 -3l5 -3l5 3v5.5l-5 3z"/><path d="M2 13.5v5.5l5 3"/><path d="M7 16.545l5 -3.03"/><path d="M12 12l8-4.5"/><path d="M12 12v9"/></svg>
                 </button>
-                <button @click="$emit('edit-sku', item)" class="icon" title="Editar SKU">
+                <button v-if="canEdit" @click="$emit('edit-sku', item)" class="icon" title="Editar SKU">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1"/><path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z"/><path d="M16 5l3 3"/></svg>
                 </button>
                 <button 
+                  v-if="canEdit"
                   @click="$emit('delete-sku', item)" 
                   class="icon danger" 
                   :disabled="!canDeleteSku(item)" 
@@ -345,7 +353,7 @@
       <div v-if="!isLoading && !error && filteredSkus.length === 0" class="empty">
         <div class="emoji" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
         <p>Nenhum SKU encontrado.</p>
-        <button v-if="!query && !pkgFilter" class="btn primary" @click="$emit('add-sku')">
+        <button v-if="canEdit && !query && !pkgFilter" class="btn primary" @click="$emit('add-sku')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           Adicionar primeiro SKU
         </button>
@@ -366,6 +374,9 @@ export default defineComponent({
     isLoading: { type: Boolean, required: true },
     error: { type: String, default: null },
     calcularVolumePorSku: { type: Function, required: true },
+    /* Falso na tela do cliente: layout e leitura iguais aos do master, mas
+     * sem cadastrar, ajustar ou excluir — o backend recusa de qualquer forma. */
+    canEdit: { type: Boolean, default: true },
   },
   emits: ['add-sku', 'edit-sku', 'delete-sku', 'adjust-stock', 'adjust-component-stock', 'open-history', 'open-package-manager', 'open-kit-manager', 'open-kit-parents', 'connect-to-kit'],
   setup(props) {
