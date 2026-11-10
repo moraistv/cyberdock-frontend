@@ -9,31 +9,42 @@
       master  → cadastra, ajusta e exclui;
       cliente → consulta: mesmos filtros, mesma busca, mesma hierarquia de kits.
 
-    Antes o cliente caía em outra tela, com os mesmos dados dentro de um modal e
-    duas tabelas repetindo a mesma informação — daí a diferença que ele via.
+    O menu e a barra do topo são montados AQUI, como em toda tela do sistema.
+    O `UserStorageView` é conteúdo de aba (nasce dentro do painel de usuários) e
+    não traz shell próprio: sem este bloco a página abria sem menu nenhum.
   -->
-  <UserStorageView
-    v-if="userId"
-    :user-id="userId"
-    :can-edit="podeAlterar"
-  />
+  <div class="dashboard-wrapper">
+    <SidebarComponent />
 
-  <div v-else class="carregando" role="status">Carregando armazenamento…</div>
+    <div class="main-content">
+      <TopbarComponent />
+
+      <div class="dashboard-content">
+        <UserStorageView
+          v-if="userId"
+          :user-id="userId"
+          :can-edit="podeAlterar"
+        />
+
+        <div v-else class="carregando" role="status">Carregando armazenamento…</div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script>
 import { computed, defineComponent } from 'vue'
 import { useAuth } from '@/composables/useAuth'
+import SidebarComponent from '@/components/SidebarComponent.vue'
+import TopbarComponent from '@/components/TopbarComponent.vue'
 import UserStorageView from './UserStorageView.vue'
 
 export default defineComponent({
   name: 'StorageEntryView',
-  components: { UserStorageView },
+  components: { SidebarComponent, TopbarComponent, UserStorageView },
   setup() {
     const { user, userRole } = useAuth()
 
-    /* O master informa `?cliente=` para abrir o estoque de alguém; sem isso ele
-     * vê o próprio. O cliente sempre vê o dele — o backend recusa outro uid. */
     const userId = computed(() => user.value?.uid || null)
 
     /* Antes de a sessão carregar o papel vale 'usuario': a tela começa somente
@@ -46,9 +57,35 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* Mesma casca das outras telas do sistema: sidebar fixa à esquerda, conteúdo
+ * ocupando o resto. `min-height: 100vh` mantém o fundo cinza até o rodapé
+ * mesmo quando a tabela é curta. */
+.dashboard-wrapper {
+  display: flex;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  background-color: #f3f4f6;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dashboard-content {
+  flex: 1;
+  padding: 2rem;
+}
+
 .carregando {
   padding: 4rem 1rem;
   text-align: center;
   color: #6b7280;
+}
+
+@media (max-width: 760px) {
+  .dashboard-content { padding: 1rem; }
 }
 </style>
