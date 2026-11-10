@@ -8,8 +8,10 @@
                 <tr>
                     <th>Data</th>
                     <th>SKU</th>
+                    <th title="Quando a baixa veio de um kit, qual kit foi vendido">Kit pai</th>
                     <th>Tipo</th>
                     <th>Quantidade</th>
+                    <th>Venda</th>
                     <th>Motivo</th>
                     <th v-if="props.canDelete"><span class="sr-only">Ações</span></th>
                 </tr>
@@ -24,6 +26,12 @@
                 <tr v-for="movement in props.movements" :key="movement.id">
                     <td data-label="Data">{{ formatDate(movement.created_at) }}</td>
                     <td data-label="SKU">{{ movement.sku ? movement.sku : 'N/A' }}</td>
+                    <td data-label="Kit pai">
+                        <span v-if="movement.kit_parent_sku" class="kit-badge" :title="`Baixa gerada pela venda do kit ${movement.kit_parent_sku}`">
+                            {{ movement.kit_parent_sku }}
+                        </span>
+                        <span v-else class="sem-kit">—</span>
+                    </td>
                     <td data-label="Tipo">
                         <span :class="['movement-badge', movement.movement_type]">
                             {{ capitalize(movement.movement_type) }}
@@ -31,6 +39,10 @@
                     </td>
                     <td data-label="Quantidade" :class="['quantity-change', movement.movement_type]">
                         {{ movement.movement_type === 'entrada' ? '+' : '-' }}{{ movement.quantity_change }}
+                    </td>
+                    <td data-label="Venda" class="sale-cell">
+                        <span v-if="movement.related_sale_id">{{ movement.related_sale_id }}</span>
+                        <span v-else class="sem-kit">—</span>
                     </td>
                     <td data-label="Motivo">{{ movement.reason }}</td>
                     <td v-if="props.canDelete" data-label="" class="td-actions">
@@ -76,7 +88,7 @@ const props = defineProps({
 
 const emit = defineEmits(['delete']);
 
-const totalDeColunas = computed(() => (props.canDelete ? 6 : 5));
+const totalDeColunas = computed(() => (props.canDelete ? 8 : 7));
 
 const confirmDelete = async (movement) => {
     if (!props.canDelete) return;
@@ -123,6 +135,25 @@ const capitalize = (s) => {
 .movement-badge.saida { background-color: #dc2626; }
 .quantity-change.entrada { color: #16a34a; font-weight: 600; }
 .quantity-change.saida { color: #dc2626; font-weight: 600; }
+
+/* Kit pai: mesma linguagem visual do selo "SKU FILHO" da tabela de SKUs —
+   a pessoa reconhece que a linha é consequência de um kit, não de uma venda
+   direta. */
+.kit-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    background-color: #eef2ff;
+    border: 1px solid #c7d2fe;
+    color: #3730a3;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.sem-kit { color: #9ca3af; }
+
+.sale-cell { font-variant-numeric: tabular-nums; color: #374151; }
 
 .sr-only {
     position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;

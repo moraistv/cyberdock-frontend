@@ -57,6 +57,7 @@
             <col style="width: 116px" />
             <col style="width: 124px" />
             <col style="width: 112px" />
+            <col style="width: 132px" />
             <col />
           </colgroup>
           <thead class="tbl__head">
@@ -64,6 +65,7 @@
               <th scope="col">Data</th>
               <th scope="col">Tipo</th>
               <th scope="col" class="th-right">Quantidade</th>
+              <th scope="col" title="Quando a baixa veio de um kit, qual kit foi vendido">Kit pai</th>
               <th scope="col">Motivo</th>
             </tr>
           </thead>
@@ -81,6 +83,10 @@
               </td>
               <td class="td-right" :class="m.movement_type">
                 {{ m.movement_type === 'entrada' ? '+' : '-' }}{{ m.quantity_change }}
+              </td>
+              <td class="td-kit">
+                <span v-if="m.kit_parent_sku" class="kit-tag">{{ m.kit_parent_sku }}</span>
+                <span v-else class="vazio">—</span>
               </td>
               <td class="td-reason">{{ m.reason || '—' }}</td>
             </tr>
@@ -338,6 +344,20 @@ export default defineComponent({
 /* O motivo carrega o ID do pedido, que é um número longo sem espaço. Sem quebra
    forçada ele estoura a coluna mesmo com table-layout fixo. */
 .td-reason { color: #374151; overflow-wrap: anywhere; }
+
+/* Kit pai: mesma linguagem do selo "SKU FILHO" da tabela de SKUs. */
+.td-kit { white-space: nowrap; }
+.kit-tag {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 6px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.vazio { color: #9ca3af; }
 
 .chip {
   display: inline-flex; align-items: center; gap: .3rem;

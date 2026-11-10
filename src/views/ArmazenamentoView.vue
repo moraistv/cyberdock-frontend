@@ -880,7 +880,37 @@ const hierarchyItems = computed(() => {
             items.unshift(kitParent);
         }
     });
-    
+
+    /* Filtro de TIPO também vale aqui.
+     *
+     * Antes ele existia só na tabela plana logo acima: a pessoa escolhia
+     * "Somente filho" e a árvore continuava mostrando tudo, o que fazia o
+     * filtro parecer quebrado. As duas tabelas mostram os mesmos dados, então
+     * precisam responder ao mesmo controle.
+     *
+     *   Somente pai  → só os kits (pai e composto), sem filhos nem órfãos;
+     *   Somente filho + Com pai    → os kits que têm filhos, e só os filhos;
+     *   Somente filho + Sem pai    → só os SKUs sem kit pai;
+     *   Somente filho + Com ou sem → tudo, como em "Todos os tipos".
+     */
+    if (skuTypeFilter.value === 'parent') {
+        return items
+            .filter(item => item.type === 'kit-parent' || item.type === 'kit-composto')
+            .map(item => (item.type === 'kit-parent' ? { ...item, children: [] } : item));
+    }
+
+    if (skuTypeFilter.value === 'child') {
+        if (childParentFilter.value === 'with') {
+            return items.filter(item => item.type === 'kit-parent' && item.children.length > 0);
+        }
+        if (childParentFilter.value === 'without') {
+            return items.filter(item => item.type === 'orphan');
+        }
+        // "Com ou sem pai": a árvore inteira, sem os kits compostos soltos,
+        // que são kit e não filho.
+        return items.filter(item => item.type !== 'kit-composto');
+    }
+
     return items;
 });
 
@@ -1580,5 +1610,78 @@ const allItemsForDisplay = computed(() => {
     .movements-prompt { align-items: flex-start; flex-wrap: wrap; }
     .btn-load-movements { width: 100%; }
     .movement-pagination { align-items: stretch; flex-direction: column; text-align: center; }
+
+    /* No telefone, as duas tabelas de estoque viram cartões.
+     *
+     * Antes elas continuavam como tabela: a largura mínima das células empurrava
+     * a tela para além da largura e o cliente precisava arrastar de lado para
+     * ler a quantidade. O rótulo de cada campo vem por `nth-child` porque a
+     * ordem das colunas é fixa e assim não é preciso repetir `data-label` em
+     * cada célula das quatro variações de linha (kit pai, kit composto, filho e
+     * avulso). */
+    .sku-table,
+    .sku-table tbody,
+    .hierarchy-table,
+    .hierarchy-table tbody { display: block; }
+
+    .sku-table thead,
+    .hierarchy-table thead { display: none; }
+
+    .sku-table tr,
+    .hierarchy-table tr {
+        display: block;
+        margin-bottom: 0.75rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.6rem;
+        overflow: hidden;
+    }
+
+    .sku-table td,
+    .hierarchy-table td {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.5rem 0.85rem;
+        text-align: right;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .sku-table td:last-child,
+    .hierarchy-table td:last-child { border-bottom: 0; }
+
+    .sku-table td::before,
+    .hierarchy-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #4b5563;
+        text-align: left;
+        flex-shrink: 0;
+    }
+
+    /* A primeira célula é o nome do item: ocupa a linha inteira, como título. */
+    .sku-table td:first-child,
+    .hierarchy-table td:first-child {
+        display: block;
+        text-align: left;
+        background: #f8fafc;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .sku-table td:first-child::before,
+    .hierarchy-table td:first-child::before { display: none; }
+
+    .hierarchy-table td:nth-child(2)::before { content: "Descrição"; }
+    .hierarchy-table td:nth-child(3)::before { content: "Tipo"; }
+    .hierarchy-table td:nth-child(4)::before { content: "Volume"; }
+    .hierarchy-table td:nth-child(5)::before { content: "Peso"; }
+    .hierarchy-table td:nth-child(6)::before { content: "Quantidade"; }
+    .hierarchy-table td:nth-child(7)::before { content: "Ações"; }
+
+    .sku-table td:nth-child(2)::before { content: "Descrição"; }
+    .sku-table td:nth-child(3)::before { content: "Dimensões"; }
+    .sku-table td:nth-child(4)::before { content: "Peso"; }
+    .sku-table td:nth-child(5)::before { content: "Estoque"; }
+    .sku-table td:nth-child(6)::before { content: "Volume"; }
 }
 </style>
