@@ -318,6 +318,20 @@ async function seedInitialData() {
             await client.query(`INSERT INTO public.services (name, price, description, type, config) VALUES ('Montagem de Full', 0, 'Montagem de pacotes para envio Full. O preço varia com a quantidade.', 'avulso_quantidade', $1) ON CONFLICT (name) DO UPDATE SET config = EXCLUDED.config;`, [JSON.stringify(montagemFullConfig)]);
         }
 
+        // O catálogo guarda o preço sugerido. A edição no lançamento fica só na fatura.
+        await client.query(
+            `INSERT INTO public.services (name, price, description, type, config)
+             VALUES
+                ('Montagem de KIT', 0.40, 'Montagem avulsa por kit.', 'avulso_quantidade', $1),
+                ('Montagem de Produto', 0.40, 'Montagem avulsa por produto.', 'avulso_quantidade', $2)
+             ON CONFLICT (name) DO NOTHING;`,
+            ['Quantidade de kits', 'Quantidade de produtos'].map(quantity_label => JSON.stringify({
+                tiers: [{ from: 1, to: null, price: 0.40 }],
+                quantity_label,
+                allow_unit_price_override: true,
+            }))
+        );
+
         const defaultStatuses = [ { value: 'custom_01_imprimir_etiqueta', label: '01 Imprimir Etiqueta' }, { value: 'custom_02_preparar_pacote', label: '02 Preparar Pacote' }, { value: 'custom_03_pacote_embalado', label: '03 Pacote Embalado' }, { value: 'custom_04_aguardando_coleta', label: '04 Aguardando Coleta' }, { value: 'custom_05_enviado', label: '05 Enviado' }, { value: 'custom_05_despachado', label: '05 Despachado' } ];
         const statusesCheck = await client.query("SELECT 1 FROM public.system_settings WHERE key = 'sales_statuses'");
         if (statusesCheck.rows.length === 0) {

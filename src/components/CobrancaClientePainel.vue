@@ -286,8 +286,12 @@
               <label :for="`av-qtd-${idBase}`">{{ servicoSelecionado?.config?.quantity_label || 'Quantidade' }}</label>
               <input :id="`av-qtd-${idBase}`" v-model.number="avulsoForm.quantity" type="number" min="1" step="1" required />
             </div>
+            <div v-if="avulsoPrecoEditavel" class="campo">
+              <label :for="`av-preco-${idBase}`">Valor unitário (R$)</label>
+              <input :id="`av-preco-${idBase}`" v-model.number="avulsoForm.unitPrice" type="number" min="0" step="0.01" required />
+            </div>
           </div>
-          <small v-if="servicoSelecionado?.config?.tiers?.length" class="avulso__dica">
+          <small v-if="!avulsoPrecoEditavel && servicoSelecionado?.config?.tiers?.length" class="avulso__dica">
             Preço por faixa:
             <template v-for="(faixa, i) in servicoSelecionado.config.tiers" :key="i">
               <template v-if="i"> · </template>{{ faixa.from }}{{ faixa.to ? `-${faixa.to}` : '+' }}: {{ formatarMoeda(faixa.price) }}
@@ -796,9 +800,13 @@ watch(
 
 /* ============================ Avulsos ============================ */
 
-const avulsoForm = ref({ aberto: false, serviceId: '', quantity: 1, serviceDate: '', erro: '' });
+const avulsoForm = ref({ aberto: false, serviceId: '', quantity: 1, unitPrice: null, serviceDate: '', erro: '' });
 const servicoSelecionado = computed(() => manualServices.value.find((s) => s.id === avulsoForm.value.serviceId) || null);
 const avulsoPorQuantidade = computed(() => servicoSelecionado.value?.type === 'avulso_quantidade');
+const avulsoPrecoEditavel = computed(() => avulsoPorQuantidade.value && servicoSelecionado.value?.config?.allow_unit_price_override === true);
+watch(servicoSelecionado, (servico) => {
+  avulsoForm.value.unitPrice = avulsoPrecoEditavel.value ? servico.price : null;
+});
 
 /* Data sugerida: hoje no mês corrente; numa competência passada, o último dia
  * dela — o serviço lançado ali foi feito naquele mês, não hoje. */
@@ -810,7 +818,7 @@ function dataSugeridaDoAvulso() {
 
 async function abrirAvulso() {
   fecharFormularios();
-  avulsoForm.value = { aberto: true, serviceId: '', quantity: 1, serviceDate: dataSugeridaDoAvulso(), erro: '' };
+  avulsoForm.value = { aberto: true, serviceId: '', quantity: 1, unitPrice: null, serviceDate: dataSugeridaDoAvulso(), erro: '' };
   if (!manualServices.value.length) await fetchManualServices();
 }
 
@@ -831,6 +839,7 @@ async function lancarAvulso() {
     period: periodo.value,
     serviceId: form.serviceId,
     quantity: avulsoPorQuantidade.value ? form.quantity : null,
+    unitPrice: avulsoPrecoEditavel.value ? form.unitPrice : undefined,
     serviceDate: form.serviceDate,
   }), { sucesso: `${nome} lançado na fatura.` });
   if (ok) avulsoForm.value.aberto = false;

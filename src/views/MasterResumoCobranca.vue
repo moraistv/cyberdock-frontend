@@ -813,12 +813,17 @@
               >
               <!-- Serviço com faixas: o preço unitário sai da quantidade, então
                    dizer as faixas aqui evita a surpresa no total da fatura. -->
-              <small v-if="selectedService?.config?.tiers?.length" class="form-hint">
+              <small v-if="!isUnitPriceEditable && selectedService?.config?.tiers?.length" class="form-hint">
                 Preço por faixa:
                 <template v-for="(tier, ti) in selectedService.config.tiers" :key="ti">
                   <template v-if="ti"> · </template>{{ tier.from }}{{ tier.to ? `-${tier.to}` : '+' }}: {{ formatCurrency(tier.price) }}
                 </template>
               </small>
+            </div>
+
+            <div v-if="isUnitPriceEditable" class="form-group">
+              <label for="manual-unit-price">Valor unitário (R$)</label>
+              <input id="manual-unit-price" v-model.number="manualService.unitPrice" type="number" min="0" step="0.01">
             </div>
 
             <p v-if="manualServiceError" class="error-text">{{ manualServiceError }}</p>
@@ -957,6 +962,7 @@ const manualServiceError = ref('');
 const manualService = ref({
   serviceId: '',
   quantity: 1,
+  unitPrice: null,
   serviceDate: new Date().toISOString().split('T')[0]
 });
 
@@ -1755,6 +1761,10 @@ async function removeManualItem(item) {
 const selectedService = computed(() =>
   manualServices.value.find(s => s.id === manualService.value.serviceId) || null
 );
+const isUnitPriceEditable = computed(() => isQuantityServiceSelected.value && selectedService.value?.config?.allow_unit_price_override === true);
+watch(selectedService, (service) => {
+  manualService.value.unitPrice = isUnitPriceEditable.value ? service.price : null;
+});
 
 const formatCurrency = (value) => {
   if (typeof value !== 'number') value = parseFloat(value || 0);
@@ -1805,6 +1815,7 @@ const openManualServiceModal = async () => {
   manualService.value = {
     serviceId: '',
     quantity: 1,
+    unitPrice: null,
     serviceDate: new Date().toISOString().split('T')[0]
   };
   manualServiceError.value = '';
@@ -1831,6 +1842,7 @@ const submitManualService = async () => {
       period: selectedPeriod.value,
       serviceId: manualService.value.serviceId,
       quantity: isQuantityServiceSelected.value ? manualService.value.quantity : null,
+      unitPrice: isUnitPriceEditable.value ? manualService.value.unitPrice : undefined,
       serviceDate: manualService.value.serviceDate
     });
     closeManualServiceModal();
